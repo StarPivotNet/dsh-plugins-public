@@ -154,9 +154,9 @@
 }
 
 .cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -207,23 +207,15 @@
 
 .card {
   box-sizing: border-box;
-  flex: 0 0 calc((100% - 32px) / 5);
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 10px;
   background: var(--dsw-alias-bg-layer-3);
-  padding: 10px 10px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.cardTop {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
 }
 
 .cardTitle {
@@ -231,6 +223,7 @@
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 13px;
   line-height: 18px;
   font-weight: 600;
@@ -239,11 +232,8 @@
 .packageName,
 .description {
   margin: 0;
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
   line-height: 16px;
@@ -251,12 +241,21 @@
 
 .packageName {
   font-family: var(--ds-font-family-code);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  margin-top: auto;
 }
 
 .button {
@@ -277,9 +276,13 @@
 }
 
 .tag {
+  align-self: flex-start;
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   min-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border-radius: 5px;
   padding: 1px 6px;
   background: var(--dsw-alias-bg-layer-1);

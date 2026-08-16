@@ -19,7 +19,7 @@ Git-hosted packages run their `prepare` script on install. If pnpm ≥10 blocks 
 
 After restart, Settings → 插件 becomes:
 
-- **发现** — fetch one or more operator JSON catalogs from http(s) marketplace URLs; five plugin cards per row
+- **发现** — fetch one or more operator JSON catalogs from http(s) marketplace URLs; four plugin cards per row
 - **已安装** — list, uninstall, and toggle single Loader entries
 - the shipped Shell / Agent loop / Web search cards stay under Installed
 

@@ -344,12 +344,9 @@ function DiscoverPage(props: {
               const already = props.installedNames.has(entry.name)
               return (
                 <li className={css.card} key={entry.name} data-plugin-name={entry.name}>
-                  <div className={css.cardTop}>
-                    <h3 className={css.cardTitle}>{entry.title}</h3>
-                    {already ? <span className={css.tag}>{t('installedTag')}</span> : null}
-                  </div>
-                  <p className={css.packageName}>{entry.name}{entry.version.length > 0 ? `@${entry.version}` : ''}</p>
-                  <p className={css.sourceLabel}>{entry.sourceTitle}</p>
+                  {already ? <span className={css.tag}>{t('installedTag')}</span> : <span className={css.tag}>{entry.sourceTitle}</span>}
+                  <h3 className={css.cardTitle} title={entry.title}>{entry.title}</h3>
+                  <p className={css.packageName} title={entry.name + (entry.version.length > 0 ? '@' + entry.version : '')}>{entry.name}{entry.version.length > 0 ? `@${entry.version}` : ''}</p>
                   <p className={css.description}>{entry.description}</p>
                   <div className={css.actions}>
                     <button
@@ -411,13 +408,11 @@ function InstalledPage(props: {
           <ul className={css.cards}>
             {props.filtered.map((entry) => (
               <li className={css.card} key={entry.packageName} data-plugin-name={entry.packageName}>
-                <div className={css.cardTop}>
-                  <h3 className={css.cardTitle}>{entry.packageName}</h3>
-                  <span className={css.tag}>
-                    {t(entry.kind === 'inbox' ? 'inboxTag' : entry.kind === 'bundle' ? 'bundleTag' : 'dependencyTag')}
-                  </span>
-                </div>
-                {entry.spec.length > 0 ? <p className={css.packageName}>{entry.spec}</p> : null}
+                <span className={css.tag}>
+                  {t(entry.kind === 'inbox' ? 'inboxTag' : entry.kind === 'bundle' ? 'bundleTag' : 'dependencyTag')}
+                </span>
+                <h3 className={css.cardTitle} title={entry.packageName}>{entry.packageName}</h3>
+                {entry.spec.length > 0 ? <p className={css.packageName} title={entry.spec}>{entry.spec}</p> : null}
                 <div className={css.actions}>
                   {entry.canToggle && entry.entryIds[0] !== undefined ? (
                     <button

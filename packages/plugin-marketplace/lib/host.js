@@ -203,15 +203,6 @@ function cachedSourceFromFetch(source, entries) {
   return { ...source, entries };
 }
 
-// src/host/commands.ts
-import { fileURLToPath } from "node:url";
-import { dirname, join as join2 } from "node:path";
-import {
-  readProfileManifest,
-  reconcileProfilePlugins,
-  runProfilePnpm
-} from "@deepseek-ai/dsh-app-boot";
-
 // src/host/reload.ts
 var SKELETON_LEAF_IDS = /* @__PURE__ */ new Set([
   "webserver",
@@ -406,6 +397,31 @@ async function requestBrowserReboot(settings, ns) {
   await settings?.update?.(ns, { rebootNonce: next });
   return next;
 }
+
+// src/host/command-targets.ts
+function listReloadTargets(entries) {
+  const seen = /* @__PURE__ */ new Set();
+  const targets = [];
+  for (const entry of entries) {
+    if (!entry.enabled || isSkeletonEntry(entry.id, entry.moduleName)) continue;
+    if (seen.has(entry.id)) continue;
+    seen.add(entry.id);
+    targets.push({ id: entry.id, moduleName: entry.moduleName });
+  }
+  return targets;
+}
+function listUpdateTargets(dependencies) {
+  return [...dependencies].sort((left, right) => left.localeCompare(right)).map((name2) => ({ name: name2 }));
+}
+
+// src/host/commands.ts
+import { fileURLToPath } from "node:url";
+import { dirname, join as join2 } from "node:path";
+import {
+  readProfileManifest,
+  reconcileProfilePlugins,
+  runProfilePnpm
+} from "@deepseek-ai/dsh-app-boot";
 
 // src/host/update.ts
 function resolveUpdateTarget(dependencies, rawInput) {
@@ -887,6 +903,16 @@ function apply(ctx, config = {}) {
       }
       return { profileName: profile.name, entries: [...byPackage.values()] };
     },
+    listCommandTargets() {
+      const reload = listReloadTargets([...ctx.loader.entries()].filter((entry) => !entry.options.group).map((entry) => ({
+        id: entry.id,
+        moduleName: String(entry.options.name ?? ""),
+        enabled: !entry.disabled
+      })));
+      const profile = requireProfile(ctx);
+      const manifest = readProfileManifest2("plugin-marketplace", profile.dir);
+      return { reload, update: listUpdateTargets(Object.keys(manifest.dependencies ?? {})) };
+    },
     listCatalog() {
       const urls = effectiveCatalogUrls(ctx, resolved.catalogUrls);
       if (urls.length === 0) return emptyCatalog();
@@ -990,6 +1016,8 @@ function apply(ctx, config = {}) {
       switch (endpoint) {
         case "listInstalled":
           return { ok: true, value: marketplace.listInstalled() };
+        case "listCommandTargets":
+          return { ok: true, value: marketplace.listCommandTargets() };
         case "listCatalog":
           return { ok: true, value: marketplace.listCatalog() };
         case "refreshCatalog":

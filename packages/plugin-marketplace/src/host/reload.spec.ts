@@ -9,6 +9,7 @@ import {
   requestBrowserReboot, requestBrowserReload, selectClientReloadIds, selectReloadEntries,
   snapshotFromSettings,
 } from './reload.ts'
+import { listReloadTargets, listUpdateTargets } from './command-targets.ts'
 import { resolveUpdateTarget } from './update.ts'
 import { argvWithPort, rebootBlocked, REBOOT_ENV } from './reboot.ts'
 import { pinAutoReloadOff } from './hmr-pin.ts'
@@ -112,6 +113,15 @@ assert(
     === '@deepseek-ai/dsh-client-ui-conversation',
   'named UI plugin reloads only that page plugin',
 )
+const reloadNames = listReloadTargets([
+  { id: 'connection', moduleName: '@deepseek-ai/dsh-client-connection', enabled: true },
+  { id: 'plugin-marketplace', moduleName: '@starpivot/dsh-plugin-marketplace/host', enabled: true },
+  { id: 'ui-conversation', moduleName: '@deepseek-ai/dsh-client-ui-conversation', enabled: true },
+  { id: 'disabled', moduleName: 'plain-lib', enabled: false },
+])
+assert(reloadNames.map(entry => entry.id).join(',') === 'plugin-marketplace,ui-conversation', 'complete only reloadable entries')
+assert(listUpdateTargets(['plain-lib', '@starpivot/dsh-plugin-marketplace']).map(entry => entry.name).join(',')
+  === '@starpivot/dsh-plugin-marketplace,plain-lib', 'update completion is sorted')
 assert(resolveUpdateTarget(['@starpivot/dsh-plugin-marketplace', 'plain-lib'], '').kind === 'all', 'update all')
 assert(resolveUpdateTarget(['plain-lib'], 'plain-lib').kind === 'one', 'update one')
 assert(resolveUpdateTarget(['plain-lib'], 'cordis:include').kind === 'none', 'inbox cannot update')

@@ -4,7 +4,7 @@ Out-of-tree DeepSeek Harness marketplace bundle. Install with `dsh plugin --prof
 
 ## Architecture
 
-Host half (`src/host`) registers loopback RPC at `/plugin-marketplace` and slash commands `/reload`, `/update`, `/reboot`. Browser half (`src/client`) replaces the shipped Plugins settings page.
+Host half (`src/host`) registers loopback RPC at `/plugin-marketplace` and slash commands `/reload`, `/update`, `/reboot`. Browser half (`src/client`) replaces the shipped Plugins settings page and hangs a searchable plugin-name popup on bare `/reload` and `/update`.
 
 Discover reads the last cached catalog from settings immediately, then refreshes in the background. Manual fetch can target every configured source or one source URL. The shipped default is `DEFAULT_CATALOG_URL` in `src/host/defaults.ts`, also set on the `plugin-marketplace` row in `cordis.patch.yml`. The catalog itself lives in `StarPivotNet/dsh-plugin-catalog`.
 

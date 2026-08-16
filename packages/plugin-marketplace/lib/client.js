@@ -78,7 +78,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var MarketplaceSettingsSection_default = { "cardBody": "DYfBnq_cardBody", "packageName": "DYfBnq_packageName", "sources": "DYfBnq_sources", "card": "DYfBnq_card", "dialogHeader": "DYfBnq_dialogHeader", "dialogTitle": "DYfBnq_dialogTitle", "field": "DYfBnq_field", "dialogDescription": "DYfBnq_dialogDescription", "dialogMask": "DYfBnq_dialogMask", "dialogRoot": "DYfBnq_dialogRoot", "cardHit": "DYfBnq_cardHit", "sourceMain": "DYfBnq_sourceMain", "tab": "DYfBnq_tab", "spin": "DYfBnq_spin", "tag": "DYfBnq_tag", "empty": "DYfBnq_empty", "dialogFooter": "DYfBnq_dialogFooter", "dialogClose": "DYfBnq_dialogClose", "headingRow": "DYfBnq_headingRow", "list": "DYfBnq_list", "marketRow": "DYfBnq_marketRow", "sourceActions": "DYfBnq_sourceActions", "section": "DYfBnq_section", "sourceLabel": "DYfBnq_sourceLabel", "description": "DYfBnq_description", "actions": "DYfBnq_actions", "cards": "DYfBnq_cards", "heading": "DYfBnq_heading", "failure": "DYfBnq_failure", "tabs": "DYfBnq_tabs", "configList": "DYfBnq_configList", "cardTitle": "DYfBnq_cardTitle", "status": "DYfBnq_status", "dialog": "DYfBnq_dialog", "dialogMeta": "DYfBnq_dialogMeta", "panel": "DYfBnq_panel", "cardAside": "DYfBnq_cardAside", "marketplace-spin": "DYfBnq_marketplace-spin", "dialogCode": "DYfBnq_dialogCode", "catalogCards": "DYfBnq_catalogCards", "button": "DYfBnq_button", "reloadToast": "DYfBnq_reloadToast", "restart": "DYfBnq_restart", "search": "DYfBnq_search", "catalogCard": "DYfBnq_catalogCard", "iconButton": "DYfBnq_iconButton", "source": "DYfBnq_source", "visuallyHidden": "DYfBnq_visuallyHidden" };
+var MarketplaceSettingsSection_default = { "catalogCard": "DYfBnq_catalogCard", "cardBody": "DYfBnq_cardBody", "cardTitle": "DYfBnq_cardTitle", "sourceMain": "DYfBnq_sourceMain", "tabs": "DYfBnq_tabs", "button": "DYfBnq_button", "description": "DYfBnq_description", "heading": "DYfBnq_heading", "tab": "DYfBnq_tab", "search": "DYfBnq_search", "visuallyHidden": "DYfBnq_visuallyHidden", "dialogMask": "DYfBnq_dialogMask", "empty": "DYfBnq_empty", "marketplace-spin": "DYfBnq_marketplace-spin", "actions": "DYfBnq_actions", "reloadToast": "DYfBnq_reloadToast", "dialogTitle": "DYfBnq_dialogTitle", "sources": "DYfBnq_sources", "iconButton": "DYfBnq_iconButton", "dialogFooter": "DYfBnq_dialogFooter", "spin": "DYfBnq_spin", "restart": "DYfBnq_restart", "sourceActions": "DYfBnq_sourceActions", "packageName": "DYfBnq_packageName", "dialog": "DYfBnq_dialog", "cardHit": "DYfBnq_cardHit", "field": "DYfBnq_field", "failure": "DYfBnq_failure", "dialogDescription": "DYfBnq_dialogDescription", "dialogRoot": "DYfBnq_dialogRoot", "configList": "DYfBnq_configList", "source": "DYfBnq_source", "tag": "DYfBnq_tag", "panel": "DYfBnq_panel", "card": "DYfBnq_card", "dialogClose": "DYfBnq_dialogClose", "cardAside": "DYfBnq_cardAside", "headingRow": "DYfBnq_headingRow", "sourceLabel": "DYfBnq_sourceLabel", "cards": "DYfBnq_cards", "status": "DYfBnq_status", "list": "DYfBnq_list", "dialogHeader": "DYfBnq_dialogHeader", "dialogCode": "DYfBnq_dialogCode", "section": "DYfBnq_section", "catalogCards": "DYfBnq_catalogCards", "marketRow": "DYfBnq_marketRow", "dialogMeta": "DYfBnq_dialogMeta" };
 
 // src/client/MarketplaceSettingsSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -739,6 +739,28 @@ function ConfigurePage(props) {
   ] });
 }
 
+// src/client/command-picker.ts
+function reloadPickOptions(targets, allLabel, allDetail) {
+  const rows = [{ id: "", label: allLabel, detail: allDetail }];
+  for (const target of targets) {
+    rows.push({
+      id: target.id,
+      label: target.id,
+      ...target.moduleName.length > 0 && target.moduleName !== target.id ? { detail: target.moduleName } : {}
+    });
+  }
+  return rows;
+}
+function updatePickOptions(targets, allLabel, allDetail) {
+  return [
+    { id: "", label: allLabel, detail: allDetail },
+    ...targets.map((target) => ({ id: target.name, label: target.name }))
+  ];
+}
+function commandLine(name, plugin) {
+  return plugin.length === 0 ? `/${name}` : `/${name} ${plugin}`;
+}
+
 // src/client/ReloadCommandCard.tsx
 var import_react2 = require("react");
 var import_dsh_client_ui_primitives2 = require("@deepseek-ai/dsh-client-ui-primitives");
@@ -819,7 +841,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css2;
   document.head.appendChild(tag);
 }
-var ReloadCommandCard_default = { "summary": "_998sQa_summary", "leading": "_998sQa_leading", "chevron": "_998sQa_chevron", "separator": "_998sQa_separator", "title": "_998sQa_title", "body": "_998sQa_body", "row": "_998sQa_row", "root": "_998sQa_root" };
+var ReloadCommandCard_default = { "separator": "_998sQa_separator", "row": "_998sQa_row", "title": "_998sQa_title", "summary": "_998sQa_summary", "chevron": "_998sQa_chevron", "leading": "_998sQa_leading", "root": "_998sQa_root", "body": "_998sQa_body" };
 
 // src/client/ReloadCommandCard.tsx
 var import_jsx_runtime2 = require("react/jsx-runtime");
@@ -1094,7 +1116,11 @@ var zh = {
   cards: "\u53EF\u914D\u7F6E\u63D2\u4EF6",
   configureEmpty: "\u8FD9\u4E2A\u90E8\u7F72\u6CA1\u6709\u53EF\u914D\u7F6E\u7684\u63D2\u4EF6\u3002",
   reloadProgress: "\u6B63\u5728\u91CD\u8F7D\u63D2\u4EF6",
-  reloadDone: "\u91CD\u8F7D\u5B8C\u6210"
+  reloadDone: "\u91CD\u8F7D\u5B8C\u6210",
+  reloadAll: "\u5168\u90E8\u53EF\u91CD\u8F7D\u63D2\u4EF6",
+  reloadAllDetail: "\u4E0D\u5199\u540D\u5B57\u5219\u91CD\u8F7D\u5168\u90E8",
+  updateAll: "\u5168\u90E8\u4F9D\u8D56",
+  updateAllDetail: "\u4E0D\u5199\u540D\u5B57\u5219\u66F4\u65B0\u5168\u90E8"
 };
 var en = {
   nav: "Plugins",
@@ -1158,12 +1184,16 @@ var en = {
   cards: "Configurable plugins",
   configureEmpty: "This deployment exposes no plugin settings.",
   reloadProgress: "Reloading plugins",
-  reloadDone: "Reload finished"
+  reloadDone: "Reload finished",
+  reloadAll: "All reloadable plugins",
+  reloadAllDetail: "Leave the name blank to reload everything allowed",
+  updateAll: "All dependencies",
+  updateAllDetail: "Leave the name blank to update every profile dependency"
 };
 
 // src/client/index.ts
 var NS = "settings.pluginMarketplace";
-var inject = ["slots", "locale", "settingsScope", "connection", "loader", "modules"];
+var inject = ["slots", "locale", "settingsScope", "connection", "loader", "modules", "commandUi", "sessions"];
 function marketplaceCaller(ctx) {
   const rpc = ctx.get("connection").rpc;
   return async (method, body) => {
@@ -1312,6 +1342,31 @@ function apply(ctx) {
     key: "reboot",
     locale: NS
   }, commandCard));
+  const command = ctx.get("commandUi");
+  const sessions = ctx.get("sessions");
+  if (command !== void 0 && sessions !== void 0) {
+    const decorateNamed = (name) => {
+      ctx.effect(() => command.decorate({
+        name,
+        available: () => true,
+        ui: {
+          kind: "popupSelect",
+          options: async () => {
+            const targets = await callMarketplace("listCommandTargets");
+            return name === "reload" ? reloadPickOptions(targets.reload, t("reloadAll"), t("reloadAllDetail")) : updatePickOptions(targets.update, t("updateAll"), t("updateAllDetail"));
+          },
+          onSelect: async (option, session) => {
+            const live = sessions.get(session.sessionId);
+            const result = await live.command(commandLine(name, option.id));
+            if (!result.ok) throw new Error(`pluginMarketplace.${name} failed: ${result.error.message}`);
+            if (!result.value.matched) throw new Error(`the host offers no /${name} command`);
+          }
+        }
+      }), `plugin-marketplace: /${name} picker`);
+    };
+    decorateNamed("reload");
+    decorateNamed("update");
+  }
   ctx.slots.inject("settings.section", () => ctx.slots.register({
     name: "settings.section",
     id: "plugins",

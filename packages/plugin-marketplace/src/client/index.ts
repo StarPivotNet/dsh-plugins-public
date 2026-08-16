@@ -1,9 +1,10 @@
 /** Out-of-tree marketplace page. Mounts over the shipped Plugins settings section. */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, SessionFace } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { CommandUiContract } from '@deepseek-ai/dsh-client-ui-commands/client'
 import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import {
@@ -11,6 +12,7 @@ import {
   type MarketplaceMutationResult,
   type MarketplaceSettingsSectionInjected,
 } from './MarketplaceSettingsSection.tsx'
+import { commandLine, reloadPickOptions, updatePickOptions, type CommandTargets } from './command-picker.ts'
 import { ReloadCommandCard } from './ReloadCommandCard.tsx'
 import { ReloadProgressToast, type ReloadProgress } from './ReloadProgressToast.tsx'
 import { reloadMarketplacePage, type MarketplacePageReloadHost } from './reload-page.ts'
@@ -22,7 +24,7 @@ import { en, zh } from './locales.ts'
 
 export const NS = 'settings.pluginMarketplace'
 export { MARKETPLACE_CLIENT_PACKAGE } from './reload-page.ts'
-export const inject = ['slots', 'locale', 'settingsScope', 'connection', 'loader', 'modules']
+export const inject = ['slots', 'locale', 'settingsScope', 'connection', 'loader', 'modules', 'commandUi', 'sessions']
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -187,6 +189,34 @@ export function apply(ctx: ClientContext): void {
     key: 'reboot',
     locale: NS,
   }, commandCard))
+
+  const command = ctx.get('commandUi') as CommandUiContract | undefined
+  const sessions = ctx.get('sessions') as { get(id: string): SessionFace } | undefined
+  if (command !== undefined && sessions !== undefined) {
+    const decorateNamed = (name: 'reload' | 'update'): void => {
+      ctx.effect(() => command.decorate({
+        name,
+        available: () => true,
+        ui: {
+          kind: 'popupSelect',
+          options: async () => {
+            const targets = await callMarketplace<CommandTargets>('listCommandTargets')
+            return name === 'reload'
+              ? reloadPickOptions(targets.reload, t('reloadAll'), t('reloadAllDetail'))
+              : updatePickOptions(targets.update, t('updateAll'), t('updateAllDetail'))
+          },
+          onSelect: async (option, session) => {
+            const live = sessions.get(session.sessionId)
+            const result = await live.command(commandLine(name, option.id))
+            if (!result.ok) throw new Error(`pluginMarketplace.${name} failed: ${result.error.message}`)
+            if (!result.value.matched) throw new Error(`the host offers no /${name} command`)
+          },
+        },
+      }), `plugin-marketplace: /${name} picker`)
+    }
+    decorateNamed('reload')
+    decorateNamed('update')
+  }
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',

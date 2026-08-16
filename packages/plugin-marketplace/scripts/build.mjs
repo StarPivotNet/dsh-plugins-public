@@ -87,6 +87,7 @@ const client = await esbuild.build({
     '@deepseek-ai/dsh-client-locale/client',
     '@deepseek-ai/dsh-client-ui-settings/client',
     '@deepseek-ai/dsh-client-ui-conversation/client',
+    '@deepseek-ai/dsh-client-ui-commands/client',
     '@deepseek-ai/dsh-client-ui-primitives',
   ],
   plugins: [cssPlugin],

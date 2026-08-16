@@ -24,6 +24,7 @@ import {
   cachedSourceFromFetch, emptyCache, isCatalogCache, mergeCachedSource,
   pruneCacheToUrls, snapshotFromCache, type CatalogCache,
 } from './catalog-cache.ts'
+import { listReloadTargets, listUpdateTargets } from './command-targets.ts'
 import { registerMarketplaceCommands } from './commands.ts'
 import { DEFAULT_CATALOG_URL } from './defaults.ts'
 import { CLIENT_HMR_NAMESPACE, pinAutoReloadOff } from './hmr-pin.ts'
@@ -226,6 +227,18 @@ export function apply(ctx: Context, config: Config = {}): void {
       }
       return { profileName: profile.name, entries: [...byPackage.values()] }
     },
+    listCommandTargets(): { reload: ReturnType<typeof listReloadTargets>; update: ReturnType<typeof listUpdateTargets> } {
+      const reload = listReloadTargets([...ctx.loader.entries()]
+        .filter(entry => !entry.options.group)
+        .map(entry => ({
+          id: entry.id,
+          moduleName: String(entry.options.name ?? ''),
+          enabled: !entry.disabled,
+        })))
+      const profile = requireProfile(ctx)
+      const manifest = readProfileManifest('plugin-marketplace', profile.dir)
+      return { reload, update: listUpdateTargets(Object.keys(manifest.dependencies ?? {})) }
+    },
     listCatalog(): CatalogSnapshot {
       const urls = effectiveCatalogUrls(ctx, resolved.catalogUrls)
       if (urls.length === 0) return emptyCatalog()
@@ -330,6 +343,8 @@ export function apply(ctx: Context, config: Config = {}): void {
       switch (endpoint) {
         case 'listInstalled':
           return { ok: true, value: marketplace.listInstalled() }
+        case 'listCommandTargets':
+          return { ok: true, value: marketplace.listCommandTargets() }
         case 'listCatalog':
           return { ok: true, value: marketplace.listCatalog() }
         case 'refreshCatalog':

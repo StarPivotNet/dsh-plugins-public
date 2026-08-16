@@ -63,6 +63,10 @@ export const zh = {
   configureEmpty: '这个部署没有可配置的插件。',
   reloadProgress: '正在重载插件',
   reloadDone: '重载完成',
+  reloadAll: '全部可重载插件',
+  reloadAllDetail: '不写名字则重载全部',
+  updateAll: '全部依赖',
+  updateAllDetail: '不写名字则更新全部',
 } satisfies Record<string, string>
 
 export type MarketplaceLocaleKey = keyof typeof zh
@@ -130,4 +134,8 @@ export const en = {
   configureEmpty: 'This deployment exposes no plugin settings.',
   reloadProgress: 'Reloading plugins',
   reloadDone: 'Reload finished',
+  reloadAll: 'All reloadable plugins',
+  reloadAllDetail: 'Leave the name blank to reload everything allowed',
+  updateAll: 'All dependencies',
+  updateAllDetail: 'Leave the name blank to update every profile dependency',
 } satisfies Record<MarketplaceLocaleKey, string>

@@ -15,11 +15,9 @@
   font-weight: 600;
 }
 
-.intro,
 .status,
 .empty,
-.restart,
-.hint {
+.restart {
   margin: 0;
   font-size: 13px;
   line-height: 20px;

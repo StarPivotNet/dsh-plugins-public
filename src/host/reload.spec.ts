@@ -30,7 +30,7 @@ try {
   assert(parsedCatalog.ok, 'local catalog parses')
   if (parsedCatalog.ok) {
     assert(parsedCatalog.title === 'StarPivot', 'catalog title')
-    assert(parsedCatalog.entries.map(entry => entry.name).join(',') === '@dsh-plugin/dsh-auxiliary,@dsh-plugin/dsh-thought-buddy,dsh-find-plugin', 'catalog names')
+    assert(parsedCatalog.entries.map(entry => entry.name).join(',') === '@starpivot/dsh-plugin-marketplace,@dsh-plugin/dsh-auxiliary,@dsh-plugin/dsh-thought-buddy,dsh-find-plugin', 'catalog names')
     assert(parsedCatalog.entries.every(entry => entry.kind === 'bundle'), 'catalog bundles only')
   }
 } catch (error) {

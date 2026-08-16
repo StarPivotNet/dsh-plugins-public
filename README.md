@@ -7,7 +7,8 @@ Public out-of-tree DeepSeek Harness plugins. This repository currently ships one
 From a machine that already has `dsh`:
 
 ```sh
-dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public
+dsh plugin --profile web add @starpivot/dsh-plugin-marketplace
+# or, from git: dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public
 # restart dsh web
 ```
 
@@ -19,7 +20,7 @@ Git-hosted packages run their `prepare` script on install. If pnpm ≥10 blocks 
 
 After restart, Settings → 插件 becomes:
 
-- **发现** — fetch one or more operator JSON catalogs from http(s) marketplace URLs; four plugin cards per row
+- **发现** — fetch one or more operator JSON catalogs from http(s) marketplace URLs; responsive cards with install on the right, hover for the full description, click the card for the full listing
 - **已安装** — list, uninstall, and toggle single Loader entries
 - **配置** — the shipped Shell / Agent loop / Web search cards
 

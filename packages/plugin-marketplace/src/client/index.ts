@@ -149,6 +149,7 @@ export function apply(ctx: ClientContext): void {
   const injected = (): MarketplaceSettingsSectionInjected => ({
     listInstalled: () => callMarketplace('listInstalled'),
     listCatalog: () => callMarketplace('listCatalog'),
+    refreshCatalog: url => callMarketplace('refreshCatalog', url === undefined ? {} : { url }),
     install: async (name, version) => mutation(await callMarketplace(
       'install',
       version === undefined ? { name } : { name, version },

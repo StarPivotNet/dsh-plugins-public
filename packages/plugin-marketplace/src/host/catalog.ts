@@ -121,5 +121,5 @@ export function normalizeCatalogUrls(raw: unknown, fallback = ''): string[] {
 }
 
 export function emptyCatalog(): CatalogSnapshot {
-  return { configured: false, sources: [], entries: [] }
+  return { configured: false, sources: [], entries: [], fetchedAt: 0 }
 }

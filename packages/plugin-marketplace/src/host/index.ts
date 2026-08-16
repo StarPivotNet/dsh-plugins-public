@@ -20,6 +20,10 @@ import {
   emptyCatalog, isCatalogUrl, MAX_CATALOG_BYTES, normalizeCatalogUrls,
   parseCatalogDocument, sourceTitleFromUrl,
 } from './catalog.ts'
+import {
+  cachedSourceFromFetch, emptyCache, isCatalogCache, mergeCachedSource,
+  pruneCacheToUrls, snapshotFromCache, type CatalogCache,
+} from './catalog-cache.ts'
 import { registerMarketplaceCommands } from './commands.ts'
 import { DEFAULT_CATALOG_URL } from './defaults.ts'
 import { CLIENT_HMR_NAMESPACE, pinAutoReloadOff } from './hmr-pin.ts'
@@ -87,6 +91,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     }
     settings.register(SETTINGS_NS, z.object({
       catalogUrls: z.array(z.string()).default([]),
+      catalogCache: z.any().default(emptyCache()),
       reloadNonce: z.number().default(0),
       rebootNonce: z.number().default(0),
       reloadClientIds: z.array(z.string()).default([]),
@@ -103,6 +108,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     }), {
       base: {
         catalogUrls: resolved.catalogUrls,
+        catalogCache: emptyCache(),
         reloadNonce: 0,
         rebootNonce: 0,
         reloadClientIds: [],
@@ -220,23 +226,42 @@ export function apply(ctx: Context, config: Config = {}): void {
       }
       return { profileName: profile.name, entries: [...byPackage.values()] }
     },
-    async listCatalog(): Promise<CatalogSnapshot> {
+    listCatalog(): CatalogSnapshot {
       const urls = effectiveCatalogUrls(ctx, resolved.catalogUrls)
       if (urls.length === 0) return emptyCatalog()
-      const sources: CatalogSource[] = []
-      const entries: CatalogPlugin[] = []
-      const seen = new Set<string>()
-      for (const url of urls) {
-        const fetched = await fetchCatalog(url, resolved.catalogTimeoutMs)
-        sources.push(fetched.source)
-        if (!fetched.ok) continue
-        for (const entry of fetched.entries) {
-          if (seen.has(entry.name)) continue
-          seen.add(entry.name)
-          entries.push(entry)
+      const cached = snapshotFromCache(urls, readCatalogCache(ctx))
+      if (cached !== undefined) return { ...cached, refreshing: false }
+      return { configured: true, sources: [], entries: [], fetchedAt: 0, stale: true, refreshing: false }
+    },
+    async refreshCatalog(request: { url?: string } = {}): Promise<CatalogSnapshot> {
+      const urls = effectiveCatalogUrls(ctx, resolved.catalogUrls)
+      if (urls.length === 0) {
+        writeCatalogCache(ctx, emptyCache())
+        return emptyCatalog()
+      }
+      const target = request.url !== undefined && request.url.length > 0 ? request.url : undefined
+      if (target !== undefined && !urls.includes(target)) {
+        return {
+          configured: true,
+          sources: [{ url: target, title: sourceTitleFromUrl(target), ok: false, error: 'market is not configured', count: 0 }],
+          entries: snapshotFromCache(urls, readCatalogCache(ctx))?.entries ?? [],
+          fetchedAt: readCatalogCache(ctx)?.fetchedAt ?? 0,
+          stale: true,
         }
       }
-      return { configured: true, sources, entries }
+      const refreshUrls = target === undefined ? urls : [target]
+      const fetchedAt = Date.now()
+      let cache = pruneCacheToUrls(readCatalogCache(ctx) ?? emptyCache(), urls)
+      const fetched = await Promise.all(refreshUrls.map(url => fetchCatalog(url, resolved.catalogTimeoutMs)))
+      for (const item of fetched) {
+        const entries = item.ok ? item.entries : cache.sources.find(source => source.url === item.source.url)?.entries ?? []
+        cache = mergeCachedSource(cache, cachedSourceFromFetch(item.source, entries), fetchedAt)
+      }
+      writeCatalogCache(ctx, cache)
+      const snapshot = snapshotFromCache(urls, cache)
+      return snapshot === undefined
+        ? { configured: true, sources: [], entries: [], fetchedAt, stale: false }
+        : { ...snapshot, fetchedAt, stale: false, refreshing: false }
     },
     install(request: { name: string; version?: string }): Promise<PluginMutationResult> {
       return serialize(async () => {
@@ -299,7 +324,9 @@ export function apply(ctx: Context, config: Config = {}): void {
         case 'listInstalled':
           return { ok: true, value: marketplace.listInstalled() }
         case 'listCatalog':
-          return { ok: true, value: await marketplace.listCatalog() }
+          return { ok: true, value: marketplace.listCatalog() }
+        case 'refreshCatalog':
+          return { ok: true, value: await marketplace.refreshCatalog(payload as { url?: string }) }
         case 'install':
           return { ok: true, value: await marketplace.install(payload as { name: string; version?: string }) }
         case 'uninstall':
@@ -355,10 +382,37 @@ function requireProfile(ctx: Context): ProfileHandle {
   return profile
 }
 
-function effectiveCatalogUrls(ctx: Context, fallback: readonly string[]): string[] {
-  const section = (ctx.get('settings') as {
-    get?: (ns: unknown) => { catalogUrls?: unknown; catalogUrl?: unknown }
+function settingsSection(ctx: Context): {
+  catalogUrls?: unknown
+  catalogUrl?: unknown
+  catalogCache?: unknown
+} | undefined {
+  return (ctx.get('settings') as {
+    get?: (ns: unknown) => {
+      catalogUrls?: unknown
+      catalogUrl?: unknown
+      catalogCache?: unknown
+    }
   } | undefined)?.get?.(SETTINGS_NS)
+}
+
+function readCatalogCache(ctx: Context): CatalogCache | undefined {
+  const raw = settingsSection(ctx)?.catalogCache
+  return isCatalogCache(raw) ? raw : undefined
+}
+
+function writeCatalogCache(ctx: Context, cache: CatalogCache): void {
+  const settings = ctx.get('settings') as {
+    update?: (ns: unknown, patch: object) => Promise<unknown>
+  } | undefined
+  if (settings?.update === undefined) return
+  void Promise.resolve(settings.update(SETTINGS_NS, { catalogCache: cache })).catch((error: unknown) => {
+    console.error('plugin-marketplace: catalog cache write failed', error)
+  })
+}
+
+function effectiveCatalogUrls(ctx: Context, fallback: readonly string[]): string[] {
+  const section = settingsSection(ctx)
   const fromSettings = normalizeCatalogUrls(section?.catalogUrls ?? section?.catalogUrl)
   return fromSettings.length > 0 ? fromSettings : [...fallback]
 }

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import {
   IconCloseOutline16,
   IconEditOutline16,
+  IconRefreshOutline14,
   IconSearchOutline16,
   IconTrashOutline16,
   Tooltip,
@@ -55,6 +56,9 @@ export interface MarketplaceCatalogSnapshot {
   readonly configured: boolean
   readonly sources: readonly MarketplaceCatalogSource[]
   readonly entries: readonly MarketplaceCatalogItem[]
+  readonly fetchedAt?: number
+  readonly stale?: boolean
+  readonly refreshing?: boolean
 }
 
 /** Result of a mutating marketplace call. */
@@ -68,6 +72,7 @@ export interface MarketplaceMutationResult {
 export interface MarketplaceSettingsSectionInjected {
   listInstalled: () => Promise<{ profileName: string; entries: readonly MarketplaceInstalledItem[] }>
   listCatalog: () => Promise<MarketplaceCatalogSnapshot>
+  refreshCatalog: (url?: string) => Promise<MarketplaceCatalogSnapshot>
   install: (name: string, version?: string) => Promise<MarketplaceMutationResult>
   uninstall: (name: string) => Promise<MarketplaceMutationResult>
   setEnabled: (entryId: string, enabled: boolean) => Promise<MarketplaceMutationResult>
@@ -116,7 +121,7 @@ function installedKindLabel(
 
 /** Render the marketplace Plugins section. */
 export function MarketplaceSettingsSection({
-  t, renderSlot, listInstalled, listCatalog, install, uninstall, setEnabled, catalogUrls, setCatalogUrls,
+  t, renderSlot, listInstalled, listCatalog, refreshCatalog, install, uninstall, setEnabled, catalogUrls, setCatalogUrls,
 }: MarketplaceSettingsSectionProps): ReactNode {
   const tabsId = useId()
   const [tab, setTab] = useState<TabId>('discover')
@@ -127,8 +132,8 @@ export function MarketplaceSettingsSection({
     catalogUrls.length > 0 ? [...catalogUrls] : [''],
   )
   const [savingUrl, setSavingUrl] = useState(false)
+  const [refreshingUrl, setRefreshingUrl] = useState<string | 'all' | null>(null)
   const [busyName, setBusyName] = useState<string | null>(null)
-  const [catalogRequest, setCatalogRequest] = useState(0)
   const [installedRequest, setInstalledRequest] = useState(0)
   const [catalog, setCatalog] = useState<ViewState<MarketplaceCatalogSnapshot>>({ status: 'loading' })
   const [installed, setInstalled] = useState<ViewState<readonly MarketplaceInstalledItem[]>>({ status: 'loading' })
@@ -136,11 +141,19 @@ export function MarketplaceSettingsSection({
   useEffect(() => {
     let current = true
     void Promise.resolve().then(() => listCatalog()).then(
-      (snapshot) => { if (current) setCatalog({ status: 'ready', value: snapshot }) },
+      (snapshot) => {
+        if (!current) return
+        setCatalog({ status: 'ready', value: snapshot })
+        setRefreshingUrl('all')
+        void refreshCatalog().then(
+          (fresh) => { if (current) setCatalog({ status: 'ready', value: fresh }) },
+          () => { if (current && snapshot.entries.length === 0) setCatalog({ status: 'error' }) },
+        ).finally(() => { if (current) setRefreshingUrl(null) })
+      },
       () => { if (current) setCatalog({ status: 'error' }) },
     )
     return () => { current = false }
-  }, [listCatalog, catalogRequest])
+  }, [listCatalog, refreshCatalog])
 
   useEffect(() => {
     let current = true
@@ -161,11 +174,23 @@ export function MarketplaceSettingsSection({
   const filteredCatalog = catalogEntries.filter(entry => matches([entry.name, entry.title, entry.description], normalizedQuery))
   const filteredInstalled = installedEntries.filter(entry => matches([entry.packageName, entry.spec], normalizedQuery))
 
+  const refreshCatalogNow = async (url?: string): Promise<void> => {
+    setRefreshingUrl(url ?? 'all')
+    setNotice(null)
+    try {
+      const snapshot = await refreshCatalog(url)
+      setCatalog({ status: 'ready', value: snapshot })
+    } catch {
+      setNotice(t('error'))
+    } finally {
+      setRefreshingUrl(null)
+    }
+  }
+
   const refreshAll = (): void => {
-    setCatalog({ status: 'loading' })
     setInstalled({ status: 'loading' })
-    setCatalogRequest(value => value + 1)
     setInstalledRequest(value => value + 1)
+    void refreshCatalogNow()
   }
 
   const runMutation = async (
@@ -185,7 +210,7 @@ export function MarketplaceSettingsSection({
   }
 
   return (
-    <div className={css.section} aria-busy={catalog.status === 'loading' || installed.status === 'loading'}>
+    <div className={css.section} aria-busy={refreshingUrl !== null || installed.status === 'loading'}>
       <h2 className={css.heading}>{t('title')}</h2>
       {restart ? <p className={css.restart} role="status">{t('restart')}</p> : null}
       {notice !== null ? <p className={css.failure} role="alert">{notice}</p> : null}
@@ -238,6 +263,7 @@ export function MarketplaceSettingsSection({
             busyName={busyName}
             draftUrls={draftUrls}
             savingUrl={savingUrl}
+            refreshingUrl={refreshingUrl}
             onDraftUrls={setDraftUrls}
             onSaveUrl={async (nextUrls) => {
               setSavingUrl(true)
@@ -245,13 +271,10 @@ export function MarketplaceSettingsSection({
               await setCatalogUrls(urls)
               setDraftUrls(urls.length > 0 ? urls : [''])
               setSavingUrl(false)
-              setCatalog({ status: 'loading' })
-              setCatalogRequest(value => value + 1)
+              await refreshCatalogNow()
             }}
-            onRetry={() => {
-              setCatalog({ status: 'loading' })
-              setCatalogRequest(value => value + 1)
-            }}
+            onRefresh={url => void refreshCatalogNow(url)}
+            onRetry={() => { void refreshCatalogNow() }}
             onInstall={(name, version) => void runMutation(name, () => install(name, version))}
           />
         ) : null}
@@ -286,8 +309,10 @@ function DiscoverPage(props: {
   busyName: string | null
   draftUrls: readonly string[]
   savingUrl: boolean
+  refreshingUrl: string | 'all' | null
   onDraftUrls: (value: string[]) => void
   onSaveUrl: (urls?: readonly string[]) => void
+  onRefresh: (url?: string) => void
   onRetry: () => void
   onInstall: (name: string, version?: string) => void
 }): ReactNode {
@@ -364,46 +389,68 @@ function DiscoverPage(props: {
           <button type="button" className={css.button} disabled={props.savingUrl} onClick={() => { props.onSaveUrl() }}>
             {props.savingUrl ? t('catalogSaving') : t('catalogSave')}
           </button>
+          <button
+            type="button"
+            className={css.button}
+            disabled={props.refreshingUrl !== null}
+            onClick={() => { props.onRefresh() }}
+          >
+            {props.refreshingUrl === 'all' ? t('refreshingCatalog') : t('refreshCatalog')}
+          </button>
         </div>
       </div>
       {sources.length > 0 ? (
         <ul className={css.sources}>
-          {sources.map(source => (
-            <li key={source.url} className={css.source} data-ok={source.ok ? 'true' : 'false'}>
-              <div className={css.sourceMain}>
-                <strong>{source.title}</strong>
-                {source.ok
-                  ? <span>{source.count}</span>
-                  : <span>{t('marketFailed')}{source.error !== undefined ? `: ${source.error}` : ''}</span>}
-              </div>
-              <div className={css.sourceActions}>
-                <Tooltip label={t('editMarket')} side="bottom">
-                  <button
-                    type="button"
-                    className={css.iconButton}
-                    aria-label={t('editMarket')}
-                    onClick={() => { editSource(source.url) }}
-                  >
-                    <IconEditOutline16 size={14} />
-                  </button>
-                </Tooltip>
-                <Tooltip label={t('removeMarket')} side="bottom">
-                  <button
-                    type="button"
-                    className={css.iconButton}
-                    aria-label={t('removeMarket')}
-                    disabled={props.savingUrl}
-                    onClick={() => { removeSource(source.url) }}
-                  >
-                    <IconTrashOutline16 size={14} />
-                  </button>
-                </Tooltip>
-              </div>
-            </li>
-          ))}
+          {sources.map(source => {
+            const sourceRefreshing = props.refreshingUrl === source.url || props.refreshingUrl === 'all'
+            return (
+              <li key={source.url} className={css.source} data-ok={source.ok ? 'true' : 'false'}>
+                <div className={css.sourceMain}>
+                  <strong>{source.title}</strong>
+                  {source.ok
+                    ? <span>{source.count}</span>
+                    : <span>{t('marketFailed')}{source.error !== undefined ? `: ${source.error}` : ''}</span>}
+                </div>
+                <div className={css.sourceActions}>
+                  <Tooltip label={t('refreshMarket')} side="bottom">
+                    <button
+                      type="button"
+                      className={css.iconButton}
+                      aria-label={t('refreshMarket')}
+                      disabled={props.refreshingUrl !== null}
+                      onClick={() => { props.onRefresh(source.url) }}
+                    >
+                      <IconRefreshOutline14 className={sourceRefreshing ? css.spin : undefined} size={14} />
+                    </button>
+                  </Tooltip>
+                  <Tooltip label={t('editMarket')} side="bottom">
+                    <button
+                      type="button"
+                      className={css.iconButton}
+                      aria-label={t('editMarket')}
+                      onClick={() => { editSource(source.url) }}
+                    >
+                      <IconEditOutline16 size={14} />
+                    </button>
+                  </Tooltip>
+                  <Tooltip label={t('removeMarket')} side="bottom">
+                    <button
+                      type="button"
+                      className={css.iconButton}
+                      aria-label={t('removeMarket')}
+                      disabled={props.savingUrl}
+                      onClick={() => { removeSource(source.url) }}
+                    >
+                      <IconTrashOutline16 size={14} />
+                    </button>
+                  </Tooltip>
+                </div>
+              </li>
+            )
+          })}
         </ul>
       ) : null}
-      {props.catalog.status === 'loading' ? <p className={css.status}>{t('loading')}</p> : null}
+      {props.catalog.status === 'loading' && props.refreshingUrl === null ? <p className={css.status}>{t('loading')}</p> : null}
       {props.catalog.status === 'error' ? (
         <div className={css.failure}>
           <p role="alert">{t('error')}</p>

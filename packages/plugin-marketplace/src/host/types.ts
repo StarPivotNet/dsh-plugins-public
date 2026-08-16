@@ -45,6 +45,9 @@ export interface CatalogSnapshot {
   readonly configured: boolean
   readonly sources: readonly CatalogSource[]
   readonly entries: readonly CatalogPlugin[]
+  readonly fetchedAt?: number
+  readonly stale?: boolean
+  readonly refreshing?: boolean
 }
 
 export interface PluginMutationSuccess { readonly ok: true; readonly restartRequired: true }

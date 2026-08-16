@@ -132,7 +132,72 @@ function normalizeCatalogUrls(raw, fallback = "") {
   return urls;
 }
 function emptyCatalog() {
-  return { configured: false, sources: [], entries: [] };
+  return { configured: false, sources: [], entries: [], fetchedAt: 0 };
+}
+
+// src/host/catalog-cache.ts
+function emptyCache() {
+  return { fetchedAt: 0, sources: [] };
+}
+function isCatalogCache(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const row = value;
+  if (typeof row.fetchedAt !== "number" || !Array.isArray(row.sources)) return false;
+  return row.sources.every(isCachedSource);
+}
+function isCachedSource(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const row = value;
+  return typeof row.url === "string" && typeof row.title === "string" && typeof row.ok === "boolean" && typeof row.count === "number" && Array.isArray(row.entries);
+}
+function pruneCacheToUrls(cache, urls) {
+  const keep = new Set(urls);
+  return {
+    fetchedAt: cache.fetchedAt,
+    sources: cache.sources.filter((source) => keep.has(source.url))
+  };
+}
+function mergeCachedSource(cache, source, fetchedAt = Date.now()) {
+  const previous = cache === void 0 ? emptyCache() : cache;
+  const sources = previous.sources.filter((item) => item.url !== source.url);
+  sources.push(source);
+  return { fetchedAt, sources };
+}
+function snapshotFromCache(urls, cache) {
+  if (cache === void 0 || cache.sources.length === 0 || urls.length === 0) return void 0;
+  const byUrl = new Map(cache.sources.map((source) => [source.url, source]));
+  const sources = [];
+  const entries = [];
+  const seen = /* @__PURE__ */ new Set();
+  let hit = false;
+  for (const url of urls) {
+    const cached = byUrl.get(url);
+    if (cached === void 0) continue;
+    hit = true;
+    sources.push({
+      url: cached.url,
+      title: cached.title,
+      ok: cached.ok,
+      error: cached.error,
+      count: cached.count
+    });
+    for (const entry of cached.entries) {
+      if (seen.has(entry.name)) continue;
+      seen.add(entry.name);
+      entries.push(entry);
+    }
+  }
+  if (!hit) return void 0;
+  return {
+    configured: true,
+    sources,
+    entries,
+    fetchedAt: cache.fetchedAt,
+    stale: sources.length < urls.length
+  };
+}
+function cachedSourceFromFetch(source, entries) {
+  return { ...source, entries };
 }
 
 // src/host/commands.ts
@@ -698,6 +763,7 @@ function apply(ctx, config = {}) {
     const settings = settingsCtx.get("settings");
     settings.register(SETTINGS_NS, z.object({
       catalogUrls: z.array(z.string()).default([]),
+      catalogCache: z.any().default(emptyCache()),
       reloadNonce: z.number().default(0),
       rebootNonce: z.number().default(0),
       reloadClientIds: z.array(z.string()).default([]),
@@ -714,6 +780,7 @@ function apply(ctx, config = {}) {
     }), {
       base: {
         catalogUrls: resolved.catalogUrls,
+        catalogCache: emptyCache(),
         reloadNonce: 0,
         rebootNonce: 0,
         reloadClientIds: [],
@@ -817,23 +884,40 @@ function apply(ctx, config = {}) {
       }
       return { profileName: profile.name, entries: [...byPackage.values()] };
     },
-    async listCatalog() {
+    listCatalog() {
       const urls = effectiveCatalogUrls(ctx, resolved.catalogUrls);
       if (urls.length === 0) return emptyCatalog();
-      const sources = [];
-      const entries = [];
-      const seen = /* @__PURE__ */ new Set();
-      for (const url of urls) {
-        const fetched = await fetchCatalog(url, resolved.catalogTimeoutMs);
-        sources.push(fetched.source);
-        if (!fetched.ok) continue;
-        for (const entry of fetched.entries) {
-          if (seen.has(entry.name)) continue;
-          seen.add(entry.name);
-          entries.push(entry);
-        }
+      const cached = snapshotFromCache(urls, readCatalogCache(ctx));
+      if (cached !== void 0) return { ...cached, refreshing: false };
+      return { configured: true, sources: [], entries: [], fetchedAt: 0, stale: true, refreshing: false };
+    },
+    async refreshCatalog(request = {}) {
+      const urls = effectiveCatalogUrls(ctx, resolved.catalogUrls);
+      if (urls.length === 0) {
+        writeCatalogCache(ctx, emptyCache());
+        return emptyCatalog();
       }
-      return { configured: true, sources, entries };
+      const target = request.url !== void 0 && request.url.length > 0 ? request.url : void 0;
+      if (target !== void 0 && !urls.includes(target)) {
+        return {
+          configured: true,
+          sources: [{ url: target, title: sourceTitleFromUrl(target), ok: false, error: "market is not configured", count: 0 }],
+          entries: snapshotFromCache(urls, readCatalogCache(ctx))?.entries ?? [],
+          fetchedAt: readCatalogCache(ctx)?.fetchedAt ?? 0,
+          stale: true
+        };
+      }
+      const refreshUrls = target === void 0 ? urls : [target];
+      const fetchedAt = Date.now();
+      let cache = pruneCacheToUrls(readCatalogCache(ctx) ?? emptyCache(), urls);
+      const fetched = await Promise.all(refreshUrls.map((url) => fetchCatalog(url, resolved.catalogTimeoutMs)));
+      for (const item of fetched) {
+        const entries = item.ok ? item.entries : cache.sources.find((source) => source.url === item.source.url)?.entries ?? [];
+        cache = mergeCachedSource(cache, cachedSourceFromFetch(item.source, entries), fetchedAt);
+      }
+      writeCatalogCache(ctx, cache);
+      const snapshot = snapshotFromCache(urls, cache);
+      return snapshot === void 0 ? { configured: true, sources: [], entries: [], fetchedAt, stale: false } : { ...snapshot, fetchedAt, stale: false, refreshing: false };
     },
     install(request) {
       return serialize(async () => {
@@ -897,7 +981,9 @@ function apply(ctx, config = {}) {
         case "listInstalled":
           return { ok: true, value: marketplace.listInstalled() };
         case "listCatalog":
-          return { ok: true, value: await marketplace.listCatalog() };
+          return { ok: true, value: marketplace.listCatalog() };
+        case "refreshCatalog":
+          return { ok: true, value: await marketplace.refreshCatalog(payload) };
         case "install":
           return { ok: true, value: await marketplace.install(payload) };
         case "uninstall":
@@ -946,8 +1032,22 @@ function requireProfile(ctx) {
   if (profile === void 0) throw new Error("plugin-marketplace: ctx.profile is required");
   return profile;
 }
+function settingsSection(ctx) {
+  return ctx.get("settings")?.get?.(SETTINGS_NS);
+}
+function readCatalogCache(ctx) {
+  const raw = settingsSection(ctx)?.catalogCache;
+  return isCatalogCache(raw) ? raw : void 0;
+}
+function writeCatalogCache(ctx, cache) {
+  const settings = ctx.get("settings");
+  if (settings?.update === void 0) return;
+  void Promise.resolve(settings.update(SETTINGS_NS, { catalogCache: cache })).catch((error) => {
+    console.error("plugin-marketplace: catalog cache write failed", error);
+  });
+}
 function effectiveCatalogUrls(ctx, fallback) {
-  const section = ctx.get("settings")?.get?.(SETTINGS_NS);
+  const section = settingsSection(ctx);
   const fromSettings = normalizeCatalogUrls(section?.catalogUrls ?? section?.catalogUrl);
   return fromSettings.length > 0 ? fromSettings : [...fallback];
 }

@@ -63,6 +63,7 @@ export function apply(ctx: ClientContext): void {
   let lastNonce: number | undefined
   let lastRebootNonce: number | undefined
   let toastLive = false
+  let rebootNotice = false
   let pageReload = Promise.resolve()
   const listeners = new Set<() => void>()
   const renderToast = (): void => {
@@ -70,6 +71,7 @@ export function apply(ctx: ClientContext): void {
       progress: progressFromStatus(reloadStatus),
       live: toastLive,
       t,
+      ...rebootNotice ? { notice: { title: t('rebootDone'), detail: t('rebootDoneDetail') } } : {},
     }))
   }
   const adoptStatus = (next: ReloadStatus | undefined, triggerPageReload: boolean): void => {
@@ -90,6 +92,7 @@ export function apply(ctx: ClientContext): void {
     if (triggerPageReload && rebootNonce > lastRebootNonce) {
       lastRebootNonce = rebootNonce
       lastNonce = nonce
+      sessionStorage.setItem('dsh-marketplace-rebooted', '1')
       window.location.reload()
       return
     }
@@ -118,12 +121,23 @@ export function apply(ctx: ClientContext): void {
       seenHost: hostDescription.getSnapshot() !== undefined,
       lostHost: false,
     }
+    if (sessionStorage.getItem('dsh-marketplace-rebooted') === '1') {
+      sessionStorage.removeItem('dsh-marketplace-rebooted')
+      rebootNotice = true
+      renderToast()
+      window.setTimeout(() => {
+        rebootNotice = false
+        renderToast()
+      }, 4000)
+    }
     const offHost = hostDescription.subscribe(() => {
       generation = hostGenerationAfterLoss({
         ...generation,
         up: hostDescription.getSnapshot() !== undefined,
       })
-      if (generation.reload) window.location.reload()
+      if (!generation.reload) return
+      sessionStorage.setItem('dsh-marketplace-rebooted', '1')
+      window.location.reload()
     })
     ctx.effect(() => () => { offHost() }, 'plugin-marketplace: reboot page refresh')
   }

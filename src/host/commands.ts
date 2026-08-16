@@ -52,12 +52,29 @@ export function registerMarketplaceCommands(ctx: Context, options: {
       const watchdogPath = join(dirname(fileURLToPath(import.meta.url)), 'reboot-watchdog.js')
       const started = await startWatchdog(watchdogPath, specPath)
       if (!started.ok) return { kind: 'error', text: started.message }
-      // command/done is appended after this handler returns. Exit on the next
-      // turn so the card can settle; ctx.appExit does not exit the web process.
-      setImmediate(() => { process.exit(0) })
+      scheduleRebootExit(ctx)
       return { kind: 'success', text: '正在重启，页面即将刷新' }
     },
   })
+}
+
+/** Persist command/done, then exit. ctx.appExit does not kill the web process. */
+function scheduleRebootExit(ctx: Context): void {
+  setTimeout(() => {
+    void (async () => {
+      const sessions = ctx.get('sessions') as {
+        list?: () => Iterable<{ id?: string }>
+        flush?: (session: { id?: string }) => Promise<unknown>
+      } | undefined
+      if (sessions?.list !== undefined && sessions.flush !== undefined) {
+        for (const session of sessions.list()) {
+          try { await sessions.flush(session) }
+          catch { /* still exit so the watchdog can start the next process */ }
+        }
+      }
+      process.exit(0)
+    })()
+  }, 0)
 }
 
 async function handleReload(

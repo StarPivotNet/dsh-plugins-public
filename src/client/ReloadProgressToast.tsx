@@ -16,6 +16,7 @@ export function ReloadProgressToast(props: {
   progress: ReloadProgress | undefined
   t: (key: MarketplaceLocaleKey) => string
   live?: boolean
+  notice?: { title: string; detail: string } | undefined
 }): ReactNode {
   const progress = props.progress
   const [visible, setVisible] = useState(false)
@@ -29,6 +30,14 @@ export function ReloadProgressToast(props: {
     const timer = setTimeout(() => { setVisible(false) }, 4000)
     return () => { clearTimeout(timer) }
   }, [progress?.phase, progress?.index, progress?.message, props.live])
+  if (props.notice !== undefined) {
+    return (
+      <div className={css.reloadToast} role="status">
+        <strong>{props.notice.title}</strong>
+        <span>{props.notice.detail}</span>
+      </div>
+    )
+  }
   if (!visible || progress === undefined || progress.phase === 'idle') return null
   return (
     <div className={css.reloadToast} role="status">

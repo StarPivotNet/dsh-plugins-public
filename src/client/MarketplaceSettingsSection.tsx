@@ -7,6 +7,7 @@ import {
 import type {
   InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
+import { confirmInstallMessage } from './confirm-install.ts'
 import type { MarketplaceLocaleKey } from './locales.ts'
 import css from './MarketplaceSettingsSection.module.css'
 
@@ -360,7 +361,7 @@ function DiscoverPage(props: {
                       className={css.button}
                       disabled={already || props.busyName === entry.name}
                       onClick={() => {
-                        if (globalThis.confirm(t('confirmInstall'))) {
+                        if (globalThis.confirm(confirmInstallMessage(t, entry))) {
                           props.onInstall(entry.name, entry.version.length > 0 ? entry.version : undefined)
                         }
                       }}

@@ -51,7 +51,11 @@ While this bundle is installed it turns off automatic hot reload (`client-hmr.au
 }
 ```
 
-Set `catalogUrls` on the `plugin-marketplace` row or in Discover (settings namespace `plugin-marketplace`). A catalog may also include a top-level `title`. Duplicate package names across markets keep the first listing.
+A fresh install already points Discover at the StarPivot catalog:
+
+`https://raw.githubusercontent.com/StarPivotNet/dsh-plugin-catalog/main/catalog.json`
+
+Add more `catalogUrls` on the `plugin-marketplace` row or in Discover (settings namespace `plugin-marketplace`). A catalog may also include a top-level `title`. Duplicate package names across markets keep the first listing. The install confirm dialog shows the package name, version, and catalog source.
 
 ## Develop
 

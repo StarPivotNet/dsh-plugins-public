@@ -21,6 +21,7 @@ import {
   parseCatalogDocument, sourceTitleFromUrl,
 } from './catalog.ts'
 import { registerMarketplaceCommands } from './commands.ts'
+import { DEFAULT_CATALOG_URL } from './defaults.ts'
 import { installSpec, isInstallVersion, isRegistryPackageName } from './names.ts'
 import type {
   CatalogPlugin,
@@ -44,6 +45,7 @@ export const MARKETPLACE_BUNDLE_PACKAGE = '@starpivot/dsh-plugin-marketplace'
 export const MARKETPLACE_HOST_ENTRY_ID = 'plugin-marketplace'
 export const MARKETPLACE_CLIENT_ENTRY_ID = 'ui-settings-plugin-marketplace'
 export const MARKETPLACE_SETTINGS_NAMESPACE = 'plugin-marketplace'
+export { DEFAULT_CATALOG_URL } from './defaults.ts'
 const SETTINGS_NS = settingsNamespace(MARKETPLACE_SETTINGS_NAMESPACE)
 const CHANNEL = '/plugin-marketplace'
 
@@ -68,7 +70,7 @@ function fail(code: PluginMarketplaceErrorCode, message: string): PluginMarketpl
 
 export function apply(ctx: Context, config: Config = {}): void {
   const resolved = {
-    catalogUrls: normalizeCatalogUrls(config.catalogUrls, config.catalogUrl ?? ''),
+    catalogUrls: normalizeCatalogUrls(config.catalogUrls, config.catalogUrl ?? DEFAULT_CATALOG_URL),
     catalogTimeoutMs: config.catalogTimeoutMs ?? 10_000,
   }
   for (const url of resolved.catalogUrls) {

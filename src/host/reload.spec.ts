@@ -1,3 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { parseCatalogDocument } from './catalog.ts'
+import { DEFAULT_CATALOG_URL } from './defaults.ts'
 import {
   isMarketplaceEntry, isSkeletonEntry, matchReloadTarget, partitionReloadEntries,
   reloadHostEntry, selectReloadEntries,
@@ -13,6 +18,16 @@ const entries = [
 
 function assert(cond: unknown, message: string): void {
   if (!cond) throw new Error(message)
+}
+
+assert(DEFAULT_CATALOG_URL === 'https://raw.githubusercontent.com/StarPivotNet/dsh-plugin-catalog/main/catalog.json', 'default catalog url')
+const localCatalog = resolve(dirname(fileURLToPath(import.meta.url)), '../../../dsh-plugin-catalog/catalog.json')
+const parsedCatalog = parseCatalogDocument(JSON.parse(readFileSync(localCatalog, 'utf8')), DEFAULT_CATALOG_URL)
+assert(parsedCatalog.ok, 'local catalog parses')
+if (parsedCatalog.ok) {
+  assert(parsedCatalog.title === 'StarPivot', 'catalog title')
+  assert(parsedCatalog.entries.map(entry => entry.name).join(',') === '@dsh-plugin/dsh-auxiliary,@dsh-plugin/dsh-thought-buddy,dsh-find-plugin', 'catalog names')
+  assert(parsedCatalog.entries.every(entry => entry.kind === 'bundle'), 'catalog bundles only')
 }
 
 assert(matchReloadTarget(entries, '').kind === 'all', 'empty query reloads all')

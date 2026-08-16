@@ -5,6 +5,9 @@
 - insert:
     - id: plugin-marketplace
       name: '@starpivot/dsh-plugin-marketplace/host'
+      config:
+        catalogUrls:
+          - https://raw.githubusercontent.com/StarPivotNet/dsh-plugin-catalog/main/catalog.json
 
     - id: ui-settings-plugin-marketplace
       name: '@starpivot/dsh-plugin-marketplace'

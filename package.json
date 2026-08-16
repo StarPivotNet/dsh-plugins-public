@@ -25,7 +25,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "test": "node --experimental-strip-types src/host/reload.spec.ts && node --experimental-strip-types src/client/confirm-install.spec.ts"
   },
   "dsh": {
     "bundle": {

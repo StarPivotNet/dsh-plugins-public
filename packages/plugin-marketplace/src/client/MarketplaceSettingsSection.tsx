@@ -14,7 +14,6 @@ import type {
   InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import { catalogPackageLabel, installedHoverLabel } from './catalog-label.ts'
-import { DEFAULT_CATALOG_URL } from '../host/defaults.ts'
 import { confirmInstallMessage } from './confirm-install.ts'
 import type { MarketplaceLocaleKey } from './locales.ts'
 import css from './MarketplaceSettingsSection.module.css'
@@ -129,9 +128,7 @@ export function MarketplaceSettingsSection({
   const [query, setQuery] = useState('')
   const [restart, setRestart] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
-  const [draftUrls, setDraftUrls] = useState<string[]>(
-    catalogUrls.length > 0 ? [...catalogUrls] : [DEFAULT_CATALOG_URL],
-  )
+  const [draftUrls, setDraftUrls] = useState<string[]>([...catalogUrls])
   const [savingUrl, setSavingUrl] = useState(false)
   const [refreshingUrl, setRefreshingUrl] = useState<string | 'all' | null>(null)
   const [busyName, setBusyName] = useState<string | null>(null)
@@ -148,7 +145,10 @@ export function MarketplaceSettingsSection({
         setRefreshingUrl('all')
         void refreshCatalog().then(
           (fresh) => { if (current) setCatalog({ status: 'ready', value: fresh }) },
-          () => { if (current) setNotice(t('error')) },
+          () => {
+            if (!current) return
+            if (snapshot.entries.length === 0) setNotice(t('error'))
+          },
         ).finally(() => { if (current) setRefreshingUrl(null) })
       },
       () => { if (current) setCatalog({ status: 'error' }) },
@@ -270,7 +270,7 @@ export function MarketplaceSettingsSection({
               setSavingUrl(true)
               const urls = (nextUrls ?? draftUrls).map(url => url.trim()).filter(url => url.length > 0)
               await setCatalogUrls(urls)
-              setDraftUrls(urls.length > 0 ? urls : [''])
+              setDraftUrls(urls)
               setSavingUrl(false)
               await refreshCatalogNow()
             }}
@@ -319,76 +319,75 @@ function DiscoverPage(props: {
 }): ReactNode {
   const { t } = props
   const [details, setDetails] = useState<MarketplaceCatalogItem | null>(null)
-  const [focusUrl, setFocusUrl] = useState<string | null>(null)
-  const inputRefs = useRef<Array<HTMLInputElement | null>>([])
+  const [adding, setAdding] = useState(false)
+  const [addUrl, setAddUrl] = useState('')
+  const [editing, setEditing] = useState<{ readonly from: string; readonly value: string } | null>(null)
+  const addRef = useRef<HTMLInputElement | null>(null)
   const sources = props.catalog.status === 'ready' ? props.catalog.value.sources : []
   useEffect(() => {
-    if (focusUrl === null) return
-    const index = props.draftUrls.findIndex(item => item.trim() === focusUrl)
-    if (index < 0) return
-    const input = inputRefs.current[index]
-    input?.focus()
-    input?.select()
-    setFocusUrl(null)
-  }, [focusUrl, props.draftUrls])
-  const editSource = (url: string): void => {
-    if (!props.draftUrls.some(item => item.trim() === url)) {
-      const next = [...props.draftUrls]
-      const empty = next.findIndex(item => item.trim().length === 0)
-      if (empty >= 0) next[empty] = url
-      else next.push(url)
-      props.onDraftUrls(next)
-    }
-    setFocusUrl(url)
+    if (adding) addRef.current?.focus()
+  }, [adding])
+  const savedUrls = (): string[] => {
+    const listed = sources.map(source => source.url)
+    if (listed.length > 0) return listed
+    return props.draftUrls.map(url => url.trim()).filter(url => url.length > 0)
+  }
+  const commitUrls = (urls: readonly string[]): void => {
+    const next = urls.map(url => url.trim()).filter(url => url.length > 0)
+    props.onDraftUrls(next)
+    props.onSaveUrl(next)
   }
   const removeSource = (url: string): void => {
     if (!globalThis.confirm(t('confirmRemoveMarket'))) return
-    const next = props.draftUrls.map(item => item.trim()).filter(item => item.length > 0 && item !== url)
-    props.onDraftUrls(next.length > 0 ? next : [''])
-    props.onSaveUrl(next)
+    commitUrls(savedUrls().filter(item => item !== url))
   }
   return (
     <>
       <div className={css.field}>
         <span id="marketplace-catalog-urls">{t('markets')}</span>
-        {props.draftUrls.map((url, index) => (
-          <div className={css.marketRow} key={`market-${String(index)}`}>
+        {adding ? (
+          <div className={css.marketRow}>
             <input
-              ref={(node) => { inputRefs.current[index] = node }}
+              ref={addRef}
               aria-labelledby="marketplace-catalog-urls"
               placeholder={t('marketUrl')}
-              value={url}
-              onChange={(event) => {
-                const next = [...props.draftUrls]
-                next[index] = event.currentTarget.value
-                props.onDraftUrls(next)
-              }}
+              value={addUrl}
+              onChange={(event) => { setAddUrl(event.currentTarget.value) }}
             />
-            <Tooltip label={t('removeMarket')} side="bottom">
-              <button
-                type="button"
-                className={css.iconButton}
-                aria-label={t('removeMarket')}
-                onClick={() => {
-                  const next = props.draftUrls.filter((_, itemIndex) => itemIndex !== index)
-                  props.onDraftUrls(next.length > 0 ? next : [''])
-                }}
-              >
-                <IconTrashOutline16 size={14} />
-              </button>
-            </Tooltip>
+            <button
+              type="button"
+              className={css.button}
+              disabled={props.savingUrl || addUrl.trim().length === 0}
+              onClick={() => {
+                commitUrls([...savedUrls(), addUrl])
+                setAddUrl('')
+                setAdding(false)
+              }}
+            >
+              {props.savingUrl ? t('catalogSaving') : t('catalogSave')}
+            </button>
+            <button
+              type="button"
+              className={css.button}
+              onClick={() => {
+                setAdding(false)
+                setAddUrl('')
+              }}
+            >
+              {t('cancel')}
+            </button>
           </div>
-        ))}
+        ) : null}
         <div className={css.actions}>
           <button
             type="button"
             className={css.button}
-            onClick={() => { props.onDraftUrls([...props.draftUrls, '']) }}
+            onClick={() => {
+              setAdding(true)
+              setAddUrl('')
+            }}
           >
             {t('addMarket')}
-          </button>
-          <button type="button" className={css.button} disabled={props.savingUrl} onClick={() => { props.onSaveUrl() }}>
-            {props.savingUrl ? t('catalogSaving') : t('catalogSave')}
           </button>
           <button
             type="button"
@@ -429,7 +428,7 @@ function DiscoverPage(props: {
                       type="button"
                       className={css.iconButton}
                       aria-label={t('editMarket')}
-                      onClick={() => { editSource(source.url) }}
+                      onClick={() => { setEditing({ from: source.url, value: source.url }) }}
                     >
                       <IconEditOutline16 size={14} />
                     </button>
@@ -531,6 +530,36 @@ function DiscoverPage(props: {
             />
           ) : null}
         </>
+      ) : null}
+      {editing !== null ? (
+        <DetailsDialog
+          t={t}
+          title={t('editMarket')}
+          rows={[]}
+          onClose={() => { setEditing(null) }}
+          actions={(
+            <button
+              type="button"
+              className={css.button}
+              disabled={props.savingUrl || editing.value.trim().length === 0}
+              onClick={() => {
+                commitUrls(savedUrls().map(url => url === editing.from ? editing.value : url))
+                setEditing(null)
+              }}
+            >
+              {props.savingUrl ? t('catalogSaving') : t('catalogSave')}
+            </button>
+          )}
+        >
+          <label className={css.field}>
+            <span>{t('marketUrl')}</span>
+            <input
+              value={editing.value}
+              placeholder={t('marketUrl')}
+              onChange={(event) => { setEditing({ from: editing.from, value: event.currentTarget.value }) }}
+            />
+          </label>
+        </DetailsDialog>
       ) : null}
     </>
   )
@@ -647,6 +676,7 @@ function DetailsDialog(props: {
     readonly mono?: boolean
   }[]
   description?: string
+  children?: ReactNode
   onClose: () => void
   actions: ReactNode
 }): ReactNode {
@@ -702,6 +732,7 @@ function DetailsDialog(props: {
         {props.description !== undefined
           ? <p className={css.dialogDescription}>{props.description}</p>
           : null}
+        {props.children}
         <div className={css.dialogFooter}>
           <button type="button" className={css.button} onClick={props.onClose}>{t('closeDetails')}</button>
           {props.actions}

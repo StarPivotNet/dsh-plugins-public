@@ -12,7 +12,17 @@ Discover fetches version-1 JSON catalogs. The shipped default is `DEFAULT_CATALO
 
 - Install accepts one npm registry package name. Path, `file:`, and git specs stay refused.
 - Confirm install names package, version, and catalog source.
-- Runtime copies under `$DSH_HOME/profiles` are disposable. Edit this repo and rebuild.
+- Runtime copies under `$DSH_HOME/profiles` are disposable. Edit this package, rebuild, and publish immediately.
+
+## Publish immediately
+
+After a user-visible change, do not stop at a local rebuild.
+
+1. From the repository root: `pnpm --filter @starpivot/dsh-plugin-marketplace test` and `pnpm --filter @starpivot/dsh-plugin-marketplace run build`.
+2. Bump `version` in this package's `package.json` when npm users should receive the change.
+3. Commit and push `StarPivotNet/dsh-plugins-public` `main`.
+4. `pnpm --filter @starpivot/dsh-plugin-marketplace publish --access public`.
+5. If the Discover listing changed, push the matching `catalog.json` edit to `StarPivotNet/dsh-plugin-catalog` `main` in the same turn.
 
 ## Commands
 

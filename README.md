@@ -21,7 +21,7 @@ After restart, Settings → 插件 becomes:
 
 - **发现** — fetch one or more operator JSON catalogs from http(s) marketplace URLs; four plugin cards per row
 - **已安装** — list, uninstall, and toggle single Loader entries
-- the shipped Shell / Agent loop / Web search cards stay under Installed
+- **配置** — the shipped Shell / Agent loop / Web search cards
 
 Install accepts one npm registry package name (optional version). Path, `file:`, and git specs are refused. A successful install writes the profile and asks you to restart.
 

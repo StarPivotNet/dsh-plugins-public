@@ -7,6 +7,7 @@ export const zh = {
   tabs: '插件视图',
   discoverTab: '发现',
   installedTab: '已安装',
+  configureTab: '配置',
   search: '搜索插件',
   catalog: '可安装插件',
   catalogEmpty: '这些市场里还没有插件。',
@@ -41,6 +42,7 @@ export const zh = {
   confirmUninstall: '卸载这个插件？',
   cancel: '取消',
   cards: '可配置插件',
+  configureEmpty: '这个部署没有可配置的插件。',
 } satisfies Record<string, string>
 
 export type MarketplaceLocaleKey = keyof typeof zh
@@ -52,6 +54,7 @@ export const en = {
   tabs: 'Plugin views',
   discoverTab: 'Discover',
   installedTab: 'Installed',
+  configureTab: 'Configure',
   search: 'Search plugins',
   catalog: 'Installable plugins',
   catalogEmpty: 'These marketplaces have no plugins yet.',
@@ -86,4 +89,5 @@ export const en = {
   confirmUninstall: 'Uninstall this plugin?',
   cancel: 'Cancel',
   cards: 'Configurable plugins',
+  configureEmpty: 'This deployment exposes no plugin settings.',
 } satisfies Record<MarketplaceLocaleKey, string>

@@ -75,7 +75,7 @@ export type MarketplaceSettingsSectionProps =
   & PropsRenderSlots<'settings.plugin.item'>
   & InjectFace<MarketplaceSettingsSectionInjected>
 
-type TabId = 'discover' | 'installed'
+type TabId = 'discover' | 'installed' | 'configure'
 
 type ViewState<T> =
   | { readonly status: 'loading' }
@@ -165,8 +165,9 @@ export function MarketplaceSettingsSection({
       {restart ? <p className={css.restart} role="status">{t('restart')}</p> : null}
       {notice !== null ? <p className={css.failure} role="alert">{notice}</p> : null}
       <div className={css.tabs} role="tablist" aria-label={t('tabs')}>
-        {(['discover', 'installed'] as const).map((id) => {
+        {(['discover', 'installed', 'configure'] as const).map((id) => {
           const selected = tab === id
+          const label = id === 'discover' ? 'discoverTab' : id === 'installed' ? 'installedTab' : 'configureTab'
           return (
             <button
               key={id}
@@ -179,7 +180,7 @@ export function MarketplaceSettingsSection({
               data-active={selected ? 'true' : undefined}
               onClick={() => { setTab(id) }}
             >
-              {t(id === 'discover' ? 'discoverTab' : 'installedTab')}
+              {t(label)}
             </button>
           )
         })}
@@ -190,17 +191,19 @@ export function MarketplaceSettingsSection({
         role="tabpanel"
         aria-labelledby={`${tabsId}-tab-${tab}`}
       >
-        <label className={css.search}>
-          <IconSearchOutline16 aria-hidden="true" />
-          <span className={css.visuallyHidden}>{t('search')}</span>
-          <input
-            type="search"
-            value={query}
-            placeholder={t('search')}
-            aria-label={t('search')}
-            onChange={(event) => { setQuery(event.currentTarget.value) }}
-          />
-        </label>
+        {tab !== 'configure' ? (
+          <label className={css.search}>
+            <IconSearchOutline16 aria-hidden="true" />
+            <span className={css.visuallyHidden}>{t('search')}</span>
+            <input
+              type="search"
+              value={query}
+              placeholder={t('search')}
+              aria-label={t('search')}
+              onChange={(event) => { setQuery(event.currentTarget.value) }}
+            />
+          </label>
+        ) : null}
         {tab === 'discover' ? (
           <DiscoverPage
             t={t}
@@ -226,7 +229,8 @@ export function MarketplaceSettingsSection({
             }}
             onInstall={(name, version) => void runMutation(name, () => install(name, version))}
           />
-        ) : (
+        ) : null}
+        {tab === 'installed' ? (
           <InstalledPage
             t={t}
             installed={installed}
@@ -238,9 +242,11 @@ export function MarketplaceSettingsSection({
             }}
             onUninstall={name => void runMutation(name, () => uninstall(name))}
             onToggle={(entryId, enabled, packageName) => void runMutation(packageName, () => setEnabled(entryId, enabled))}
-            renderCards={() => renderSlot('settings.plugin.item', {})}
           />
-        )}
+        ) : null}
+        {tab === 'configure' ? (
+          <ConfigurePage t={t} renderCards={() => renderSlot('settings.plugin.item', {})} />
+        ) : null}
       </div>
     </div>
   )
@@ -381,7 +387,6 @@ function InstalledPage(props: {
   onRetry: () => void
   onUninstall: (name: string) => void
   onToggle: (entryId: string, enabled: boolean, packageName: string) => void
-  renderCards: () => ReactNode
 }): ReactNode {
   const { t } = props
   return (
@@ -442,10 +447,21 @@ function InstalledPage(props: {
           </ul>
         </>
       ) : null}
+    </>
+  )
+}
+
+function ConfigurePage(props: {
+  t: MarketplaceSettingsSectionProps['t']
+  renderCards: () => ReactNode
+}): ReactNode {
+  const cards = props.renderCards()
+  return (
+    <>
       <div className={css.headingRow}>
-        <h3>{t('cards')}</h3>
+        <h3>{props.t('cards')}</h3>
       </div>
-      <ul className={css.cards}>{props.renderCards()}</ul>
+      <ul className={css.configList}>{cards}</ul>
     </>
   )
 }

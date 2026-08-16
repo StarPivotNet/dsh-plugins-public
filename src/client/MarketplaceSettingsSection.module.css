@@ -162,13 +162,18 @@
   list-style: none;
 }
 
-.list {
+.list,
+.configList {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.configList > * {
+  min-width: 0;
 }
 
 .marketRow {

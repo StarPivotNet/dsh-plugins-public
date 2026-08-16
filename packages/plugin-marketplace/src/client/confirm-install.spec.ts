@@ -1,3 +1,4 @@
+import { catalogPackageLabel } from './catalog-label.ts'
 import { confirmInstallMessage, installSourceLabel } from './confirm-install.ts'
 
 function assert(cond: unknown, message: string): void {
@@ -28,4 +29,6 @@ assert(
   'homepage host fallback',
 )
 assert(installSourceLabel('StarPivot', 'https://example.com') === 'StarPivot', 'title wins')
+assert(catalogPackageLabel('@dsh-plugin/dsh-auxiliary', '0.4.2') === '@dsh-plugin/dsh-auxiliary@0.4.2', 'versioned package')
+assert(catalogPackageLabel('dsh-find-plugin', '') === 'dsh-find-plugin', 'unversioned package')
 console.log('confirm install checks passed')

@@ -1,12 +1,16 @@
 /** Plugins marketplace section: discover + installed pages plus Host cards. */
 
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
+  IconCloseOutline16,
   IconSearchOutline16,
+  Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
+import { catalogPackageLabel } from './catalog-label.ts'
 import { confirmInstallMessage } from './confirm-install.ts'
 import type { MarketplaceLocaleKey } from './locales.ts'
 import css from './MarketplaceSettingsSection.module.css'
@@ -87,6 +91,16 @@ type ViewState<T> =
 function matches(haystacks: readonly string[], query: string): boolean {
   if (query.length === 0) return true
   return haystacks.some(value => value.toLocaleLowerCase().includes(query))
+}
+
+function requestInstall(
+  t: MarketplaceSettingsSectionProps['t'],
+  entry: MarketplaceCatalogItem,
+  onInstall: (name: string, version?: string) => void,
+): void {
+  if (globalThis.confirm(confirmInstallMessage(t, entry))) {
+    onInstall(entry.name, entry.version.length > 0 ? entry.version : undefined)
+  }
 }
 
 /** Render the marketplace Plugins section. */
@@ -268,6 +282,7 @@ function DiscoverPage(props: {
   onInstall: (name: string, version?: string) => void
 }): ReactNode {
   const { t } = props
+  const [details, setDetails] = useState<MarketplaceCatalogItem | null>(null)
   const sources = props.catalog.status === 'ready' ? props.catalog.value.sources : []
   return (
     <>
@@ -346,33 +361,58 @@ function DiscoverPage(props: {
             <h3>{t('catalog')}</h3>
             <span>{props.filtered.length}</span>
           </div>
-          <ul className={css.cards}>
+          <ul className={`${css.cards} ${css.catalogCards}`}>
             {props.filtered.map((entry) => {
               const already = props.installedNames.has(entry.name)
+              const packageLabel = catalogPackageLabel(entry.name, entry.version)
+              const installing = props.busyName === entry.name
               return (
-                <li className={css.card} key={entry.name} data-plugin-name={entry.name}>
-                  {already ? <span className={css.tag}>{t('installedTag')}</span> : <span className={css.tag}>{entry.sourceTitle}</span>}
-                  <h3 className={css.cardTitle} title={entry.title}>{entry.title}</h3>
-                  <p className={css.packageName} title={entry.name + (entry.version.length > 0 ? '@' + entry.version : '')}>{entry.name}{entry.version.length > 0 ? `@${entry.version}` : ''}</p>
-                  <p className={css.description}>{entry.description}</p>
-                  <div className={css.actions}>
+                <li className={`${css.card} ${css.catalogCard}`} key={entry.name} data-plugin-name={entry.name}>
+                  <Tooltip
+                    label={entry.description}
+                    side="bottom"
+                    maxWidth={280}
+                    disabled={entry.description.length === 0}
+                  >
+                    <button
+                      type="button"
+                      className={css.cardHit}
+                      aria-haspopup="dialog"
+                      aria-label={t('openDetailsNamed', { title: entry.title })}
+                      onClick={() => { setDetails(entry) }}
+                    >
+                      {already
+                        ? <span className={css.tag}>{t('installedTag')}</span>
+                        : <span className={css.tag}>{entry.sourceTitle}</span>}
+                      <h3 className={css.cardTitle}>{entry.title}</h3>
+                      <p className={css.packageName}>{packageLabel}</p>
+                      <span className={css.description}>{entry.description}</span>
+                    </button>
+                  </Tooltip>
+                  <div className={css.cardAside}>
                     <button
                       type="button"
                       className={css.button}
-                      disabled={already || props.busyName === entry.name}
-                      onClick={() => {
-                        if (globalThis.confirm(confirmInstallMessage(t, entry))) {
-                          props.onInstall(entry.name, entry.version.length > 0 ? entry.version : undefined)
-                        }
-                      }}
+                      disabled={already || installing}
+                      onClick={() => { requestInstall(t, entry, props.onInstall) }}
                     >
-                      {props.busyName === entry.name ? t('installing') : t('install')}
+                      {installing ? t('installing') : t('install')}
                     </button>
                   </div>
                 </li>
               )
             })}
           </ul>
+          {details !== null ? (
+            <CatalogDetailsDialog
+              t={t}
+              entry={details}
+              already={props.installedNames.has(details.name)}
+              installing={props.busyName === details.name}
+              onClose={() => { setDetails(null) }}
+              onInstall={() => { requestInstall(t, details, props.onInstall) }}
+            />
+          ) : null}
         </>
       ) : null}
     </>
@@ -450,6 +490,90 @@ function InstalledPage(props: {
       ) : null}
     </>
   )
+}
+
+function CatalogDetailsDialog(props: {
+  t: MarketplaceSettingsSectionProps['t']
+  entry: MarketplaceCatalogItem
+  already: boolean
+  installing: boolean
+  onClose: () => void
+  onInstall: () => void
+}): ReactNode {
+  const { t, entry } = props
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const onCloseRef = useRef(props.onClose)
+  onCloseRef.current = props.onClose
+  const packageLabel = catalogPackageLabel(entry.name, entry.version)
+  const kindLabel = t(entry.kind === 'bundle' ? 'bundleTag' : 'pluginTag')
+  useEffect(() => {
+    closeRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.stopImmediatePropagation()
+      onCloseRef.current()
+    }
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => { document.removeEventListener('keydown', onKeyDown, true) }
+  }, [])
+  return createPortal((
+    <div className={css.dialogRoot} role="presentation">
+      <div className={css.dialogMask} aria-hidden="true" onClick={props.onClose} />
+      <div
+        className={css.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="marketplace-plugin-details-title"
+      >
+        <div className={css.dialogHeader}>
+          <h2 className={css.dialogTitle} id="marketplace-plugin-details-title">{entry.title}</h2>
+          <button
+            ref={closeRef}
+            type="button"
+            className={css.dialogClose}
+            aria-label={t('closeDetails')}
+            onClick={props.onClose}
+          >
+            <IconCloseOutline16 size={14} />
+          </button>
+        </div>
+        <dl className={css.dialogMeta}>
+          <div>
+            <dt>{t('detailsPackage')}</dt>
+            <dd><code className={css.dialogCode}>{packageLabel}</code></dd>
+          </div>
+          <div>
+            <dt>{t('detailsKind')}</dt>
+            <dd>{kindLabel}</dd>
+          </div>
+          <div>
+            <dt>{t('detailsSource')}</dt>
+            <dd>{entry.sourceTitle}</dd>
+          </div>
+          {entry.homepage.length > 0 ? (
+            <div>
+              <dt>{t('detailsHomepage')}</dt>
+              <dd>
+                <a href={entry.homepage} target="_blank" rel="noreferrer">{entry.homepage}</a>
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+        <p className={css.dialogDescription}>{entry.description.length > 0 ? entry.description : t('detailsNoDescription')}</p>
+        <div className={css.dialogFooter}>
+          <button type="button" className={css.button} onClick={props.onClose}>{t('closeDetails')}</button>
+          <button
+            type="button"
+            className={css.button}
+            disabled={props.already || props.installing}
+            onClick={props.onInstall}
+          >
+            {props.already ? t('installedTag') : props.installing ? t('installing') : t('install')}
+          </button>
+        </div>
+      </div>
+    </div>
+  ), document.body)
 }
 
 function ConfigurePage(props: {

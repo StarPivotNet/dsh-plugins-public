@@ -86,6 +86,8 @@
 
 .tab:focus-visible,
 .button:focus-visible,
+.cardHit:focus-visible,
+.dialogClose:focus-visible,
 .search input:focus-visible,
 .field input:focus-visible {
   outline: 2px solid var(--dsw-alias-state-business-primary);
@@ -162,6 +164,10 @@
   list-style: none;
 }
 
+.catalogCards {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
 .list,
 .configList {
   display: flex;
@@ -223,6 +229,44 @@
   gap: 6px;
 }
 
+.catalogCard {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.catalogCard:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.cardHit {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cardAside {
+  flex: none;
+  display: flex;
+  align-items: center;
+  align-self: center;
+}
+
+.cardAside .button {
+  white-space: nowrap;
+}
+
 .cardTitle {
   min-width: 0;
   margin: 0;
@@ -252,6 +296,7 @@
 
 .description {
   display: -webkit-box;
+  width: 100%;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -317,6 +362,126 @@
   clip: rect(0 0 0 0);
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+.dialogRoot {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.dialogMask {
+  position: absolute;
+  inset: 0;
+  background: var(--dsw-alias-bg-mask-1);
+  backdrop-filter: var(--dsw-mask-blur);
+}
+
+.dialog {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(440px, 100%);
+  max-height: min(640px, calc(100vh - 48px));
+  overflow: auto;
+  padding: 20px 20px 18px;
+  border: 1px solid var(--dsw-alias-border-inverted);
+  border-radius: 16px;
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: var(--dsw-shadow-lv3);
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dialogTitle {
+  margin: 0;
+  min-width: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+.dialogClose {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.dialogClose:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dialogMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.dialogMeta > div {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.dialogMeta dt {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.dialogMeta dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.dialogMeta a {
+  color: inherit;
+}
+
+.dialogCode {
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+}
+
+.dialogDescription {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.dialogFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .reloadToast {

@@ -4,7 +4,7 @@ Accepted contract for the first marketplace delivery.
 
 ## Goal
 
-A user who installs `github:StarPivotNet/dsh-plugins-public` into the web profile opens Settings → 插件 → 发现 and sees a non-empty official catalog. Confirming install shows package name, version, and source, then runs the existing npm-only installer.
+A user who installs `github:StarPivotNet/dsh-plugins-public#path:packages/plugin-marketplace` into the web profile opens Settings → 插件 → 发现 and sees a non-empty official catalog. Confirming install shows package name, version, and source, then runs the existing npm-only installer.
 
 ## Scenario
 
@@ -49,7 +49,7 @@ A user who installs `github:StarPivotNet/dsh-plugins-public` into the web profil
 
 | name | version | homepage |
 | --- | --- | --- |
-| `@starpivot/dsh-plugin-marketplace` | `0.1.0` | https://github.com/StarPivotNet/dsh-plugins-public |
+| `@starpivot/dsh-plugin-marketplace` | `0.1.0` | https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/plugin-marketplace |
 | `@dsh-plugin/dsh-auxiliary` | `0.4.2` | https://github.com/dsh-plugins/dsh-auxiliary |
 | `@dsh-plugin/dsh-thought-buddy` | `0.1.1` | https://github.com/dsh-plugins/dsh-thought-buddy |
 | `dsh-find-plugin` | `0.3.6` | https://github.com/awesome-dsh-plugin/dsh-find-plugin |

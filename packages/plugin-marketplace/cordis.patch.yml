@@ -1,5 +1,5 @@
 # Install with:
-#   dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public
+#   dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:packages/plugin-marketplace
 # then restart dsh web. Removing the bundle restores the shipped Plugins page.
 
 - insert:

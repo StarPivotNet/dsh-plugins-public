@@ -25,7 +25,7 @@ function assert(cond: unknown, message: string): void {
 
 assert(DEFAULT_CATALOG_URL === 'https://raw.githubusercontent.com/StarPivotNet/dsh-plugin-catalog/main/catalog.json', 'default catalog url')
 try {
-  const localCatalog = resolve(dirname(fileURLToPath(import.meta.url)), '../../../dsh-plugin-catalog/catalog.json')
+  const localCatalog = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../dsh-plugin-catalog/catalog.json')
   const parsedCatalog = parseCatalogDocument(JSON.parse(readFileSync(localCatalog, 'utf8')), DEFAULT_CATALOG_URL)
   assert(parsedCatalog.ok, 'local catalog parses')
   if (parsedCatalog.ok) {

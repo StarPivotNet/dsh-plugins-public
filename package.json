@@ -1,64 +1,10 @@
 {
-  "name": "@starpivot/dsh-plugin-marketplace",
-  "version": "0.1.0",
-  "description": "可安装的 DeepSeek Harness 插件市场，替换设置里的插件页",
-  "homepage": "https://github.com/StarPivotNet/dsh-plugins-public",
-  "keywords": [
-    "dsh-plugin",
-    "deepseek-harness",
-    "marketplace"
-  ],
-  "type": "module",
+  "name": "dsh-plugins-public",
+  "private": true,
+  "description": "Public out-of-tree DeepSeek Harness plugins. Each installable plugin lives in packages/<name>.",
   "license": "MIT",
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/StarPivotNet/dsh-plugins-public.git"
-  },
-  "main": "lib/node.js",
-  "exports": {
-    ".": "./lib/node.js",
-    "./host": "./lib/host.js",
-    "./client": "./lib/client.js",
-    "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
-  },
-  "files": [
-    "lib/node.js",
-    "lib/host.js",
-    "lib/client.js",
-    "lib/reboot-watchdog.js",
-    "cordis.patch.yml",
-    "README.md"
-  ],
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "prepublishOnly": "node scripts/build.mjs",
-    "test": "node --experimental-strip-types src/host/reload.spec.ts && node --experimental-strip-types src/client/confirm-install.spec.ts"
-  },
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    },
-    "client": {
-      "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-settings",
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-connection",
-        "@deepseek-ai/dsh-client-modules",
-        "@deepseek-ai/dsh-client-ui-conversation"
-      ]
-    }
-  },
-  "devDependencies": {
-    "esbuild": "^0.25.0",
-    "lightningcss": "^1.30.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "lightningcss"]
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test"
   }
 }

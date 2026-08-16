@@ -8,7 +8,10 @@ import {
   reconcileProfilePlugins,
   runProfilePnpm,
 } from '@deepseek-ai/dsh-app-boot'
-import { matchReloadTarget, reloadClientPlugins, reloadHostEntry, type ReloadableEntry } from './reload.ts'
+import {
+  matchReloadTarget, reloadClientPlugins, reloadHostEntry, selectReloadEntries,
+  type ReloadableEntry,
+} from './reload.ts'
 import { resolveUpdateTarget } from './update.ts'
 import { buildRebootSpec, rebootBlocked, startWatchdog, writeRebootSpec } from './reboot.ts'
 
@@ -20,9 +23,9 @@ export function registerMarketplaceCommands(ctx: Context, options: {
 }): void {
   ctx.commands.register({
     name: 'reload',
-    description: '重载插件，不重启 dsh。不写名字则重载全部。',
+    description: '重载已安装插件。不写名字则重载全部可替换插件；骨架请用 /reboot。',
     input: { hint: '[插件名字]' },
-    handler: invocation => handleReload(ctx, invocation.rawInput),
+    handler: invocation => handleReload(ctx, options.requireProfile(), invocation.rawInput),
   })
   ctx.commands.register({
     name: 'update',
@@ -48,7 +51,12 @@ export function registerMarketplaceCommands(ctx: Context, options: {
   })
 }
 
-async function handleReload(ctx: Context, rawInput: string): Promise<{ kind: 'success' | 'error'; text: string }> {
+async function handleReload(
+  ctx: Context,
+  profile: { dir: string },
+  rawInput: string,
+): Promise<{ kind: 'success' | 'error'; text: string }> {
+  const dependencies = Object.keys(readProfileManifest('plugin-marketplace', profile.dir).dependencies ?? {})
   const entries = [...ctx.loader.entries()]
     .filter(entry => !entry.options.group)
     .map((entry): ReloadableEntry => ({
@@ -70,19 +78,20 @@ async function handleReload(ctx: Context, rawInput: string): Promise<{ kind: 'su
       text: `有多个插件匹配 ${JSON.stringify(matched.query)}：${matched.matches.map(entry => entry.id).join('、')}`,
     }
   }
-  const selected = matched.kind === 'one'
-    ? entries.filter(entry => entry.id === matched.entry.id)
-    : entries.filter(entry => entry.enabled && entry.id !== 'plugin-marketplace')
+  const picked = selectReloadEntries(entries, matched, dependencies)
+  if (!picked.ok) return { kind: 'error', text: picked.message }
+  const registry = (ctx as { registry?: { delete(callback: unknown): void } }).registry
   const failures: string[] = []
   let ok = 0
-  for (const entry of selected) {
-    const result = await reloadHostEntry(entry)
+  for (const entry of picked.selected) {
+    const result = await reloadHostEntry(entry, registry)
     if (result.ok) ok += 1
     else failures.push(`${entry.id}: ${result.message}`)
   }
   const port = (ctx.get('webServer') as { port?: number } | undefined)?.port
   const client = await reloadClientPlugins(port)
-  const summary = `已重载 ${String(ok)} 个 Host 插件。${client}`
+  const skipped = picked.skipped > 0 ? `跳过 ${String(picked.skipped)} 个骨架/内置条目。` : ''
+  const summary = `已重载 ${String(ok)} 个 Host 插件。${skipped}${client}`
   if (failures.length === 0) return { kind: 'success', text: summary }
   return { kind: 'error', text: `${summary} 失败：${failures.join('；')}` }
 }

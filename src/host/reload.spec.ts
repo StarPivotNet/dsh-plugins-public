@@ -1,4 +1,4 @@
-import { matchReloadTarget, reloadHostEntry } from './reload.ts'
+import { isSkeletonEntry, matchReloadTarget, reloadHostEntry, selectReloadEntries } from './reload.ts'
 import { resolveUpdateTarget } from './update.ts'
 import { rebootBlocked, REBOOT_ENV } from './reboot.ts'
 
@@ -16,6 +16,17 @@ assert(matchReloadTarget(entries, '').kind === 'all', 'empty query reloads all')
 assert(matchReloadTarget(entries, 'llm').kind === 'one', 'id match')
 assert(matchReloadTarget(entries, '@deepseek-ai/dsh-session').kind === 'one', 'module match')
 assert(matchReloadTarget(entries, 'missing').kind === 'none', 'unknown')
+assert(isSkeletonEntry('connection', '@deepseek-ai/dsh-client-connection'), 'connection is skeleton')
+assert(!isSkeletonEntry('plain-plugin', 'plain-lib'), 'extra plugin is not skeleton')
+const selectedAll = selectReloadEntries([
+  { id: 'connection', moduleName: '@deepseek-ai/dsh-client-connection', enabled: true, async refresh() {} },
+  { id: 'plain', moduleName: 'plain-lib', enabled: true, async refresh() {} },
+], { kind: 'all' }, ['plain-lib'])
+assert(selectedAll.ok && selectedAll.selected.map(entry => entry.id).join(',') === 'plain', 'all skips skeleton')
+const namedCore = selectReloadEntries([
+  { id: 'connection', moduleName: '@deepseek-ai/dsh-client-connection', enabled: true, async refresh() {} },
+], { kind: 'one', entry: { id: 'connection', moduleName: '@deepseek-ai/dsh-client-connection' } }, [])
+assert(!namedCore.ok, 'named skeleton requires reboot')
 assert(resolveUpdateTarget(['@starpivot/dsh-plugin-marketplace', 'plain-lib'], '').kind === 'all', 'update all')
 assert(resolveUpdateTarget(['plain-lib'], 'plain-lib').kind === 'one', 'update one')
 assert(resolveUpdateTarget(['plain-lib'], 'cordis:include').kind === 'none', 'inbox cannot update')

@@ -1,0 +1,13 @@
+# Install with:
+#   dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public
+# then restart dsh web. Removing the bundle restores the shipped Plugins page.
+
+- insert:
+    - id: plugin-marketplace
+      name: '@starpivot/dsh-plugin-marketplace/host'
+
+    - id: ui-settings-plugin-marketplace
+      name: '@starpivot/dsh-plugin-marketplace'
+
+- id: ui-settings-plugin-inventory
+  disabled: true

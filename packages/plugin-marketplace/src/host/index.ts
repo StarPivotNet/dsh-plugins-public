@@ -231,7 +231,14 @@ export function apply(ctx: Context, config: Config = {}): void {
       if (urls.length === 0) return emptyCatalog()
       const cached = snapshotFromCache(urls, readCatalogCache(ctx))
       if (cached !== undefined) return { ...cached, refreshing: false }
-      return { configured: true, sources: [], entries: [], fetchedAt: 0, stale: true, refreshing: false }
+      return {
+        configured: true,
+        sources: urls.map(url => ({ url, title: sourceTitleFromUrl(url), ok: true, count: 0 })),
+        entries: [],
+        fetchedAt: 0,
+        stale: true,
+        refreshing: false,
+      }
     },
     async refreshCatalog(request: { url?: string } = {}): Promise<CatalogSnapshot> {
       const urls = effectiveCatalogUrls(ctx, resolved.catalogUrls)

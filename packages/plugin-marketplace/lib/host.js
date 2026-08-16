@@ -164,15 +164,18 @@ function mergeCachedSource(cache, source, fetchedAt = Date.now()) {
   return { fetchedAt, sources };
 }
 function snapshotFromCache(urls, cache) {
-  if (cache === void 0 || cache.sources.length === 0 || urls.length === 0) return void 0;
-  const byUrl = new Map(cache.sources.map((source) => [source.url, source]));
+  if (urls.length === 0) return void 0;
+  const byUrl = new Map((cache?.sources ?? []).map((source) => [source.url, source]));
   const sources = [];
   const entries = [];
   const seen = /* @__PURE__ */ new Set();
   let hit = false;
   for (const url of urls) {
     const cached = byUrl.get(url);
-    if (cached === void 0) continue;
+    if (cached === void 0) {
+      sources.push({ url, title: sourceTitleFromUrl(url), ok: true, count: 0 });
+      continue;
+    }
     hit = true;
     sources.push({
       url: cached.url,
@@ -187,13 +190,13 @@ function snapshotFromCache(urls, cache) {
       entries.push(entry);
     }
   }
-  if (!hit) return void 0;
+  if (!hit && (cache === void 0 || cache.sources.length === 0)) return void 0;
   return {
     configured: true,
     sources,
     entries,
-    fetchedAt: cache.fetchedAt,
-    stale: sources.length < urls.length
+    fetchedAt: cache?.fetchedAt ?? 0,
+    stale: !hit || sources.some((source) => byUrl.get(source.url) === void 0)
   };
 }
 function cachedSourceFromFetch(source, entries) {
@@ -889,7 +892,14 @@ function apply(ctx, config = {}) {
       if (urls.length === 0) return emptyCatalog();
       const cached = snapshotFromCache(urls, readCatalogCache(ctx));
       if (cached !== void 0) return { ...cached, refreshing: false };
-      return { configured: true, sources: [], entries: [], fetchedAt: 0, stale: true, refreshing: false };
+      return {
+        configured: true,
+        sources: urls.map((url) => ({ url, title: sourceTitleFromUrl(url), ok: true, count: 0 })),
+        entries: [],
+        fetchedAt: 0,
+        stale: true,
+        refreshing: false
+      };
     },
     async refreshCatalog(request = {}) {
       const urls = effectiveCatalogUrls(ctx, resolved.catalogUrls);

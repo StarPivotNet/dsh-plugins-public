@@ -14,6 +14,7 @@ import type {
   InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import { catalogPackageLabel, installedHoverLabel } from './catalog-label.ts'
+import { DEFAULT_CATALOG_URL } from '../host/defaults.ts'
 import { confirmInstallMessage } from './confirm-install.ts'
 import type { MarketplaceLocaleKey } from './locales.ts'
 import css from './MarketplaceSettingsSection.module.css'
@@ -129,7 +130,7 @@ export function MarketplaceSettingsSection({
   const [restart, setRestart] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [draftUrls, setDraftUrls] = useState<string[]>(
-    catalogUrls.length > 0 ? [...catalogUrls] : [''],
+    catalogUrls.length > 0 ? [...catalogUrls] : [DEFAULT_CATALOG_URL],
   )
   const [savingUrl, setSavingUrl] = useState(false)
   const [refreshingUrl, setRefreshingUrl] = useState<string | 'all' | null>(null)
@@ -147,7 +148,7 @@ export function MarketplaceSettingsSection({
         setRefreshingUrl('all')
         void refreshCatalog().then(
           (fresh) => { if (current) setCatalog({ status: 'ready', value: fresh }) },
-          () => { if (current && snapshot.entries.length === 0) setCatalog({ status: 'error' }) },
+          () => { if (current) setNotice(t('error')) },
         ).finally(() => { if (current) setRefreshingUrl(null) })
       },
       () => { if (current) setCatalog({ status: 'error' }) },
@@ -457,6 +458,9 @@ function DiscoverPage(props: {
           <button type="button" className={css.button} onClick={props.onRetry}>{t('retry')}</button>
         </div>
       ) : null}
+      {props.refreshingUrl !== null && props.catalog.status === 'ready' && props.catalog.value.entries.length === 0
+        ? <p className={css.status}>{t('refreshingCatalog')}</p>
+        : null}
       {props.catalog.status === 'ready' && !props.catalog.value.configured
         ? <p className={css.empty}>{t('catalogUnconfigured')}</p>
         : null}

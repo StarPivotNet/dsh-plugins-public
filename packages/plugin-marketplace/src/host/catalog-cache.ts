@@ -1,5 +1,6 @@
 /** Persist and reassemble Discover catalog snapshots between fetches. */
 
+import { sourceTitleFromUrl } from './catalog.ts'
 import type { CatalogPlugin, CatalogSnapshot, CatalogSource } from './types.ts'
 
 export interface CachedCatalogSource extends CatalogSource {
@@ -55,15 +56,18 @@ export function snapshotFromCache(
   urls: readonly string[],
   cache: CatalogCache | undefined,
 ): CatalogSnapshot | undefined {
-  if (cache === undefined || cache.sources.length === 0 || urls.length === 0) return undefined
-  const byUrl = new Map(cache.sources.map(source => [source.url, source]))
+  if (urls.length === 0) return undefined
+  const byUrl = new Map((cache?.sources ?? []).map(source => [source.url, source]))
   const sources: CatalogSource[] = []
   const entries: CatalogPlugin[] = []
   const seen = new Set<string>()
   let hit = false
   for (const url of urls) {
     const cached = byUrl.get(url)
-    if (cached === undefined) continue
+    if (cached === undefined) {
+      sources.push({ url, title: sourceTitleFromUrl(url), ok: true, count: 0 })
+      continue
+    }
     hit = true
     sources.push({
       url: cached.url,
@@ -78,13 +82,13 @@ export function snapshotFromCache(
       entries.push(entry)
     }
   }
-  if (!hit) return undefined
+  if (!hit && (cache === undefined || cache.sources.length === 0)) return undefined
   return {
     configured: true,
     sources,
     entries,
-    fetchedAt: cache.fetchedAt,
-    stale: sources.length < urls.length,
+    fetchedAt: cache?.fetchedAt ?? 0,
+    stale: !hit || sources.some(source => byUrl.get(source.url) === undefined),
   }
 }
 

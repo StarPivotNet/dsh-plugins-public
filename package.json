@@ -1,7 +1,7 @@
 {
   "name": "@starpivot/dsh-plugin-marketplace",
   "version": "0.1.0",
-  "description": "Out-of-tree DeepSeek Harness plugin marketplace that replaces Web Settings Plugins",
+  "description": "可安装的 DeepSeek Harness 插件市场，替换设置里的插件页",
   "type": "module",
   "license": "MIT",
   "repository": {

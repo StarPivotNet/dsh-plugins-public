@@ -26,7 +26,7 @@ export function rebootBlocked(now = Date.now(), env: NodeJS.ProcessEnv = process
   const started = Number(raw)
   if (!Number.isFinite(started)) return undefined
   if (now - started < REBOOT_COOLDOWN_MS) {
-    return 'dsh just restarted; wait a few seconds before /reboot again'
+    return 'dsh 刚刚重启过，请稍后再运行 /reboot'
   }
   return undefined
 }
@@ -92,10 +92,10 @@ export async function startWatchdog(watchdogPath: string, specPath: string): Pro
     windowsHide: false,
   })
   if (child.pid === undefined) {
-    return { ok: false, message: 'failed to spawn reboot watchdog' }
+    return { ok: false, message: '无法拉起重启看门狗' }
   }
   child.unref()
   const alive = await waitUntil(() => processAlive(child.pid!), 2_000)
-  if (!alive) return { ok: false, message: 'reboot watchdog exited before dsh handed off' }
+  if (!alive) return { ok: false, message: '看门狗在交接前就退出了' }
   return { ok: true, pid: child.pid }
 }

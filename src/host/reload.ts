@@ -41,7 +41,7 @@ export function matchReloadTarget(
 }
 
 export async function reloadHostEntry(entry: ReloadableEntry): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (!entry.enabled) return { ok: false, message: `entry ${entry.id} is disabled` }
+  if (!entry.enabled) return { ok: false, message: `条目 ${entry.id} 已停用` }
   try {
     const fiber = entry.fiber
     if (fiber !== undefined) {
@@ -61,9 +61,9 @@ export async function reloadHostEntry(entry: ReloadableEntry): Promise<{ ok: tru
 
 export async function reloadClientPlugins(port: number | undefined): Promise<string> {
   if (port === undefined || !Number.isInteger(port) || port <= 0) {
-    return 'skipped client reload (no webServer port)'
+    return '已跳过浏览器插件重载（没有 webServer 端口）'
   }
   const response = await fetch(`http://127.0.0.1:${String(port)}/plugins/reload`, { method: 'POST' })
-  if (!response.ok) return `client reload failed: HTTP ${String(response.status)}`
-  return 'client plugins reloaded'
+  if (!response.ok) return `浏览器插件重载失败：HTTP ${String(response.status)}`
+  return '浏览器插件已重载'
 }

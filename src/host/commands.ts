@@ -20,19 +20,19 @@ export function registerMarketplaceCommands(ctx: Context, options: {
 }): void {
   ctx.commands.register({
     name: 'reload',
-    description: 'Reload plugins without restarting dsh. Omit the name to reload all.',
-    input: { hint: '[plugin name]' },
+    description: '重载插件，不重启 dsh。不写名字则重载全部。',
+    input: { hint: '[插件名字]' },
     handler: invocation => handleReload(ctx, invocation.rawInput),
   })
   ctx.commands.register({
     name: 'update',
-    description: 'Update installed profile plugins. Does not reload.',
-    input: { hint: '[plugin name]' },
+    description: '更新已安装的 profile 插件，不会热重载。',
+    input: { hint: '[插件名字]' },
     handler: invocation => handleUpdate(options.requireProfile(), invocation.rawInput),
   })
   ctx.commands.register({
     name: 'reboot',
-    description: 'Restart the dsh process through a watchdog.',
+    description: '通过看门狗重启整个 dsh 进程。',
     handler: async () => {
       options.pinAutoReloadOff()
       const blocked = rebootBlocked()
@@ -43,7 +43,7 @@ export function registerMarketplaceCommands(ctx: Context, options: {
       const started = await startWatchdog(watchdogPath, specPath)
       if (!started.ok) return { kind: 'error', text: started.message }
       setTimeout(() => { options.exitProcess() }, 0)
-      return { kind: 'success', text: 'Watchdog is ready. Exiting so dsh can restart…' }
+      return { kind: 'success', text: '看门狗已就绪，正在退出以便重启…' }
     },
   })
 }
@@ -61,13 +61,13 @@ async function handleReload(ctx: Context, rawInput: string): Promise<{ kind: 'su
     }))
   const matched = matchReloadTarget(entries, rawInput)
   if (matched.kind === 'none') {
-    const hint = matched.suggestions.length > 0 ? ` Did you mean: ${matched.suggestions.join(', ')}` : ''
-    return { kind: 'error', text: `No plugin matches ${JSON.stringify(matched.query)}.${hint}` }
+    const hint = matched.suggestions.length > 0 ? ` 是不是指：${matched.suggestions.join('、')}` : ''
+    return { kind: 'error', text: `没有匹配 ${JSON.stringify(matched.query)} 的插件。${hint}` }
   }
   if (matched.kind === 'ambiguous') {
     return {
       kind: 'error',
-      text: `Several plugins match ${JSON.stringify(matched.query)}: ${matched.matches.map(entry => entry.id).join(', ')}`,
+      text: `有多个插件匹配 ${JSON.stringify(matched.query)}：${matched.matches.map(entry => entry.id).join('、')}`,
     }
   }
   const selected = matched.kind === 'one'
@@ -82,9 +82,9 @@ async function handleReload(ctx: Context, rawInput: string): Promise<{ kind: 'su
   }
   const port = (ctx.get('webServer') as { port?: number } | undefined)?.port
   const client = await reloadClientPlugins(port)
-  const summary = `Reloaded ${String(ok)} host plugin(s). ${client}`
+  const summary = `已重载 ${String(ok)} 个 Host 插件。${client}`
   if (failures.length === 0) return { kind: 'success', text: summary }
-  return { kind: 'error', text: `${summary} Failed: ${failures.join('; ')}` }
+  return { kind: 'error', text: `${summary} 失败：${failures.join('；')}` }
 }
 
 function handleUpdate(
@@ -95,17 +95,17 @@ function handleUpdate(
   const dependencies = Object.keys(manifest.dependencies ?? {})
   const matched = resolveUpdateTarget(dependencies, rawInput)
   if (matched.kind === 'none') {
-    return { kind: 'error', text: `${JSON.stringify(matched.query)} is not a profile dependency and cannot be updated.` }
+    return { kind: 'error', text: `${JSON.stringify(matched.query)} 不是 profile 依赖，不能更新。` }
   }
   if (matched.kind === 'ambiguous') {
-    return { kind: 'error', text: `Several dependencies match: ${matched.matches.join(', ')}` }
+    return { kind: 'error', text: `有多个依赖匹配：${matched.matches.join('、')}` }
   }
   const args = matched.kind === 'all' ? ['update'] : ['update', matched.name]
   const before = readProfileManifest('plugin-marketplace', profile.dir)
   const result = runProfilePnpm({ profileDir: profile.dir, args, stdio: 'pipe' })
-  if (result.missingPnpm) return { kind: 'error', text: 'pnpm is not on PATH; install pnpm to update plugins.' }
+  if (result.missingPnpm) return { kind: 'error', text: '找不到 pnpm，请先安装 pnpm 再更新插件。' }
   if (result.exitCode !== 0) {
-    return { kind: 'error', text: result.stderr.trim() || result.stdout.trim() || `pnpm exited ${String(result.exitCode)}` }
+    return { kind: 'error', text: result.stderr.trim() || result.stdout.trim() || `pnpm 退出码 ${String(result.exitCode)}` }
   }
   reconcileProfilePlugins({
     binName: 'plugin-marketplace',
@@ -115,6 +115,6 @@ function handleUpdate(
   })
   return {
     kind: 'success',
-    text: 'Updated. Run /reload to load the new code, or /reboot to restart the process.',
+    text: '已更新。要加载新代码请运行 /reload；要重启进程请运行 /reboot。',
   }
 }

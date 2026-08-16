@@ -187,7 +187,6 @@ export function MarketplaceSettingsSection({
   return (
     <div className={css.section} aria-busy={catalog.status === 'loading' || installed.status === 'loading'}>
       <h2 className={css.heading}>{t('title')}</h2>
-      <p className={css.intro}>{t('intro')}</p>
       {restart ? <p className={css.restart} role="status">{t('restart')}</p> : null}
       {notice !== null ? <p className={css.failure} role="alert">{notice}</p> : null}
       <div className={css.tabs} role="tablist" aria-label={t('tabs')}>
@@ -354,7 +353,6 @@ function DiscoverPage(props: {
             </Tooltip>
           </div>
         ))}
-        <p className={css.hint}>{t('marketUrlHint')}</p>
         <div className={css.actions}>
           <button
             type="button"

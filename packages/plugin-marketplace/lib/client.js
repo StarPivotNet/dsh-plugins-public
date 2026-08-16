@@ -75,7 +75,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var MarketplaceSettingsSection_default = { "description": "DYfBnq_description", "hint": "DYfBnq_hint", "dialogFooter": "DYfBnq_dialogFooter", "catalogCards": "DYfBnq_catalogCards", "list": "DYfBnq_list", "headingRow": "DYfBnq_headingRow", "dialogClose": "DYfBnq_dialogClose", "cardHit": "DYfBnq_cardHit", "panel": "DYfBnq_panel", "tab": "DYfBnq_tab", "sources": "DYfBnq_sources", "heading": "DYfBnq_heading", "failure": "DYfBnq_failure", "packageName": "DYfBnq_packageName", "dialogMask": "DYfBnq_dialogMask", "dialogHeader": "DYfBnq_dialogHeader", "dialogCode": "DYfBnq_dialogCode", "catalogCard": "DYfBnq_catalogCard", "intro": "DYfBnq_intro", "cards": "DYfBnq_cards", "section": "DYfBnq_section", "configList": "DYfBnq_configList", "dialogRoot": "DYfBnq_dialogRoot", "source": "DYfBnq_source", "dialogDescription": "DYfBnq_dialogDescription", "iconButton": "DYfBnq_iconButton", "sourceMain": "DYfBnq_sourceMain", "search": "DYfBnq_search", "card": "DYfBnq_card", "status": "DYfBnq_status", "tabs": "DYfBnq_tabs", "field": "DYfBnq_field", "sourceActions": "DYfBnq_sourceActions", "visuallyHidden": "DYfBnq_visuallyHidden", "button": "DYfBnq_button", "restart": "DYfBnq_restart", "empty": "DYfBnq_empty", "cardBody": "DYfBnq_cardBody", "reloadToast": "DYfBnq_reloadToast", "tag": "DYfBnq_tag", "cardAside": "DYfBnq_cardAside", "actions": "DYfBnq_actions", "dialogTitle": "DYfBnq_dialogTitle", "marketRow": "DYfBnq_marketRow", "dialog": "DYfBnq_dialog", "sourceLabel": "DYfBnq_sourceLabel", "cardTitle": "DYfBnq_cardTitle", "dialogMeta": "DYfBnq_dialogMeta" };
+var MarketplaceSettingsSection_default = { "tabs": "DYfBnq_tabs", "hint": "DYfBnq_hint", "iconButton": "DYfBnq_iconButton", "section": "DYfBnq_section", "list": "DYfBnq_list", "sourceActions": "DYfBnq_sourceActions", "catalogCard": "DYfBnq_catalogCard", "cardTitle": "DYfBnq_cardTitle", "dialogMask": "DYfBnq_dialogMask", "dialogTitle": "DYfBnq_dialogTitle", "dialogDescription": "DYfBnq_dialogDescription", "status": "DYfBnq_status", "catalogCards": "DYfBnq_catalogCards", "empty": "DYfBnq_empty", "search": "DYfBnq_search", "marketRow": "DYfBnq_marketRow", "tag": "DYfBnq_tag", "cardHit": "DYfBnq_cardHit", "visuallyHidden": "DYfBnq_visuallyHidden", "panel": "DYfBnq_panel", "configList": "DYfBnq_configList", "cards": "DYfBnq_cards", "tab": "DYfBnq_tab", "field": "DYfBnq_field", "sources": "DYfBnq_sources", "card": "DYfBnq_card", "failure": "DYfBnq_failure", "sourceLabel": "DYfBnq_sourceLabel", "cardAside": "DYfBnq_cardAside", "dialogRoot": "DYfBnq_dialogRoot", "dialogFooter": "DYfBnq_dialogFooter", "cardBody": "DYfBnq_cardBody", "headingRow": "DYfBnq_headingRow", "description": "DYfBnq_description", "dialogHeader": "DYfBnq_dialogHeader", "dialogCode": "DYfBnq_dialogCode", "reloadToast": "DYfBnq_reloadToast", "restart": "DYfBnq_restart", "sourceMain": "DYfBnq_sourceMain", "dialogMeta": "DYfBnq_dialogMeta", "source": "DYfBnq_source", "button": "DYfBnq_button", "actions": "DYfBnq_actions", "dialog": "DYfBnq_dialog", "dialogClose": "DYfBnq_dialogClose", "packageName": "DYfBnq_packageName", "intro": "DYfBnq_intro", "heading": "DYfBnq_heading" };
 
 // src/client/MarketplaceSettingsSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -173,7 +173,6 @@ function MarketplaceSettingsSection({
   };
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: MarketplaceSettingsSection_default.section, "aria-busy": catalog.status === "loading" || installed.status === "loading", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { className: MarketplaceSettingsSection_default.heading, children: t("title") }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.intro, children: t("intro") }),
     restart ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.restart, role: "status", children: t("restart") }) : null,
     notice !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.failure, role: "alert", children: notice }) : null,
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: MarketplaceSettingsSection_default.tabs, role: "tablist", "aria-label": t("tabs"), children: ["discover", "installed", "configure"].map((id) => {
@@ -334,7 +333,6 @@ function DiscoverPage(props) {
           }
         ) })
       ] }, `market-${String(index)}`)),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.hint, children: t("marketUrlHint") }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: MarketplaceSettingsSection_default.actions, children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "button",
@@ -765,7 +763,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css2;
   document.head.appendChild(tag);
 }
-var ReloadCommandCard_default = { "leading": "_998sQa_leading", "root": "_998sQa_root", "row": "_998sQa_row", "body": "_998sQa_body", "summary": "_998sQa_summary", "chevron": "_998sQa_chevron", "title": "_998sQa_title", "separator": "_998sQa_separator" };
+var ReloadCommandCard_default = { "chevron": "_998sQa_chevron", "leading": "_998sQa_leading", "separator": "_998sQa_separator", "body": "_998sQa_body", "root": "_998sQa_root", "row": "_998sQa_row", "summary": "_998sQa_summary", "title": "_998sQa_title" };
 
 // src/client/ReloadCommandCard.tsx
 var import_jsx_runtime2 = require("react/jsx-runtime");
@@ -981,7 +979,6 @@ function sameReloadStatus(left, right) {
 var zh = {
   nav: "\u63D2\u4EF6",
   title: "\u63D2\u4EF6\u5E02\u573A",
-  intro: "\u6D4F\u89C8\u53EF\u5B89\u88C5\u63D2\u4EF6\uFF0C\u5E76\u7BA1\u7406\u672C profile \u5DF2\u5B89\u88C5\u7684\u63D2\u4EF6\u3002",
   tabs: "\u63D2\u4EF6\u89C6\u56FE",
   discoverTab: "\u53D1\u73B0",
   installedTab: "\u5DF2\u5B89\u88C5",
@@ -992,7 +989,6 @@ var zh = {
   catalogUnconfigured: "\u5C1A\u672A\u914D\u7F6E\u8FDC\u7A0B\u63D2\u4EF6\u5E02\u573A\u3002\u5728\u4E0B\u65B9\u6DFB\u52A0\u4E00\u4E2A http(s) \u76EE\u5F55 URL\u3002",
   markets: "\u8FDC\u7A0B\u5E02\u573A",
   marketUrl: "\u5E02\u573A URL",
-  marketUrlHint: "\u6BCF\u4E2A\u5E02\u573A\u662F\u4E00\u4EFD version \u4E3A 1 \u7684 JSON \u76EE\u5F55\u3002\u53EF\u6DFB\u52A0\u591A\u4E2A\u3002",
   addMarket: "\u6DFB\u52A0\u5E02\u573A",
   editMarket: "\u7F16\u8F91",
   removeMarket: "\u79FB\u9664",
@@ -1044,7 +1040,6 @@ var zh = {
 var en = {
   nav: "Plugins",
   title: "Plugin marketplace",
-  intro: "Browse installable plugins and manage the plugins in this profile.",
   tabs: "Plugin views",
   discoverTab: "Discover",
   installedTab: "Installed",
@@ -1055,7 +1050,6 @@ var en = {
   catalogUnconfigured: "No remote marketplace is configured. Add an http(s) catalog URL below.",
   markets: "Remote marketplaces",
   marketUrl: "Marketplace URL",
-  marketUrlHint: "Each marketplace is a version-1 JSON catalog. Add as many as you need.",
   addMarket: "Add marketplace",
   editMarket: "Edit",
   removeMarket: "Remove",

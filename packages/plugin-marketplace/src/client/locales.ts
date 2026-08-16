@@ -3,7 +3,6 @@
 export const zh = {
   nav: '插件',
   title: '插件市场',
-  intro: '浏览可安装插件，并管理本 profile 已安装的插件。',
   tabs: '插件视图',
   discoverTab: '发现',
   installedTab: '已安装',
@@ -14,7 +13,6 @@ export const zh = {
   catalogUnconfigured: '尚未配置远程插件市场。在下方添加一个 http(s) 目录 URL。',
   markets: '远程市场',
   marketUrl: '市场 URL',
-  marketUrlHint: '每个市场是一份 version 为 1 的 JSON 目录。可添加多个。',
   addMarket: '添加市场',
   editMarket: '编辑',
   removeMarket: '移除',
@@ -69,7 +67,6 @@ export type MarketplaceLocaleKey = keyof typeof zh
 export const en = {
   nav: 'Plugins',
   title: 'Plugin marketplace',
-  intro: 'Browse installable plugins and manage the plugins in this profile.',
   tabs: 'Plugin views',
   discoverTab: 'Discover',
   installedTab: 'Installed',
@@ -80,7 +77,6 @@ export const en = {
   catalogUnconfigured: 'No remote marketplace is configured. Add an http(s) catalog URL below.',
   markets: 'Remote marketplaces',
   marketUrl: 'Marketplace URL',
-  marketUrlHint: 'Each marketplace is a version-1 JSON catalog. Add as many as you need.',
   addMarket: 'Add marketplace',
   editMarket: 'Edit',
   removeMarket: 'Remove',

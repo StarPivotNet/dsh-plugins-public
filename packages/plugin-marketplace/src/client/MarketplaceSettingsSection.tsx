@@ -121,7 +121,28 @@ function installedKindLabel(
   return t(kind === 'inbox' ? 'inboxTag' : kind === 'bundle' ? 'bundleTag' : 'dependencyTag')
 }
 
+type InstalledTagFilter =
+  | { readonly mode: 'all' }
+  | { readonly mode: 'untagged' }
+  | { readonly mode: 'tag'; readonly tag: string }
 
+function notesMap(entries: readonly MarketplaceInstalledItem[]): Record<string, { note: string; tags: readonly string[] }> {
+  return Object.fromEntries(entries.map(entry => [entry.packageName, { note: entry.note, tags: entry.tags }]))
+}
+
+function mergeTags(current: readonly string[], raw: string): string[] {
+  return parseTagInput([...current, raw].join(','))
+}
+
+function resolveTagFilter(
+  filter: InstalledTagFilter,
+  tags: readonly string[],
+): InstalledTagFilter {
+  if (filter.mode !== 'tag') return filter
+  return tags.some(tag => tag.toLocaleLowerCase() === filter.tag.toLocaleLowerCase())
+    ? filter
+    : { mode: 'all' }
+}
 
 /** Render the marketplace Plugins section. */
 export function MarketplaceSettingsSection({
@@ -203,20 +224,37 @@ export function MarketplaceSettingsSection({
     void refreshCatalogNow()
   }
 
+  const refreshInstalled = (): void => {
+    setInstalledRequest(value => value + 1)
+  }
+
+  const applyInstalledNote = (name: string, note: string, tags: readonly string[]): void => {
+    setInstalled((current) => {
+      if (current.status !== 'ready') return current
+      return {
+        status: 'ready',
+        value: current.value.map(entry => entry.packageName === name ? { ...entry, note, tags } : entry),
+      }
+    })
+  }
+
   const runMutation = async (
     name: string,
     work: () => Promise<MarketplaceMutationResult>,
-  ): Promise<void> => {
+    options: { readonly keepList?: boolean } = {},
+  ): Promise<boolean> => {
     setBusyName(name)
     setNotice(null)
     const result = await work()
     setBusyName(null)
     if (!result.ok) {
       setNotice(result.message ?? t('error'))
-      return
+      return false
     }
     if (result.restartRequired === true) setRestart(true)
-    refreshAll()
+    if (options.keepList === true) refreshInstalled()
+    else refreshAll()
+    return true
   }
 
   return (
@@ -300,7 +338,12 @@ export function MarketplaceSettingsSection({
             }}
             onUninstall={name => void runMutation(name, () => uninstall(name))}
             onToggle={(entryId, enabled, packageName) => void runMutation(packageName, () => setEnabled(entryId, enabled))}
-            onSaveNote={(name, note, tags) => void runMutation(name, () => setPluginNote(name, note, tags))}
+            onSaveNote={async (name, note, tags) => {
+              applyInstalledNote(name, note, tags)
+              const ok = await runMutation(name, () => setPluginNote(name, note, tags), { keepList: true })
+              if (!ok) refreshInstalled()
+              return ok
+            }}
           />
         ) : null}
         {tab === 'configure' ? (
@@ -584,18 +627,27 @@ function InstalledPage(props: {
   onRetry: () => void
   onUninstall: (name: string) => void
   onToggle: (entryId: string, enabled: boolean, packageName: string) => void
-  onSaveNote: (name: string, note: string, tags: readonly string[]) => void
+  onSaveNote: (name: string, note: string, tags: readonly string[]) => Promise<boolean>
 }): ReactNode {
   const { t } = props
-  const [details, setDetails] = useState<MarketplaceInstalledItem | null>(null)
+  const [detailsName, setDetailsName] = useState<string | null>(null)
   const [kindFilter, setKindFilter] = useState<'all' | MarketplaceInstalledItem['kind']>('all')
-  const [tagFilter, setTagFilter] = useState<string | null>(null)
-  const tags = allTags(Object.fromEntries(props.filtered.map(entry => [entry.packageName, { note: entry.note, tags: entry.tags }])))
+  const [tagFilter, setTagFilter] = useState<InstalledTagFilter>({ mode: 'all' })
+  const listed = props.installed.status === 'ready' ? props.installed.value : []
+  const tags = allTags(notesMap(listed))
+  const activeTagFilter = resolveTagFilter(tagFilter, tags)
+  const untaggedCount = listed.filter(entry => entry.tags.length === 0).length
   const visible = props.filtered.filter((entry) => {
     if (kindFilter !== 'all' && entry.kind !== kindFilter) return false
-    if (tagFilter !== null && !entry.tags.some(tag => tag.toLocaleLowerCase() === tagFilter.toLocaleLowerCase())) return false
+    if (activeTagFilter.mode === 'untagged') return entry.tags.length === 0
+    if (activeTagFilter.mode === 'tag') {
+      return entry.tags.some(tag => tag.toLocaleLowerCase() === activeTagFilter.tag.toLocaleLowerCase())
+    }
     return true
   })
+  const details = detailsName === null
+    ? null
+    : listed.find(entry => entry.packageName === detailsName) ?? null
   return (
     <>
       {props.installed.status === 'loading' ? <p className={css.status}>{t('loading')}</p> : null}
@@ -632,23 +684,43 @@ function InstalledPage(props: {
               </button>
             ))}
           </div>
-          {tags.length > 0 ? (
-            <div className={css.filters} role="group" aria-label={t('filterTags')}>
-              {tags.map(tag => (
-                <button
-                  key={tag}
-                  type="button"
-                  className={css.filter}
-                  data-active={tagFilter?.toLocaleLowerCase() === tag.toLocaleLowerCase() ? 'true' : undefined}
-                  onClick={() => {
-                    setTagFilter(current => current?.toLocaleLowerCase() === tag.toLocaleLowerCase() ? null : tag)
-                  }}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          ) : null}
+          <div className={css.filters} role="group" aria-label={t('filterTags')}>
+            <button
+              type="button"
+              className={css.filter}
+              data-active={activeTagFilter.mode === 'all' ? 'true' : undefined}
+              onClick={() => { setTagFilter({ mode: 'all' }) }}
+            >
+              {t('filterAllTags')}
+            </button>
+            <button
+              type="button"
+              className={css.filter}
+              data-active={activeTagFilter.mode === 'untagged' ? 'true' : undefined}
+              onClick={() => { setTagFilter({ mode: 'untagged' }) }}
+            >
+              {t('filterUntagged')}
+              {untaggedCount > 0 ? ` ${untaggedCount}` : ''}
+            </button>
+            {tags.map(tag => (
+              <button
+                key={tag}
+                type="button"
+                className={css.filter}
+                data-active={activeTagFilter.mode === 'tag' && activeTagFilter.tag.toLocaleLowerCase() === tag.toLocaleLowerCase() ? 'true' : undefined}
+                onClick={() => {
+                  setTagFilter(current => (
+                    current.mode === 'tag' && current.tag.toLocaleLowerCase() === tag.toLocaleLowerCase()
+                      ? { mode: 'all' }
+                      : { mode: 'tag', tag }
+                  ))
+                }}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+          {tags.length === 0 ? <p className={css.hint}>{t('tagsIntro')}</p> : null}
           {visible.length === 0 ? <p className={css.empty}>{t('emptySearch')}</p> : (
           <>
           <ul className={`${css.cards} ${css.catalogCards}`}>
@@ -663,19 +735,29 @@ function InstalledPage(props: {
                         className={css.cardHit}
                         aria-haspopup="dialog"
                         aria-label={t('openDetailsNamed', { title: entry.packageName })}
-                        onClick={() => { setDetails(entry) }}
+                        onClick={() => { setDetailsName(entry.packageName) }}
                       >
                         <span className={css.tag}>{installedKindLabel(t, entry.kind)}</span>
                         <h3 className={css.cardTitle}>{entry.packageName}</h3>
                         {entry.spec.length > 0 ? <p className={css.packageName}>{entry.spec}</p> : null}
                         {entry.note.length > 0 ? <p className={css.notePreview}>{entry.note}</p> : null}
-                        {entry.tags.length > 0 ? (
-                          <span className={css.tagRow}>
-                            {entry.tags.map(tag => <span className={css.noteTag} key={tag}>{tag}</span>)}
-                          </span>
-                        ) : null}
                       </button>
                     </Tooltip>
+                    {entry.tags.length > 0 ? (
+                      <div className={css.tagRow}>
+                        {entry.tags.map(tag => (
+                          <button
+                            type="button"
+                            className={css.noteTag}
+                            data-filter="true"
+                            key={tag}
+                            onClick={() => { setTagFilter({ mode: 'tag', tag }) }}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                   <div className={css.cardAside}>
                     {entry.canToggle && entry.entryIds[0] !== undefined ? (
@@ -709,15 +791,16 @@ function InstalledPage(props: {
             <InstalledDetailsDialog
               t={t}
               entry={details}
+              knownTags={tags}
               busy={props.busyName === details.packageName}
-              onClose={() => { setDetails(null) }}
+              onClose={() => { setDetailsName(null) }}
               onToggle={entryId => {
                 props.onToggle(entryId, !details.enabled, details.packageName)
               }}
               onUninstall={() => {
                 if (globalThis.confirm(t('confirmUninstall'))) props.onUninstall(details.packageName)
               }}
-              onSaveNote={(note, tags) => { props.onSaveNote(details.packageName, note, tags) }}
+              onSaveNote={(note, tags) => props.onSaveNote(details.packageName, note, tags)}
             />
           ) : null}
           </>
@@ -845,19 +928,31 @@ function CatalogDetailsDialog(props: {
 function InstalledDetailsDialog(props: {
   t: MarketplaceSettingsSectionProps['t']
   entry: MarketplaceInstalledItem
+  knownTags: readonly string[]
   busy: boolean
   onClose: () => void
   onToggle: (entryId: string) => void
   onUninstall: () => void
-  onSaveNote: (note: string, tags: readonly string[]) => void
+  onSaveNote: (note: string, tags: readonly string[]) => Promise<boolean>
 }): ReactNode {
   const { t, entry } = props
   const [note, setNote] = useState(entry.note)
-  const [tagDraft, setTagDraft] = useState(entry.tags.join(', '))
+  const [tags, setTags] = useState<readonly string[]>(entry.tags)
+  const [tagDraft, setTagDraft] = useState('')
+  const [dirty, setDirty] = useState(false)
   useEffect(() => {
+    if (dirty) return
     setNote(entry.note)
-    setTagDraft(entry.tags.join(', '))
-  }, [entry.note, entry.packageName, entry.tags])
+    setTags(entry.tags)
+    setTagDraft('')
+  }, [dirty, entry.note, entry.packageName, entry.tags])
+  const commitDraft = (): void => {
+    const next = mergeTags(tags, tagDraft)
+    if (next.length === tags.length && tagDraft.trim().length === 0) return
+    setTags(next)
+    setTagDraft('')
+    setDirty(true)
+  }
   const rows = [
     { label: t('detailsPackage'), value: entry.packageName, mono: true },
     { label: t('detailsKind'), value: installedKindLabel(t, entry.kind) },
@@ -870,6 +965,9 @@ function InstalledDetailsDialog(props: {
       ? [{ label: t('detailsPhase'), value: entry.fiberPhase, mono: true }]
       : [],
   ]
+  const suggestions = props.knownTags.filter(tag => (
+    !tags.some(current => current.toLocaleLowerCase() === tag.toLocaleLowerCase())
+  ))
   return (
     <DetailsDialog
       t={t}
@@ -882,9 +980,17 @@ function InstalledDetailsDialog(props: {
             type="button"
             className={css.button}
             disabled={props.busy}
-            onClick={() => { props.onSaveNote(note, parseTagInput(tagDraft)) }}
+            onClick={() => {
+              const nextTags = mergeTags(tags, tagDraft)
+              void props.onSaveNote(note, nextTags).then((ok) => {
+                if (!ok) return
+                setTags(nextTags)
+                setTagDraft('')
+                setDirty(false)
+              })
+            }}
           >
-            {t('saveNote')}
+            {props.busy ? t('savingNote') : t('saveNote')}
           </button>
           {entry.canToggle && entry.entryIds[0] !== undefined ? (
             <button
@@ -915,17 +1021,69 @@ function InstalledDetailsDialog(props: {
           className={css.noteInput}
           value={note}
           placeholder={t('notePlaceholder')}
-          onChange={(event) => { setNote(event.currentTarget.value) }}
+          onChange={(event) => {
+            setNote(event.currentTarget.value)
+            setDirty(true)
+          }}
         />
       </label>
-      <label className={css.field}>
+      <div className={css.field}>
         <span>{t('tagsLabel')}</span>
-        <input
-          value={tagDraft}
-          placeholder={t('tagsPlaceholder')}
-          onChange={(event) => { setTagDraft(event.currentTarget.value) }}
-        />
-      </label>
+        <div className={css.tagEditor}>
+          {tags.map(tag => (
+            <span className={css.noteTag} data-editable="true" key={tag}>
+              {tag}
+              <button
+                type="button"
+                className={css.tagRemove}
+                aria-label={t('tagsRemove', { tag })}
+                onClick={() => {
+                  setTags(current => current.filter(item => item.toLocaleLowerCase() !== tag.toLocaleLowerCase()))
+                  setDirty(true)
+                }}
+              >
+                <IconCloseOutline16 size={10} />
+              </button>
+            </span>
+          ))}
+          <input
+            className={css.tagInput}
+            value={tagDraft}
+            placeholder={tags.length === 0 ? t('tagsPlaceholder') : t('tagsAdd')}
+            aria-label={t('tagsAdd')}
+            onChange={(event) => { setTagDraft(event.currentTarget.value) }}
+            onBlur={commitDraft}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ',' || event.key === '，') {
+                event.preventDefault()
+                commitDraft()
+                return
+              }
+              if (event.key === 'Backspace' && tagDraft.length === 0 && tags.length > 0) {
+                setTags(current => current.slice(0, -1))
+                setDirty(true)
+              }
+            }}
+          />
+        </div>
+        {suggestions.length > 0 ? (
+          <div className={css.tagSuggest} role="group" aria-label={t('tagsSuggest')}>
+            {suggestions.map(tag => (
+              <button
+                key={tag}
+                type="button"
+                className={css.filter}
+                onClick={() => {
+                  setTags(current => mergeTags(current, tag))
+                  setDirty(true)
+                }}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </DetailsDialog>
   )
 }

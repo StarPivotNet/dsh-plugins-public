@@ -1054,9 +1054,9 @@ function apply(ctx, config = {}) {
         return { ok: true };
       });
     },
-    setPluginNote(request) {
+    async setPluginNote(request) {
       if (request.name.trim().length === 0) return fail("package-invalid", "note requires a package name");
-      writePluginNotes(ctx, writeNote(readPluginNotes(ctx), request.name, request));
+      await writePluginNotes(ctx, writeNote(readPluginNotes(ctx), request.name, request));
       return { ok: true };
     }
   };
@@ -1088,7 +1088,7 @@ function apply(ctx, config = {}) {
         case "setEnabled":
           return { ok: true, value: await marketplace.setEnabled(payload) };
         case "setPluginNote":
-          return { ok: true, value: marketplace.setPluginNote(payload) };
+          return { ok: true, value: await marketplace.setPluginNote(payload) };
         case "reloadStatus":
           return { ok: true, value: reloadLive };
         default:
@@ -1138,12 +1138,15 @@ function readPluginNotes(ctx) {
   const raw = settingsSection(ctx)?.pluginNotes;
   return isPluginNotes(raw) ? raw : {};
 }
-function writePluginNotes(ctx, notes) {
+async function writePluginNotes(ctx, notes) {
   const settings = ctx.get("settings");
   if (settings?.update === void 0) return;
-  void Promise.resolve(settings.update(SETTINGS_NS, { pluginNotes: notes })).catch((error) => {
+  try {
+    await Promise.resolve(settings.update(SETTINGS_NS, { pluginNotes: notes }));
+  } catch (error) {
     console.error("plugin-marketplace: plugin notes write failed", error);
-  });
+    throw error;
+  }
 }
 function readCatalogCache(ctx) {
   const raw = settingsSection(ctx)?.catalogCache;

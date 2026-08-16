@@ -342,9 +342,9 @@ export function apply(ctx: Context, config: Config = {}): void {
         return { ok: true }
       })
     },
-    setPluginNote(request: { name: string; note: string; tags: readonly string[] }): PluginEnableResult {
+    async setPluginNote(request: { name: string; note: string; tags: readonly string[] }): Promise<PluginEnableResult> {
       if (request.name.trim().length === 0) return fail('package-invalid', 'note requires a package name')
-      writePluginNotes(ctx, writeNote(readPluginNotes(ctx), request.name, request))
+      await writePluginNotes(ctx, writeNote(readPluginNotes(ctx), request.name, request))
       return { ok: true }
     },
   }
@@ -375,7 +375,7 @@ export function apply(ctx: Context, config: Config = {}): void {
         case 'setEnabled':
           return { ok: true, value: await marketplace.setEnabled(payload as SetEnabledRequest) }
         case 'setPluginNote':
-          return { ok: true, value: marketplace.setPluginNote(payload as { name: string; note: string; tags: readonly string[] }) }
+          return { ok: true, value: await marketplace.setPluginNote(payload as { name: string; note: string; tags: readonly string[] }) }
         case 'reloadStatus':
           return { ok: true, value: reloadLive }
         default:
@@ -446,14 +446,17 @@ function readPluginNotes(ctx: Context): PluginNotes {
   return isPluginNotes(raw) ? raw : {}
 }
 
-function writePluginNotes(ctx: Context, notes: PluginNotes): void {
+async function writePluginNotes(ctx: Context, notes: PluginNotes): Promise<void> {
   const settings = ctx.get('settings') as {
     update?: (ns: unknown, patch: object) => Promise<unknown>
   } | undefined
   if (settings?.update === undefined) return
-  void Promise.resolve(settings.update(SETTINGS_NS, { pluginNotes: notes })).catch((error: unknown) => {
+  try {
+    await Promise.resolve(settings.update(SETTINGS_NS, { pluginNotes: notes }))
+  } catch (error: unknown) {
     console.error('plugin-marketplace: plugin notes write failed', error)
-  })
+    throw error
+  }
 }
 
 function readCatalogCache(ctx: Context): CatalogCache | undefined {

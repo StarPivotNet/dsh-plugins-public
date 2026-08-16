@@ -26,7 +26,7 @@ export function rebootBlocked(now = Date.now(), env: NodeJS.ProcessEnv = process
   const started = Number(raw)
   if (!Number.isFinite(started)) return undefined
   if (now - started < REBOOT_COOLDOWN_MS) {
-    return 'dsh 刚刚重启过。页面会自动刷新；15 秒内不必再运行 /reboot'
+    return '刚刚重启过，请稍后再试'
   }
   return undefined
 }

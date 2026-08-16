@@ -43,7 +43,7 @@ export function registerMarketplaceCommands(ctx: Context, options: {
   })
   ctx.commands.register({
     name: 'reboot',
-    description: '通过看门狗重启整个 dsh 进程。',
+    description: '重启 dsh 进程，页面会自动刷新。',
     handler: async () => {
       const blocked = rebootBlocked()
       if (blocked !== undefined) return { kind: 'error', text: blocked }
@@ -52,10 +52,10 @@ export function registerMarketplaceCommands(ctx: Context, options: {
       const watchdogPath = join(dirname(fileURLToPath(import.meta.url)), 'reboot-watchdog.js')
       const started = await startWatchdog(watchdogPath, specPath)
       if (!started.ok) return { kind: 'error', text: started.message }
-      // Wait for command/done to reach the browser before killing the process.
-      // ctx.appExit only disposes the tree and does not exit the web process.
-      setTimeout(() => { process.exit(0) }, 800)
-      return { kind: 'success', text: '看门狗已就绪，800ms 后退出并由看门狗拉起新进程。页面会自动刷新。' }
+      // command/done is appended after this handler returns. Exit on the next
+      // turn so the card can settle; ctx.appExit does not exit the web process.
+      setImmediate(() => { process.exit(0) })
+      return { kind: 'success', text: '正在重启，页面即将刷新' }
     },
   })
 }

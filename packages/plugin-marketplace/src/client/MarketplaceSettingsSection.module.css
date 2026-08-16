@@ -492,7 +492,8 @@
 }
 
 .packageName,
-.description {
+.description,
+.updatedAt {
   margin: 0;
   min-width: 0;
   overflow: hidden;
@@ -512,6 +513,10 @@
   width: 100%;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.updatedAt {
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .actions {

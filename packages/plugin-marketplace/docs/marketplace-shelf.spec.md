@@ -10,7 +10,7 @@ A user who installs `github:StarPivotNet/dsh-plugins-public#path:packages/plugin
 
 1. Install the marketplace bundle and restart dsh web.
 2. Open Discover. The StarPivot catalog URL is already configured.
-3. See the marketplace bundle plus the three community npm bundles. Hover a card to read its full description. Click the card body to open the listing dialog. The Install button sits on the right of the card.
+3. See the marketplace bundle plus the community npm bundles. Hover a card to read its full description. A card with `updatedAt` shows how long ago that pinned version was published. Click the card body to open the listing dialog. The Install button sits on the right of the card.
 4. Click Install. The confirm dialog names the package, version, and source.
 5. After confirm, the Host installs that registry package and asks for a restart.
 
@@ -49,7 +49,7 @@ A user who installs `github:StarPivotNet/dsh-plugins-public#path:packages/plugin
 
 | name | version | homepage |
 | --- | --- | --- |
-| `@starpivot/dsh-plugin-marketplace` | `0.1.12` | https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/plugin-marketplace |
+| `@starpivot/dsh-plugin-marketplace` | `0.1.13` | https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/plugin-marketplace |
 | `@dsh-plugin/dsh-auxiliary` | `0.4.2` | https://github.com/dsh-plugins/dsh-auxiliary |
 | `@dsh-plugin/dsh-thought-buddy` | `0.1.1` | https://github.com/dsh-plugins/dsh-thought-buddy |
 | `dsh-find-plugin` | `0.3.6` | https://github.com/awesome-dsh-plugin/dsh-find-plugin |

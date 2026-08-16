@@ -12,7 +12,7 @@ const sourceA: CatalogSource = { url: 'https://a.example/catalog.json', title: '
 const sourceB: CatalogSource = { url: 'https://b.example/catalog.json', title: 'B', ok: true, count: 1 }
 const pluginA: CatalogPlugin = {
   name: 'a', version: '1.0.0', title: 'A', description: '', homepage: '', kind: 'bundle',
-  sourceUrl: sourceA.url, sourceTitle: 'A',
+  sourceUrl: sourceA.url, sourceTitle: 'A', updatedAt: '2026-08-16T17:52:31.074Z',
 }
 const pluginB: CatalogPlugin = {
   name: 'b', version: '1.0.0', title: 'B', description: '', homepage: '', kind: 'bundle',

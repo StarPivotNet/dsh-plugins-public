@@ -71,6 +71,8 @@ function parseListing(
   if (typeof row.kind !== 'string' || !KINDS.has(row.kind as CatalogPluginKind)) {
     return { ok: false, message: `catalog plugins[${String(index)}] kind must be bundle or plugin` }
   }
+  const updatedAt = parseUpdatedAt(row.updatedAt, index)
+  if (!updatedAt.ok) return updatedAt
   return {
     ok: true,
     entry: {
@@ -80,8 +82,20 @@ function parseListing(
       description: row.description,
       homepage,
       kind: row.kind as CatalogPluginKind,
+      ...updatedAt.value === undefined ? {} : { updatedAt: updatedAt.value },
     },
   }
+}
+
+function parseUpdatedAt(
+  raw: unknown,
+  index: number,
+): { readonly ok: true; readonly value?: string } | { readonly ok: false; readonly message: string } {
+  if (raw === undefined) return { ok: true }
+  if (typeof raw !== 'string' || !Number.isFinite(Date.parse(raw))) {
+    return { ok: false, message: `catalog plugins[${String(index)}] updatedAt must be an ISO time` }
+  }
+  return { ok: true, value: new Date(raw).toISOString() }
 }
 
 export function isCatalogUrl(catalogUrl: string): boolean {

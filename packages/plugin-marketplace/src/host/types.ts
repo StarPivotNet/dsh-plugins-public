@@ -33,6 +33,8 @@ export interface CatalogPlugin {
   readonly kind: CatalogPluginKind
   readonly sourceUrl: string
   readonly sourceTitle: string
+  /** npm publish time of the pinned version, as UTC ISO-8601. */
+  readonly updatedAt?: string
 }
 
 export interface CatalogSource {

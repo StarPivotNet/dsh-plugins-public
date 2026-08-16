@@ -14,6 +14,7 @@ import type {
   InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import { catalogPackageLabel, installedHoverLabel } from './catalog-label.ts'
+import { updatedAgoLine, updatedAgoRelative } from './updated-ago.ts'
 import { allTags, parseTagInput } from '../host/plugin-notes.ts'
 import { confirmInstallMessage } from './confirm-install.ts'
 import type { MarketplaceLocaleKey } from './locales.ts'
@@ -29,6 +30,7 @@ export interface MarketplaceCatalogItem {
   readonly kind: 'bundle' | 'plugin'
   readonly sourceUrl: string
   readonly sourceTitle: string
+  readonly updatedAt?: string
 }
 
 export interface MarketplaceCatalogSource {
@@ -533,6 +535,7 @@ function DiscoverPage(props: {
               const already = props.installedNames.has(entry.name)
               const packageLabel = catalogPackageLabel(entry.name, entry.version)
               const installing = props.busyName === entry.name
+              const updated = updatedAgoLine(t, entry.updatedAt, Date.now())
               return (
                 <li className={`${css.card} ${css.catalogCard}`} key={entry.name} data-plugin-name={entry.name}>
                   <div className={css.cardBody}>
@@ -555,6 +558,7 @@ function DiscoverPage(props: {
                         <h3 className={css.cardTitle}>{entry.title}</h3>
                         <p className={css.packageName}>{packageLabel}</p>
                         <span className={css.description}>{entry.description}</span>
+                        {updated !== undefined ? <span className={css.updatedAt}>{updated}</span> : null}
                       </button>
                     </Tooltip>
                   </div>
@@ -896,10 +900,12 @@ function CatalogDetailsDialog(props: {
   onInstall: () => void
 }): ReactNode {
   const { t, entry } = props
+  const updated = updatedAgoRelative(t, entry.updatedAt, Date.now())
   const rows = [
     { label: t('detailsPackage'), value: catalogPackageLabel(entry.name, entry.version), mono: true },
     { label: t('detailsKind'), value: t(entry.kind === 'bundle' ? 'bundleTag' : 'pluginTag') },
     { label: t('detailsSource'), value: entry.sourceTitle },
+    ...updated !== undefined ? [{ label: t('updatedAtLabel'), value: updated }] : [],
     ...entry.homepage.length > 0
       ? [{ label: t('detailsHomepage'), value: entry.homepage, href: entry.homepage }]
       : [],

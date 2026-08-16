@@ -83,6 +83,8 @@ function parseListing(item, index) {
   if (typeof row.kind !== "string" || !KINDS.has(row.kind)) {
     return { ok: false, message: `catalog plugins[${String(index)}] kind must be bundle or plugin` };
   }
+  const updatedAt = parseUpdatedAt(row.updatedAt, index);
+  if (!updatedAt.ok) return updatedAt;
   return {
     ok: true,
     entry: {
@@ -91,9 +93,17 @@ function parseListing(item, index) {
       title: row.title.trim(),
       description: row.description,
       homepage,
-      kind: row.kind
+      kind: row.kind,
+      ...updatedAt.value === void 0 ? {} : { updatedAt: updatedAt.value }
     }
   };
+}
+function parseUpdatedAt(raw, index) {
+  if (raw === void 0) return { ok: true };
+  if (typeof raw !== "string" || !Number.isFinite(Date.parse(raw))) {
+    return { ok: false, message: `catalog plugins[${String(index)}] updatedAt must be an ISO time` };
+  }
+  return { ok: true, value: new Date(raw).toISOString() };
 }
 function isCatalogUrl(catalogUrl) {
   if (catalogUrl.length === 0) return true;

@@ -20,7 +20,7 @@ Git-hosted packages run their `prepare` script on install. If pnpm ≥10 blocks 
 
 After restart, Settings → 插件 becomes:
 
-- **发现** — fetch one or more operator JSON catalogs from http(s) marketplace URLs; Discover shows the last cached listing immediately, then refreshes in the background. Fetch all sources, or one source from its row. The saved source row hides the raw URL and offers edit/remove icons; cards keep install on the right, hover for the full description, and click for the full listing
+- **发现** — fetch one or more operator JSON catalogs from http(s) marketplace URLs; Discover shows the last cached listing immediately, then refreshes in the background. Fetch all sources, or one source from its row. The saved source row hides the raw URL and offers edit/remove icons; cards keep install on the right, hover for the full description, show how long ago the pinned version was published, and click for the full listing
 - **已安装** — list, filter by kind or tag (including untagged), add a local note and chip tags in the details dialog, uninstall, and toggle single Loader entries; hover for the full package name and spec, click the card for the full listing
 - **配置** — the shipped Shell / Agent loop / Web search cards
 
@@ -46,7 +46,8 @@ While this bundle is installed it forces `client-hmr.autoReload=false` and keeps
       "title": "Display name",
       "description": "Short summary",
       "homepage": "https://example.com",
-      "kind": "bundle"
+      "kind": "bundle",
+      "updatedAt": "2026-08-16T17:52:31.074Z"
     }
   ]
 }
@@ -56,7 +57,7 @@ A fresh install already points Discover at the StarPivot catalog:
 
 `https://raw.githubusercontent.com/StarPivotNet/dsh-plugin-catalog/main/catalog.json`
 
-Add more `catalogUrls` on the `plugin-marketplace` row or in Discover (settings namespace `plugin-marketplace`). A catalog may also include a top-level `title`. Duplicate package names across markets keep the first listing. The install confirm dialog shows the package name, version, and catalog source.
+Add more `catalogUrls` on the `plugin-marketplace` row or in Discover (settings namespace `plugin-marketplace`). A catalog may also include a top-level `title`. An optional `updatedAt` is the UTC ISO-8601 publish time of the pinned version; Discover shows it as a relative age. Duplicate package names across markets keep the first listing. The install confirm dialog shows the package name, version, and catalog source.
 
 ## Develop
 

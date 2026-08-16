@@ -1,6 +1,6 @@
 {
   "name": "@starpivot/dsh-plugin-marketplace",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "可安装的 DeepSeek Harness 插件市场，替换设置里的插件页",
   "homepage": "https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/plugin-marketplace",
   "keywords": [
@@ -37,7 +37,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepublishOnly": "node scripts/build.mjs",
-    "test": "node --experimental-strip-types src/host/reload.spec.ts && node --experimental-strip-types src/host/catalog-cache.spec.ts && node --experimental-strip-types src/host/plugin-notes.spec.ts && node --experimental-strip-types src/client/confirm-install.spec.ts && node --experimental-strip-types src/client/command-picker.spec.ts"
+    "test": "node --experimental-strip-types src/host/reload.spec.ts && node --experimental-strip-types src/host/catalog.spec.ts && node --experimental-strip-types src/host/catalog-cache.spec.ts && node --experimental-strip-types src/host/plugin-notes.spec.ts && node --experimental-strip-types src/client/confirm-install.spec.ts && node --experimental-strip-types src/client/updated-ago.spec.ts && node --experimental-strip-types src/client/command-picker.spec.ts"
   },
   "dsh": {
     "bundle": {

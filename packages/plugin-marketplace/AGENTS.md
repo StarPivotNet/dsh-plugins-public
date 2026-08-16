@@ -36,7 +36,8 @@ pnpm --filter @starpivot/dsh-plugin-marketplace run build
 
 ## Module Map
 
-- `src/host/catalog.ts` — catalog JSON protocol
+- `src/host/catalog.ts` — catalog JSON protocol, including optional `updatedAt`
 - `src/host/defaults.ts` — shipped Discover URL
 - `src/client/confirm-install.ts` — install confirm copy
+- `src/client/updated-ago.ts` — relative age of a listing's pinned publish time
 - `docs/marketplace-shelf.spec.md` — accepted first-shelf contract

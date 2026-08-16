@@ -21,7 +21,7 @@ Git-hosted packages run their `prepare` script on install. If pnpm ≥10 blocks 
 After restart, Settings → 插件 becomes:
 
 - **发现** — fetch one or more operator JSON catalogs from http(s) marketplace URLs; responsive cards with install on the right, hover for the full description, click the card for the full listing
-- **已安装** — list, uninstall, and toggle single Loader entries
+- **已安装** — list, uninstall, and toggle single Loader entries; hover for the full package name and spec, click the card for the full listing
 - **配置** — the shipped Shell / Agent loop / Web search cards
 
 Install accepts one npm registry package name (optional version). Path, `file:`, and git specs are refused. A successful install writes the profile and asks you to restart.

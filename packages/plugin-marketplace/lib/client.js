@@ -40,6 +40,10 @@ var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primit
 function catalogPackageLabel(name, version) {
   return version.length > 0 ? `${name}@${version}` : name;
 }
+function installedHoverLabel(packageName, spec) {
+  return spec.length > 0 ? `${packageName}
+${spec}` : packageName;
+}
 
 // src/client/confirm-install.ts
 function installSourceLabel(sourceTitle, homepage) {
@@ -62,7 +66,7 @@ function confirmInstallMessage(t, entry) {
 }
 
 // src/client/MarketplaceSettingsSection.module.css
-var css = '.DYfBnq_section{width:100%;max-width:none;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px;display:flex}.DYfBnq_heading{margin:0;font-size:18px;font-weight:600}.DYfBnq_intro,.DYfBnq_status,.DYfBnq_empty,.DYfBnq_restart,.DYfBnq_hint{color:var(--dsw-alias-label-tertiary);margin:0;font-size:13px;line-height:20px}.DYfBnq_restart{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:8px 12px}.DYfBnq_failure{color:var(--dsw-alias-state-error-primary);align-items:center;gap:10px;font-size:13px;line-height:20px;display:flex}.DYfBnq_failure p{margin:0}.DYfBnq_tabs{border-bottom:1px solid var(--dsw-alias-border-l2);align-items:flex-end;gap:22px;margin-top:2px;display:flex}.DYfBnq_tab{color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;background:0 0;border:0;padding:7px 1px 9px;font-size:13px;line-height:20px;position:relative}.DYfBnq_tab:hover,.DYfBnq_tab[data-active=true]{color:var(--dsw-alias-label-primary)}.DYfBnq_tab[data-active=true]:after,.DYfBnq_tab:focus-visible:after{background:var(--dsw-alias-label-primary);content:"";border-radius:2px 2px 0 0;height:2px;position:absolute;bottom:-1px;left:0;right:0}.DYfBnq_tab:focus-visible,.DYfBnq_button:focus-visible,.DYfBnq_cardHit:focus-visible,.DYfBnq_dialogClose:focus-visible,.DYfBnq_search input:focus-visible,.DYfBnq_field input:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.DYfBnq_panel{flex-direction:column;gap:12px;min-width:0;padding-top:2px;display:flex}.DYfBnq_search{width:100%;color:var(--dsw-alias-label-tertiary);align-items:center;display:flex;position:relative}.DYfBnq_search>svg{pointer-events:none;position:absolute;left:12px}.DYfBnq_search input,.DYfBnq_field input{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);width:100%;height:36px;color:var(--dsw-alias-label-primary);font:inherit;border-radius:8px;outline:none;padding:0 12px;font-size:13px}.DYfBnq_search input{padding-left:36px}.DYfBnq_headingRow{align-items:baseline;gap:7px;padding:0 2px;display:flex}.DYfBnq_headingRow h3{margin:0;font-size:13px;font-weight:600;line-height:20px}.DYfBnq_headingRow span{color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums;font-size:12px;line-height:18px}.DYfBnq_cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none;display:grid}.DYfBnq_catalogCards{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}.DYfBnq_list,.DYfBnq_configList{flex-direction:column;gap:10px;margin:0;padding:0;list-style:none;display:flex}.DYfBnq_configList>*{min-width:0}.DYfBnq_marketRow{gap:8px;display:flex}.DYfBnq_sources{flex-direction:column;gap:6px;margin:0;padding:0;list-style:none;display:flex}.DYfBnq_source{color:var(--dsw-alias-label-secondary);flex-wrap:wrap;gap:8px 12px;font-size:12px;line-height:18px;display:flex}.DYfBnq_source[data-ok=false]{color:var(--dsw-alias-state-error-primary)}.DYfBnq_sourceLabel{color:var(--dsw-alias-label-tertiary);margin:0;font-size:11px;line-height:16px}.DYfBnq_card{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:10px;flex-direction:column;gap:6px;min-width:0;padding:10px 12px;display:flex;overflow:hidden}.DYfBnq_catalogCard{flex-direction:row;align-items:stretch;gap:10px}.DYfBnq_catalogCard:hover{background:var(--dsw-alias-interactive-bg-hover)}.DYfBnq_cardHit{min-width:0;color:inherit;font:inherit;text-align:left;cursor:pointer;background:0 0;border:0;flex-direction:column;flex:1;align-items:flex-start;gap:6px;margin:0;padding:0;display:flex}.DYfBnq_cardAside{flex:none;align-self:center;align-items:center;display:flex}.DYfBnq_cardAside .DYfBnq_button{white-space:nowrap}.DYfBnq_cardTitle{text-overflow:ellipsis;white-space:nowrap;min-width:0;margin:0;font-size:13px;font-weight:600;line-height:18px;overflow:hidden}.DYfBnq_packageName,.DYfBnq_description{min-width:0;color:var(--dsw-alias-label-secondary);margin:0;font-size:11px;line-height:16px;overflow:hidden}.DYfBnq_packageName{font-family:var(--ds-font-family-code);text-overflow:ellipsis;white-space:nowrap}.DYfBnq_description{-webkit-line-clamp:2;-webkit-box-orient:vertical;width:100%;display:-webkit-box}.DYfBnq_actions{flex-wrap:wrap;gap:6px;margin-top:auto;display:flex}.DYfBnq_button{border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;background:0 0;border-radius:6px;padding:4px 10px;font-size:12px;line-height:18px}.DYfBnq_button:disabled{opacity:.55;cursor:default}.DYfBnq_tag{text-overflow:ellipsis;background:var(--dsw-alias-bg-layer-1);max-width:100%;min-height:20px;color:var(--dsw-alias-label-secondary);white-space:nowrap;border-radius:5px;align-self:flex-start;align-items:center;padding:1px 6px;font-size:11px;line-height:16px;display:inline-flex;overflow:hidden}.DYfBnq_field{flex-direction:column;gap:6px;display:flex}.DYfBnq_field label{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}.DYfBnq_visuallyHidden{clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}.DYfBnq_dialogRoot{z-index:1100;justify-content:center;align-items:center;padding:24px;display:flex;position:fixed;inset:0}.DYfBnq_dialogMask{background:var(--dsw-alias-bg-mask-1);backdrop-filter:var(--dsw-mask-blur);position:absolute;inset:0}.DYfBnq_dialog{z-index:1;border:1px solid var(--dsw-alias-border-inverted);background:var(--dsw-alias-bg-layer-2);width:min(440px,100%);max-height:min(640px,100vh - 48px);box-shadow:var(--dsw-shadow-lv3);border-radius:16px;flex-direction:column;gap:16px;padding:20px 20px 18px;display:flex;position:relative;overflow:auto}.DYfBnq_dialogHeader{justify-content:space-between;align-items:flex-start;gap:8px;display:flex}.DYfBnq_dialogTitle{min-width:0;margin:0;font-size:16px;font-weight:600;line-height:24px}.DYfBnq_dialogClose{cursor:pointer;width:28px;height:28px;color:var(--dsw-alias-label-secondary);background:0 0;border:none;border-radius:8px;flex:none;justify-content:center;align-items:center;display:inline-flex}.DYfBnq_dialogClose:hover{background:var(--dsw-alias-interactive-bg-hover)}.DYfBnq_dialogMeta{flex-direction:column;gap:8px;margin:0;display:flex}.DYfBnq_dialogMeta>div{grid-template-columns:56px minmax(0,1fr);align-items:start;gap:10px;display:grid}.DYfBnq_dialogMeta dt{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}.DYfBnq_dialogMeta dd{overflow-wrap:anywhere;min-width:0;color:var(--dsw-alias-label-primary);margin:0;font-size:13px;line-height:18px}.DYfBnq_dialogMeta a{color:inherit}.DYfBnq_dialogCode{font-family:var(--ds-font-family-code);font-size:12px}.DYfBnq_dialogDescription{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary);margin:0;font-size:13px;line-height:20px}.DYfBnq_dialogFooter{justify-content:flex-end;gap:8px;display:flex}.DYfBnq_reloadToast{z-index:1200;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);max-width:360px;box-shadow:var(--dsw-shadow-lv3);color:var(--dsw-alias-label-primary);border-radius:10px;flex-direction:column;gap:4px;padding:10px 14px;font-size:12px;line-height:18px;display:flex;position:fixed;bottom:24px;right:24px}.DYfBnq_reloadToast strong{font-size:13px}';
+var css = '.DYfBnq_section{width:100%;max-width:none;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px;display:flex}.DYfBnq_heading{margin:0;font-size:18px;font-weight:600}.DYfBnq_intro,.DYfBnq_status,.DYfBnq_empty,.DYfBnq_restart,.DYfBnq_hint{color:var(--dsw-alias-label-tertiary);margin:0;font-size:13px;line-height:20px}.DYfBnq_restart{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:8px 12px}.DYfBnq_failure{color:var(--dsw-alias-state-error-primary);align-items:center;gap:10px;font-size:13px;line-height:20px;display:flex}.DYfBnq_failure p{margin:0}.DYfBnq_tabs{border-bottom:1px solid var(--dsw-alias-border-l2);align-items:flex-end;gap:22px;margin-top:2px;display:flex}.DYfBnq_tab{color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;background:0 0;border:0;padding:7px 1px 9px;font-size:13px;line-height:20px;position:relative}.DYfBnq_tab:hover,.DYfBnq_tab[data-active=true]{color:var(--dsw-alias-label-primary)}.DYfBnq_tab[data-active=true]:after,.DYfBnq_tab:focus-visible:after{background:var(--dsw-alias-label-primary);content:"";border-radius:2px 2px 0 0;height:2px;position:absolute;bottom:-1px;left:0;right:0}.DYfBnq_tab:focus-visible,.DYfBnq_button:focus-visible,.DYfBnq_cardHit:focus-visible,.DYfBnq_dialogClose:focus-visible,.DYfBnq_search input:focus-visible,.DYfBnq_field input:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.DYfBnq_panel{flex-direction:column;gap:12px;min-width:0;padding-top:2px;display:flex}.DYfBnq_search{width:100%;color:var(--dsw-alias-label-tertiary);align-items:center;display:flex;position:relative}.DYfBnq_search>svg{pointer-events:none;position:absolute;left:12px}.DYfBnq_search input,.DYfBnq_field input{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);width:100%;height:36px;color:var(--dsw-alias-label-primary);font:inherit;border-radius:8px;outline:none;padding:0 12px;font-size:13px}.DYfBnq_search input{padding-left:36px}.DYfBnq_headingRow{align-items:baseline;gap:7px;padding:0 2px;display:flex}.DYfBnq_headingRow h3{margin:0;font-size:13px;font-weight:600;line-height:20px}.DYfBnq_headingRow span{color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums;font-size:12px;line-height:18px}.DYfBnq_cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none;display:grid}.DYfBnq_catalogCards{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}.DYfBnq_list,.DYfBnq_configList{flex-direction:column;gap:10px;margin:0;padding:0;list-style:none;display:flex}.DYfBnq_configList>*{min-width:0}.DYfBnq_marketRow{gap:8px;display:flex}.DYfBnq_sources{flex-direction:column;gap:6px;margin:0;padding:0;list-style:none;display:flex}.DYfBnq_source{color:var(--dsw-alias-label-secondary);flex-wrap:wrap;gap:8px 12px;font-size:12px;line-height:18px;display:flex}.DYfBnq_source[data-ok=false]{color:var(--dsw-alias-state-error-primary)}.DYfBnq_sourceLabel{color:var(--dsw-alias-label-tertiary);margin:0;font-size:11px;line-height:16px}.DYfBnq_card{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:10px;flex-direction:column;gap:6px;min-width:0;padding:10px 12px;display:flex;overflow:hidden}.DYfBnq_catalogCard{flex-direction:row;align-items:stretch;gap:10px}.DYfBnq_catalogCard:hover{background:var(--dsw-alias-interactive-bg-hover)}.DYfBnq_cardHit{min-width:0;color:inherit;font:inherit;text-align:left;cursor:pointer;background:0 0;border:0;flex-direction:column;flex:1;align-items:flex-start;gap:6px;margin:0;padding:0;display:flex}.DYfBnq_cardAside{flex-wrap:wrap;flex:none;justify-content:flex-end;align-self:center;align-items:center;gap:6px;display:flex}.DYfBnq_cardAside .DYfBnq_button{white-space:nowrap}.DYfBnq_cardTitle{text-overflow:ellipsis;white-space:nowrap;min-width:0;margin:0;font-size:13px;font-weight:600;line-height:18px;overflow:hidden}.DYfBnq_packageName,.DYfBnq_description{min-width:0;color:var(--dsw-alias-label-secondary);margin:0;font-size:11px;line-height:16px;overflow:hidden}.DYfBnq_packageName{font-family:var(--ds-font-family-code);text-overflow:ellipsis;white-space:nowrap}.DYfBnq_description{-webkit-line-clamp:2;-webkit-box-orient:vertical;width:100%;display:-webkit-box}.DYfBnq_actions{flex-wrap:wrap;gap:6px;margin-top:auto;display:flex}.DYfBnq_button{border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;background:0 0;border-radius:6px;padding:4px 10px;font-size:12px;line-height:18px}.DYfBnq_button:disabled{opacity:.55;cursor:default}.DYfBnq_tag{text-overflow:ellipsis;background:var(--dsw-alias-bg-layer-1);max-width:100%;min-height:20px;color:var(--dsw-alias-label-secondary);white-space:nowrap;border-radius:5px;align-self:flex-start;align-items:center;padding:1px 6px;font-size:11px;line-height:16px;display:inline-flex;overflow:hidden}.DYfBnq_field{flex-direction:column;gap:6px;display:flex}.DYfBnq_field label{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}.DYfBnq_visuallyHidden{clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}.DYfBnq_dialogRoot{z-index:1100;justify-content:center;align-items:center;padding:24px;display:flex;position:fixed;inset:0}.DYfBnq_dialogMask{background:var(--dsw-alias-bg-mask-1);backdrop-filter:var(--dsw-mask-blur);position:absolute;inset:0}.DYfBnq_dialog{z-index:1;border:1px solid var(--dsw-alias-border-inverted);background:var(--dsw-alias-bg-layer-2);width:min(440px,100%);max-height:min(640px,100vh - 48px);box-shadow:var(--dsw-shadow-lv3);border-radius:16px;flex-direction:column;gap:16px;padding:20px 20px 18px;display:flex;position:relative;overflow:auto}.DYfBnq_dialogHeader{justify-content:space-between;align-items:flex-start;gap:8px;display:flex}.DYfBnq_dialogTitle{min-width:0;margin:0;font-size:16px;font-weight:600;line-height:24px}.DYfBnq_dialogClose{cursor:pointer;width:28px;height:28px;color:var(--dsw-alias-label-secondary);background:0 0;border:none;border-radius:8px;flex:none;justify-content:center;align-items:center;display:inline-flex}.DYfBnq_dialogClose:hover{background:var(--dsw-alias-interactive-bg-hover)}.DYfBnq_dialogMeta{flex-direction:column;gap:8px;margin:0;display:flex}.DYfBnq_dialogMeta>div{grid-template-columns:56px minmax(0,1fr);align-items:start;gap:10px;display:grid}.DYfBnq_dialogMeta dt{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}.DYfBnq_dialogMeta dd{overflow-wrap:anywhere;white-space:pre-wrap;min-width:0;color:var(--dsw-alias-label-primary);margin:0;font-size:13px;line-height:18px}.DYfBnq_dialogMeta a{color:inherit}.DYfBnq_dialogCode{font-family:var(--ds-font-family-code);font-size:12px}.DYfBnq_dialogDescription{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary);margin:0;font-size:13px;line-height:20px}.DYfBnq_dialogFooter{justify-content:flex-end;gap:8px;display:flex}.DYfBnq_reloadToast{z-index:1200;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);max-width:360px;box-shadow:var(--dsw-shadow-lv3);color:var(--dsw-alias-label-primary);border-radius:10px;flex-direction:column;gap:4px;padding:10px 14px;font-size:12px;line-height:18px;display:flex;position:fixed;bottom:24px;right:24px}.DYfBnq_reloadToast strong{font-size:13px}';
 var tagId = "plugin-marketplace/MarketplaceSettingsSection.module.css";
 if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
   const tag = document.createElement("style");
@@ -71,7 +75,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var MarketplaceSettingsSection_default = { "cardTitle": "DYfBnq_cardTitle", "dialogDescription": "DYfBnq_dialogDescription", "packageName": "DYfBnq_packageName", "dialogClose": "DYfBnq_dialogClose", "cardHit": "DYfBnq_cardHit", "headingRow": "DYfBnq_headingRow", "configList": "DYfBnq_configList", "intro": "DYfBnq_intro", "search": "DYfBnq_search", "sources": "DYfBnq_sources", "dialogTitle": "DYfBnq_dialogTitle", "dialogFooter": "DYfBnq_dialogFooter", "dialogMeta": "DYfBnq_dialogMeta", "panel": "DYfBnq_panel", "card": "DYfBnq_card", "sourceLabel": "DYfBnq_sourceLabel", "status": "DYfBnq_status", "list": "DYfBnq_list", "field": "DYfBnq_field", "heading": "DYfBnq_heading", "button": "DYfBnq_button", "empty": "DYfBnq_empty", "cards": "DYfBnq_cards", "actions": "DYfBnq_actions", "restart": "DYfBnq_restart", "dialog": "DYfBnq_dialog", "catalogCards": "DYfBnq_catalogCards", "dialogRoot": "DYfBnq_dialogRoot", "dialogCode": "DYfBnq_dialogCode", "cardAside": "DYfBnq_cardAside", "dialogHeader": "DYfBnq_dialogHeader", "visuallyHidden": "DYfBnq_visuallyHidden", "description": "DYfBnq_description", "source": "DYfBnq_source", "tabs": "DYfBnq_tabs", "tab": "DYfBnq_tab", "hint": "DYfBnq_hint", "section": "DYfBnq_section", "tag": "DYfBnq_tag", "marketRow": "DYfBnq_marketRow", "failure": "DYfBnq_failure", "dialogMask": "DYfBnq_dialogMask", "reloadToast": "DYfBnq_reloadToast", "catalogCard": "DYfBnq_catalogCard" };
+var MarketplaceSettingsSection_default = { "button": "DYfBnq_button", "cardHit": "DYfBnq_cardHit", "cardAside": "DYfBnq_cardAside", "hint": "DYfBnq_hint", "heading": "DYfBnq_heading", "source": "DYfBnq_source", "section": "DYfBnq_section", "dialogCode": "DYfBnq_dialogCode", "intro": "DYfBnq_intro", "dialogTitle": "DYfBnq_dialogTitle", "dialogDescription": "DYfBnq_dialogDescription", "dialogMeta": "DYfBnq_dialogMeta", "restart": "DYfBnq_restart", "dialogFooter": "DYfBnq_dialogFooter", "catalogCard": "DYfBnq_catalogCard", "cardTitle": "DYfBnq_cardTitle", "sources": "DYfBnq_sources", "visuallyHidden": "DYfBnq_visuallyHidden", "panel": "DYfBnq_panel", "tabs": "DYfBnq_tabs", "description": "DYfBnq_description", "catalogCards": "DYfBnq_catalogCards", "dialogRoot": "DYfBnq_dialogRoot", "dialog": "DYfBnq_dialog", "dialogClose": "DYfBnq_dialogClose", "tag": "DYfBnq_tag", "field": "DYfBnq_field", "packageName": "DYfBnq_packageName", "actions": "DYfBnq_actions", "empty": "DYfBnq_empty", "headingRow": "DYfBnq_headingRow", "search": "DYfBnq_search", "reloadToast": "DYfBnq_reloadToast", "list": "DYfBnq_list", "cards": "DYfBnq_cards", "marketRow": "DYfBnq_marketRow", "failure": "DYfBnq_failure", "dialogMask": "DYfBnq_dialogMask", "dialogHeader": "DYfBnq_dialogHeader", "card": "DYfBnq_card", "configList": "DYfBnq_configList", "sourceLabel": "DYfBnq_sourceLabel", "status": "DYfBnq_status", "tab": "DYfBnq_tab" };
 
 // src/client/MarketplaceSettingsSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -83,6 +87,9 @@ function requestInstall(t, entry, onInstall) {
   if (globalThis.confirm(confirmInstallMessage(t, entry))) {
     onInstall(entry.name, entry.version.length > 0 ? entry.version : void 0);
   }
+}
+function installedKindLabel(t, kind) {
+  return t(kind === "inbox" ? "inboxTag" : kind === "bundle" ? "bundleTag" : "dependencyTag");
 }
 function MarketplaceSettingsSection({
   t,
@@ -399,6 +406,7 @@ function DiscoverPage(props) {
 }
 function InstalledPage(props) {
   const { t } = props;
+  const [details, setDetails] = (0, import_react.useState)(null);
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
     props.installed.status === "loading" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.status, children: t("loading") }) : null,
     props.installed.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: MarketplaceSettingsSection_default.failure, children: [
@@ -412,47 +420,79 @@ function InstalledPage(props) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t("installedHeading") }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: props.filtered.length })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: MarketplaceSettingsSection_default.cards, children: props.filtered.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: MarketplaceSettingsSection_default.card, "data-plugin-name": entry.packageName, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: MarketplaceSettingsSection_default.tag, children: t(entry.kind === "inbox" ? "inboxTag" : entry.kind === "bundle" ? "bundleTag" : "dependencyTag") }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: MarketplaceSettingsSection_default.cardTitle, title: entry.packageName, children: entry.packageName }),
-        entry.spec.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.packageName, title: entry.spec, children: entry.spec }) : null,
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: MarketplaceSettingsSection_default.actions, children: [
-          entry.canToggle && entry.entryIds[0] !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: `${MarketplaceSettingsSection_default.cards} ${MarketplaceSettingsSection_default.catalogCards}`, children: props.filtered.map((entry) => {
+        const busy = props.busyName === entry.packageName;
+        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: `${MarketplaceSettingsSection_default.card} ${MarketplaceSettingsSection_default.catalogCard}`, "data-plugin-name": entry.packageName, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Tooltip, { label: installedHoverLabel(entry.packageName, entry.spec), side: "bottom", maxWidth: 360, children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
             "button",
             {
               type: "button",
-              className: MarketplaceSettingsSection_default.button,
-              disabled: props.busyName === entry.packageName,
+              className: MarketplaceSettingsSection_default.cardHit,
+              "aria-haspopup": "dialog",
+              "aria-label": t("openDetailsNamed", { title: entry.packageName }),
               onClick: () => {
-                props.onToggle(entry.entryIds[0], !entry.enabled, entry.packageName);
+                setDetails(entry);
               },
-              children: entry.enabled ? t("disable") : t("enable")
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: MarketplaceSettingsSection_default.tag, children: installedKindLabel(t, entry.kind) }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: MarketplaceSettingsSection_default.cardTitle, children: entry.packageName }),
+                entry.spec.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.packageName, children: entry.spec }) : null
+              ]
             }
-          ) : null,
-          entry.canUninstall ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "button",
-            {
-              type: "button",
-              className: MarketplaceSettingsSection_default.button,
-              disabled: props.busyName === entry.packageName,
-              onClick: () => {
-                if (globalThis.confirm(t("confirmUninstall"))) props.onUninstall(entry.packageName);
-              },
-              children: props.busyName === entry.packageName ? t("uninstalling") : t("uninstall")
-            }
-          ) : null
-        ] })
-      ] }, entry.packageName)) })
+          ) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: MarketplaceSettingsSection_default.cardAside, children: [
+            entry.canToggle && entry.entryIds[0] !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "button",
+              {
+                type: "button",
+                className: MarketplaceSettingsSection_default.button,
+                disabled: busy,
+                onClick: () => {
+                  props.onToggle(entry.entryIds[0], !entry.enabled, entry.packageName);
+                },
+                children: entry.enabled ? t("disable") : t("enable")
+              }
+            ) : null,
+            entry.canUninstall ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "button",
+              {
+                type: "button",
+                className: MarketplaceSettingsSection_default.button,
+                disabled: busy,
+                onClick: () => {
+                  if (globalThis.confirm(t("confirmUninstall"))) props.onUninstall(entry.packageName);
+                },
+                children: busy ? t("uninstalling") : t("uninstall")
+              }
+            ) : null
+          ] })
+        ] }, entry.packageName);
+      }) }),
+      details !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        InstalledDetailsDialog,
+        {
+          t,
+          entry: details,
+          busy: props.busyName === details.packageName,
+          onClose: () => {
+            setDetails(null);
+          },
+          onToggle: (entryId) => {
+            props.onToggle(entryId, !details.enabled, details.packageName);
+          },
+          onUninstall: () => {
+            if (globalThis.confirm(t("confirmUninstall"))) props.onUninstall(details.packageName);
+          }
+        }
+      ) : null
     ] }) : null
   ] });
 }
-function CatalogDetailsDialog(props) {
-  const { t, entry } = props;
+function DetailsDialog(props) {
+  const { t } = props;
   const closeRef = (0, import_react.useRef)(null);
   const onCloseRef = (0, import_react.useRef)(props.onClose);
   onCloseRef.current = props.onClose;
-  const packageLabel = catalogPackageLabel(entry.name, entry.version);
-  const kindLabel = t(entry.kind === "bundle" ? "bundleTag" : "pluginTag");
   (0, import_react.useEffect)(() => {
     closeRef.current?.focus();
     const onKeyDown = (event) => {
@@ -476,7 +516,7 @@ function CatalogDetailsDialog(props) {
         "aria-labelledby": "marketplace-plugin-details-title",
         children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: MarketplaceSettingsSection_default.dialogHeader, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { className: MarketplaceSettingsSection_default.dialogTitle, id: "marketplace-plugin-details-title", children: entry.title }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { className: MarketplaceSettingsSection_default.dialogTitle, id: "marketplace-plugin-details-title", children: props.title }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
               "button",
               {
@@ -489,42 +529,92 @@ function CatalogDetailsDialog(props) {
               }
             )
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("dl", { className: MarketplaceSettingsSection_default.dialogMeta, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { children: t("detailsPackage") }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", { className: MarketplaceSettingsSection_default.dialogCode, children: packageLabel }) })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { children: t("detailsKind") }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { children: kindLabel })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { children: t("detailsSource") }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { children: entry.sourceTitle })
-            ] }),
-            entry.homepage.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { children: t("detailsHomepage") }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: entry.homepage, target: "_blank", rel: "noreferrer", children: entry.homepage }) })
-            ] }) : null
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.dialogDescription, children: entry.description.length > 0 ? entry.description : t("detailsNoDescription") }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dl", { className: MarketplaceSettingsSection_default.dialogMeta, children: props.rows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { children: row.label }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { children: row.href !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: row.href, target: "_blank", rel: "noreferrer", children: row.value }) : row.mono === true ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", { className: MarketplaceSettingsSection_default.dialogCode, children: row.value }) : row.value })
+          ] }, row.label)) }),
+          props.description !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.dialogDescription, children: props.description }) : null,
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: MarketplaceSettingsSection_default.dialogFooter, children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: MarketplaceSettingsSection_default.button, onClick: props.onClose, children: t("closeDetails") }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              "button",
-              {
-                type: "button",
-                className: MarketplaceSettingsSection_default.button,
-                disabled: props.already || props.installing,
-                onClick: props.onInstall,
-                children: props.already ? t("installedTag") : props.installing ? t("installing") : t("install")
-              }
-            )
+            props.actions
           ] })
         ]
       }
     )
   ] }), document.body);
+}
+function CatalogDetailsDialog(props) {
+  const { t, entry } = props;
+  const rows = [
+    { label: t("detailsPackage"), value: catalogPackageLabel(entry.name, entry.version), mono: true },
+    { label: t("detailsKind"), value: t(entry.kind === "bundle" ? "bundleTag" : "pluginTag") },
+    { label: t("detailsSource"), value: entry.sourceTitle },
+    ...entry.homepage.length > 0 ? [{ label: t("detailsHomepage"), value: entry.homepage, href: entry.homepage }] : []
+  ];
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    DetailsDialog,
+    {
+      t,
+      title: entry.title,
+      rows,
+      description: entry.description.length > 0 ? entry.description : t("detailsNoDescription"),
+      onClose: props.onClose,
+      actions: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        "button",
+        {
+          type: "button",
+          className: MarketplaceSettingsSection_default.button,
+          disabled: props.already || props.installing,
+          onClick: props.onInstall,
+          children: props.already ? t("installedTag") : props.installing ? t("installing") : t("install")
+        }
+      )
+    }
+  );
+}
+function InstalledDetailsDialog(props) {
+  const { t, entry } = props;
+  const rows = [
+    { label: t("detailsPackage"), value: entry.packageName, mono: true },
+    { label: t("detailsKind"), value: installedKindLabel(t, entry.kind) },
+    ...entry.spec.length > 0 ? [{ label: t("detailsSpec"), value: entry.spec, mono: true }] : [],
+    { label: t("detailsStatus"), value: entry.enabled ? t("enabledTag") : t("disabledTag") },
+    ...entry.entryIds.length > 0 ? [{ label: t("detailsEntries"), value: entry.entryIds.join("\n"), mono: true }] : [],
+    ...entry.fiberPhase !== null ? [{ label: t("detailsPhase"), value: entry.fiberPhase, mono: true }] : []
+  ];
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    DetailsDialog,
+    {
+      t,
+      title: entry.packageName,
+      rows,
+      onClose: props.onClose,
+      actions: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+        entry.canToggle && entry.entryIds[0] !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            type: "button",
+            className: MarketplaceSettingsSection_default.button,
+            disabled: props.busy,
+            onClick: () => {
+              props.onToggle(entry.entryIds[0]);
+            },
+            children: entry.enabled ? t("disable") : t("enable")
+          }
+        ) : null,
+        entry.canUninstall ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            type: "button",
+            className: MarketplaceSettingsSection_default.button,
+            disabled: props.busy,
+            onClick: props.onUninstall,
+            children: props.busy ? t("uninstalling") : t("uninstall")
+          }
+        ) : null
+      ] })
+    }
+  );
 }
 function ConfigurePage(props) {
   const cards = props.renderCards();
@@ -614,7 +704,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css2;
   document.head.appendChild(tag);
 }
-var ReloadCommandCard_default = { "body": "_998sQa_body", "row": "_998sQa_row", "summary": "_998sQa_summary", "title": "_998sQa_title", "leading": "_998sQa_leading", "root": "_998sQa_root", "chevron": "_998sQa_chevron", "separator": "_998sQa_separator" };
+var ReloadCommandCard_default = { "separator": "_998sQa_separator", "summary": "_998sQa_summary", "title": "_998sQa_title", "chevron": "_998sQa_chevron", "body": "_998sQa_body", "row": "_998sQa_row", "leading": "_998sQa_leading", "root": "_998sQa_root" };
 
 // src/client/ReloadCommandCard.tsx
 var import_jsx_runtime2 = require("react/jsx-runtime");
@@ -875,7 +965,13 @@ var zh = {
   detailsKind: "\u7C7B\u578B",
   detailsSource: "\u6765\u6E90",
   detailsHomepage: "\u4E3B\u9875",
+  detailsSpec: "\u89C4\u683C",
+  detailsStatus: "\u72B6\u6001",
+  detailsEntries: "\u6761\u76EE",
+  detailsPhase: "\u9636\u6BB5",
   detailsNoDescription: "\u8FD9\u4E2A\u63D2\u4EF6\u6CA1\u6709\u63CF\u8FF0\u3002",
+  enabledTag: "\u5DF2\u542F\u7528",
+  disabledTag: "\u5DF2\u505C\u7528",
   pluginTag: "\u63D2\u4EF6",
   cards: "\u53EF\u914D\u7F6E\u63D2\u4EF6",
   configureEmpty: "\u8FD9\u4E2A\u90E8\u7F72\u6CA1\u6709\u53EF\u914D\u7F6E\u7684\u63D2\u4EF6\u3002",
@@ -930,7 +1026,13 @@ var en = {
   detailsKind: "Kind",
   detailsSource: "Source",
   detailsHomepage: "Homepage",
+  detailsSpec: "Spec",
+  detailsStatus: "Status",
+  detailsEntries: "Entries",
+  detailsPhase: "Phase",
   detailsNoDescription: "This plugin has no description.",
+  enabledTag: "Enabled",
+  disabledTag: "Disabled",
   pluginTag: "Plugin",
   cards: "Configurable plugins",
   configureEmpty: "This deployment exposes no plugin settings.",

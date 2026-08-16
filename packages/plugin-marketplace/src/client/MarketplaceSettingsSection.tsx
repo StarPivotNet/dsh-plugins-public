@@ -10,7 +10,7 @@ import {
 import type {
   InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import { catalogPackageLabel } from './catalog-label.ts'
+import { catalogPackageLabel, installedHoverLabel } from './catalog-label.ts'
 import { confirmInstallMessage } from './confirm-install.ts'
 import type { MarketplaceLocaleKey } from './locales.ts'
 import css from './MarketplaceSettingsSection.module.css'
@@ -102,6 +102,15 @@ function requestInstall(
     onInstall(entry.name, entry.version.length > 0 ? entry.version : undefined)
   }
 }
+
+function installedKindLabel(
+  t: MarketplaceSettingsSectionProps['t'],
+  kind: MarketplaceInstalledItem['kind'],
+): string {
+  return t(kind === 'inbox' ? 'inboxTag' : kind === 'bundle' ? 'bundleTag' : 'dependencyTag')
+}
+
+
 
 /** Render the marketplace Plugins section. */
 export function MarketplaceSettingsSection({
@@ -430,6 +439,7 @@ function InstalledPage(props: {
   onToggle: (entryId: string, enabled: boolean, packageName: string) => void
 }): ReactNode {
   const { t } = props
+  const [details, setDetails] = useState<MarketplaceInstalledItem | null>(null)
   return (
     <>
       {props.installed.status === 'loading' ? <p className={css.status}>{t('loading')}</p> : null}
@@ -451,61 +461,89 @@ function InstalledPage(props: {
             <h3>{t('installedHeading')}</h3>
             <span>{props.filtered.length}</span>
           </div>
-          <ul className={css.cards}>
-            {props.filtered.map((entry) => (
-              <li className={css.card} key={entry.packageName} data-plugin-name={entry.packageName}>
-                <span className={css.tag}>
-                  {t(entry.kind === 'inbox' ? 'inboxTag' : entry.kind === 'bundle' ? 'bundleTag' : 'dependencyTag')}
-                </span>
-                <h3 className={css.cardTitle} title={entry.packageName}>{entry.packageName}</h3>
-                {entry.spec.length > 0 ? <p className={css.packageName} title={entry.spec}>{entry.spec}</p> : null}
-                <div className={css.actions}>
-                  {entry.canToggle && entry.entryIds[0] !== undefined ? (
+          <ul className={`${css.cards} ${css.catalogCards}`}>
+            {props.filtered.map((entry) => {
+              const busy = props.busyName === entry.packageName
+              return (
+                <li className={`${css.card} ${css.catalogCard}`} key={entry.packageName} data-plugin-name={entry.packageName}>
+                  <Tooltip label={installedHoverLabel(entry.packageName, entry.spec)} side="bottom" maxWidth={360}>
                     <button
                       type="button"
-                      className={css.button}
-                      disabled={props.busyName === entry.packageName}
-                      onClick={() => { props.onToggle(entry.entryIds[0]!, !entry.enabled, entry.packageName) }}
+                      className={css.cardHit}
+                      aria-haspopup="dialog"
+                      aria-label={t('openDetailsNamed', { title: entry.packageName })}
+                      onClick={() => { setDetails(entry) }}
                     >
-                      {entry.enabled ? t('disable') : t('enable')}
+                      <span className={css.tag}>{installedKindLabel(t, entry.kind)}</span>
+                      <h3 className={css.cardTitle}>{entry.packageName}</h3>
+                      {entry.spec.length > 0 ? <p className={css.packageName}>{entry.spec}</p> : null}
                     </button>
-                  ) : null}
-                  {entry.canUninstall ? (
-                    <button
-                      type="button"
-                      className={css.button}
-                      disabled={props.busyName === entry.packageName}
-                      onClick={() => {
-                        if (globalThis.confirm(t('confirmUninstall'))) props.onUninstall(entry.packageName)
-                      }}
-                    >
-                      {props.busyName === entry.packageName ? t('uninstalling') : t('uninstall')}
-                    </button>
-                  ) : null}
-                </div>
-              </li>
-            ))}
+                  </Tooltip>
+                  <div className={css.cardAside}>
+                    {entry.canToggle && entry.entryIds[0] !== undefined ? (
+                      <button
+                        type="button"
+                        className={css.button}
+                        disabled={busy}
+                        onClick={() => { props.onToggle(entry.entryIds[0]!, !entry.enabled, entry.packageName) }}
+                      >
+                        {entry.enabled ? t('disable') : t('enable')}
+                      </button>
+                    ) : null}
+                    {entry.canUninstall ? (
+                      <button
+                        type="button"
+                        className={css.button}
+                        disabled={busy}
+                        onClick={() => {
+                          if (globalThis.confirm(t('confirmUninstall'))) props.onUninstall(entry.packageName)
+                        }}
+                      >
+                        {busy ? t('uninstalling') : t('uninstall')}
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              )
+            })}
           </ul>
+          {details !== null ? (
+            <InstalledDetailsDialog
+              t={t}
+              entry={details}
+              busy={props.busyName === details.packageName}
+              onClose={() => { setDetails(null) }}
+              onToggle={entryId => {
+                props.onToggle(entryId, !details.enabled, details.packageName)
+              }}
+              onUninstall={() => {
+                if (globalThis.confirm(t('confirmUninstall'))) props.onUninstall(details.packageName)
+              }}
+            />
+          ) : null}
         </>
       ) : null}
     </>
   )
 }
 
-function CatalogDetailsDialog(props: {
+function DetailsDialog(props: {
   t: MarketplaceSettingsSectionProps['t']
-  entry: MarketplaceCatalogItem
-  already: boolean
-  installing: boolean
+  title: string
+  rows: readonly {
+    readonly label: string
+    readonly value: string
+    readonly href?: string
+    readonly mono?: boolean
+  }[]
+  description?: string
   onClose: () => void
-  onInstall: () => void
+  actions: ReactNode
 }): ReactNode {
-  const { t, entry } = props
+  const { t } = props
   const closeRef = useRef<HTMLButtonElement>(null)
   const onCloseRef = useRef(props.onClose)
   onCloseRef.current = props.onClose
-  const packageLabel = catalogPackageLabel(entry.name, entry.version)
-  const kindLabel = t(entry.kind === 'bundle' ? 'bundleTag' : 'pluginTag')
   useEffect(() => {
     closeRef.current?.focus()
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -526,7 +564,7 @@ function CatalogDetailsDialog(props: {
         aria-labelledby="marketplace-plugin-details-title"
       >
         <div className={css.dialogHeader}>
-          <h2 className={css.dialogTitle} id="marketplace-plugin-details-title">{entry.title}</h2>
+          <h2 className={css.dialogTitle} id="marketplace-plugin-details-title">{props.title}</h2>
           <button
             ref={closeRef}
             type="button"
@@ -538,42 +576,122 @@ function CatalogDetailsDialog(props: {
           </button>
         </div>
         <dl className={css.dialogMeta}>
-          <div>
-            <dt>{t('detailsPackage')}</dt>
-            <dd><code className={css.dialogCode}>{packageLabel}</code></dd>
-          </div>
-          <div>
-            <dt>{t('detailsKind')}</dt>
-            <dd>{kindLabel}</dd>
-          </div>
-          <div>
-            <dt>{t('detailsSource')}</dt>
-            <dd>{entry.sourceTitle}</dd>
-          </div>
-          {entry.homepage.length > 0 ? (
-            <div>
-              <dt>{t('detailsHomepage')}</dt>
+          {props.rows.map(row => (
+            <div key={row.label}>
+              <dt>{row.label}</dt>
               <dd>
-                <a href={entry.homepage} target="_blank" rel="noreferrer">{entry.homepage}</a>
+                {row.href !== undefined
+                  ? <a href={row.href} target="_blank" rel="noreferrer">{row.value}</a>
+                  : row.mono === true
+                    ? <code className={css.dialogCode}>{row.value}</code>
+                    : row.value}
               </dd>
             </div>
-          ) : null}
+          ))}
         </dl>
-        <p className={css.dialogDescription}>{entry.description.length > 0 ? entry.description : t('detailsNoDescription')}</p>
+        {props.description !== undefined
+          ? <p className={css.dialogDescription}>{props.description}</p>
+          : null}
         <div className={css.dialogFooter}>
           <button type="button" className={css.button} onClick={props.onClose}>{t('closeDetails')}</button>
-          <button
-            type="button"
-            className={css.button}
-            disabled={props.already || props.installing}
-            onClick={props.onInstall}
-          >
-            {props.already ? t('installedTag') : props.installing ? t('installing') : t('install')}
-          </button>
+          {props.actions}
         </div>
       </div>
     </div>
   ), document.body)
+}
+
+function CatalogDetailsDialog(props: {
+  t: MarketplaceSettingsSectionProps['t']
+  entry: MarketplaceCatalogItem
+  already: boolean
+  installing: boolean
+  onClose: () => void
+  onInstall: () => void
+}): ReactNode {
+  const { t, entry } = props
+  const rows = [
+    { label: t('detailsPackage'), value: catalogPackageLabel(entry.name, entry.version), mono: true },
+    { label: t('detailsKind'), value: t(entry.kind === 'bundle' ? 'bundleTag' : 'pluginTag') },
+    { label: t('detailsSource'), value: entry.sourceTitle },
+    ...entry.homepage.length > 0
+      ? [{ label: t('detailsHomepage'), value: entry.homepage, href: entry.homepage }]
+      : [],
+  ]
+  return (
+    <DetailsDialog
+      t={t}
+      title={entry.title}
+      rows={rows}
+      description={entry.description.length > 0 ? entry.description : t('detailsNoDescription')}
+      onClose={props.onClose}
+      actions={(
+        <button
+          type="button"
+          className={css.button}
+          disabled={props.already || props.installing}
+          onClick={props.onInstall}
+        >
+          {props.already ? t('installedTag') : props.installing ? t('installing') : t('install')}
+        </button>
+      )}
+    />
+  )
+}
+
+function InstalledDetailsDialog(props: {
+  t: MarketplaceSettingsSectionProps['t']
+  entry: MarketplaceInstalledItem
+  busy: boolean
+  onClose: () => void
+  onToggle: (entryId: string) => void
+  onUninstall: () => void
+}): ReactNode {
+  const { t, entry } = props
+  const rows = [
+    { label: t('detailsPackage'), value: entry.packageName, mono: true },
+    { label: t('detailsKind'), value: installedKindLabel(t, entry.kind) },
+    ...entry.spec.length > 0 ? [{ label: t('detailsSpec'), value: entry.spec, mono: true }] : [],
+    { label: t('detailsStatus'), value: entry.enabled ? t('enabledTag') : t('disabledTag') },
+    ...entry.entryIds.length > 0
+      ? [{ label: t('detailsEntries'), value: entry.entryIds.join('\n'), mono: true }]
+      : [],
+    ...entry.fiberPhase !== null
+      ? [{ label: t('detailsPhase'), value: entry.fiberPhase, mono: true }]
+      : [],
+  ]
+  return (
+    <DetailsDialog
+      t={t}
+      title={entry.packageName}
+      rows={rows}
+      onClose={props.onClose}
+      actions={(
+        <>
+          {entry.canToggle && entry.entryIds[0] !== undefined ? (
+            <button
+              type="button"
+              className={css.button}
+              disabled={props.busy}
+              onClick={() => { props.onToggle(entry.entryIds[0]!) }}
+            >
+              {entry.enabled ? t('disable') : t('enable')}
+            </button>
+          ) : null}
+          {entry.canUninstall ? (
+            <button
+              type="button"
+              className={css.button}
+              disabled={props.busy}
+              onClick={props.onUninstall}
+            >
+              {props.busy ? t('uninstalling') : t('uninstall')}
+            </button>
+          ) : null}
+        </>
+      )}
+    />
+  )
 }
 
 function ConfigurePage(props: {

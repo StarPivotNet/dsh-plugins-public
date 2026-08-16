@@ -259,8 +259,11 @@
 .cardAside {
   flex: none;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   align-self: center;
+  gap: 6px;
 }
 
 .cardAside .button {
@@ -455,6 +458,7 @@
   margin: 0;
   min-width: 0;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
   color: var(--dsw-alias-label-primary);
   font-size: 13px;
   line-height: 18px;

@@ -1,4 +1,4 @@
-import { catalogPackageLabel } from './catalog-label.ts'
+import { catalogPackageLabel, installedHoverLabel } from './catalog-label.ts'
 import { confirmInstallMessage, installSourceLabel } from './confirm-install.ts'
 
 function assert(cond: unknown, message: string): void {
@@ -31,4 +31,10 @@ assert(
 assert(installSourceLabel('StarPivot', 'https://example.com') === 'StarPivot', 'title wins')
 assert(catalogPackageLabel('@dsh-plugin/dsh-auxiliary', '0.4.2') === '@dsh-plugin/dsh-auxiliary@0.4.2', 'versioned package')
 assert(catalogPackageLabel('dsh-find-plugin', '') === 'dsh-find-plugin', 'unversioned package')
+assert(
+  installedHoverLabel('@starpivot/dsh-plugin-marketplace', 'file:/tmp/plugin')
+    === '@starpivot/dsh-plugin-marketplace\nfile:/tmp/plugin',
+  'installed hover includes spec',
+)
+assert(installedHoverLabel('cordis:include', '') === 'cordis:include', 'installed hover without spec')
 console.log('confirm install checks passed')

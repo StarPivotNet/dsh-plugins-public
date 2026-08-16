@@ -3,11 +3,14 @@
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import { createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
 import {
   MarketplaceSettingsSection,
   type MarketplaceMutationResult,
   type MarketplaceSettingsSectionInjected,
 } from './MarketplaceSettingsSection.tsx'
+import { ReloadProgressToast, type ReloadProgress } from './ReloadProgressToast.tsx'
 import { en, zh } from './locales.ts'
 
 export const NS = 'settings.pluginMarketplace'
@@ -38,19 +41,41 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'plugin-marketplace: dictionaries')
   ctx.provide('pluginMarketplaceUi', true)
   const t = ctx.locale.bind(NS)
-  const catalogScope = ctx.settingsScope.bind<{ catalogUrls: string[]; reloadNonce: number }>({
+  const catalogScope = ctx.settingsScope.bind<{
+    catalogUrls: string[]
+    reloadNonce: number
+    reloadProgress: ReloadProgress
+  }>({
     namespace: 'plugin-marketplace',
   })
   const callMarketplace = marketplaceCaller(ctx)
   let lastReloadNonce = catalogScope.getSnapshot().value?.reloadNonce ?? 0
+  const host = document.createElement('div')
+  host.dataset.pluginMarketplaceReload = 'true'
+  document.body.append(host)
+  const root: Root = createRoot(host)
+  const renderToast = (): void => {
+    root.render(createElement(ReloadProgressToast, {
+      progress: catalogScope.getSnapshot().value?.reloadProgress,
+      t,
+    }))
+  }
+  renderToast()
   ctx.effect(() => catalogScope.subscribe(() => {
-    const next = catalogScope.getSnapshot().value?.reloadNonce ?? lastReloadNonce
-    if (next === lastReloadNonce) return
-    lastReloadNonce = next
-    void fetch('/plugins/reload', { method: 'POST' }).catch(() => {
-      // The Host already finished /reload; a failed browser swap is visible in HMR logs.
-    })
+    const snapshot = catalogScope.getSnapshot().value
+    const next = snapshot?.reloadNonce ?? lastReloadNonce
+    if (next !== lastReloadNonce) {
+      lastReloadNonce = next
+      void fetch('/plugins/reload', { method: 'POST' }).catch(() => {
+        // The Host already finished /reload; a failed browser swap is visible in HMR logs.
+      })
+    }
+    renderToast()
   }), 'plugin-marketplace: browser reload on nonce')
+  ctx.effect(() => () => {
+    root.unmount()
+    host.remove()
+  }, 'plugin-marketplace: reload toast')
 
   const mutation = (value: { ok: true; restartRequired?: true } | { ok: false; message: string }): MarketplaceMutationResult => {
     if (!value.ok) return { ok: false, message: value.message }

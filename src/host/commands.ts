@@ -9,8 +9,8 @@ import {
   runProfilePnpm,
 } from '@deepseek-ai/dsh-app-boot'
 import {
-  matchReloadTarget, reloadHostEntry, requestBrowserReload, selectReloadEntries,
-  type ReloadableEntry,
+  matchReloadTarget, partitionReloadEntries, reloadHostEntry, requestBrowserReload,
+  selectReloadEntries, writeReloadProgress, type ReloadableEntry,
 } from './reload.ts'
 import { resolveUpdateTarget } from './update.ts'
 import { buildRebootSpec, rebootBlocked, startWatchdog, writeRebootSpec } from './reboot.ts'
@@ -26,7 +26,7 @@ export function registerMarketplaceCommands(ctx: Context, options: {
     name: 'reload',
     description: '重载插件。不写名字则重载除连接骨架外的全部插件。',
     input: { hint: '[插件名字]' },
-    handler: invocation => handleReload(ctx, options.settingsNs, invocation.rawInput),
+    handler: invocation => handleReload(ctx, options.settingsNs, invocation.rawInput, invocation.agent),
   })
   ctx.commands.register({
     name: 'update',
@@ -58,6 +58,7 @@ async function handleReload(
   ctx: Context,
   settingsNs: unknown,
   rawInput: string,
+  _agent: unknown,
 ): Promise<{ kind: 'success' | 'error'; text: string }> {
   const entries = [...ctx.loader.entries()]
     .filter(entry => !entry.options.group)
@@ -82,47 +83,46 @@ async function handleReload(
   }
   const picked = selectReloadEntries(entries, matched)
   if (!picked.ok) return { kind: 'error', text: picked.message }
-  if (picked.selected.length === 0) {
+  const ordered = orderReloadQueue(picked.selected)
+  if (ordered.length === 0) {
     return { kind: 'success', text: '没有可热重载的 Host 插件。连接骨架请用 /reboot。' }
   }
-  const names = picked.selected.map(entry => entry.id)
-  const skipped = picked.skipped > 0 ? `跳过 ${String(picked.skipped)} 个连接骨架。` : ''
-  setTimeout(() => {
-    void runDeferredReload(ctx, settingsNs, names)
-  }, 800)
-  return {
-    kind: 'success',
-    text: `将在 800ms 后重载 ${String(names.length)} 个插件：${names.slice(0, 8).join('、')}${names.length > 8 ? '…' : ''}。${skipped}连接骨架请用 /reboot。`,
+  const settings = ctx.get('settings') as {
+    get?: (ns: unknown) => { reloadNonce?: number }
+    update?: (ns: unknown, patch: object) => Promise<unknown>
+  } | undefined
+  const registry = (ctx as { registry?: { delete(callback: unknown): void } }).registry
+  const failures: string[] = []
+  let ok = 0
+  for (const [index, entry] of ordered.entries()) {
+    await writeReloadProgress(settings, settingsNs, {
+      phase: 'running',
+      current: entry.id,
+      index: index + 1,
+      total: ordered.length,
+      message: `正在重载 ${entry.id}（${String(index + 1)}/${String(ordered.length)}）`,
+    })
+    const result = await reloadHostEntry(entry, registry)
+    if (result.ok) ok += 1
+    else failures.push(`${entry.id}: ${result.message}`)
   }
+  const client = await requestBrowserReload(settings, settingsNs)
+  const summary = failures.length === 0
+    ? `重载完成。已重载 ${String(ok)} 个插件。${client}`
+    : `重载完成，${String(ok)} 个成功，失败：${failures.join('；')}。${client}`
+  await writeReloadProgress(settings, settingsNs, {
+    phase: 'done',
+    current: '',
+    index: ordered.length,
+    total: ordered.length,
+    message: summary,
+  })
+  return { kind: failures.length === 0 ? 'success' : 'error', text: summary }
 }
 
-async function runDeferredReload(
-  ctx: Context,
-  settingsNs: unknown,
-  entryIds: readonly string[],
-): Promise<void> {
-  const registry = (ctx as { registry?: { delete(callback: unknown): void } }).registry
-  const wanted = new Set(entryIds)
-  const selected = [...ctx.loader.entries()]
-    .filter(entry => !entry.options.group && wanted.has(entry.id))
-    .map((entry): ReloadableEntry => ({
-      id: entry.id,
-      moduleName: String(entry.options.name ?? ''),
-      enabled: !entry.disabled,
-      get fiber() { return entry.fiber },
-      set fiber(value) { entry.fiber = value },
-      refresh: () => entry.refresh(),
-    }))
-  for (const entry of selected) {
-    await reloadHostEntry(entry, registry)
-  }
-  await requestBrowserReload(
-    ctx.get('settings') as {
-      get?: (ns: unknown) => { reloadNonce?: number }
-      update?: (ns: unknown, patch: object) => Promise<unknown>
-    } | undefined,
-    settingsNs,
-  )
+function orderReloadQueue(entries: readonly ReloadableEntry[]): ReloadableEntry[] {
+  const { others, marketplace } = partitionReloadEntries(entries)
+  return [...others, ...marketplace]
 }
 
 function handleUpdate(

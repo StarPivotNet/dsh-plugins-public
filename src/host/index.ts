@@ -83,8 +83,19 @@ export function apply(ctx: Context, config: Config = {}): void {
     settings.register(SETTINGS_NS, z.object({
       catalogUrls: z.array(z.string()).default([]),
       reloadNonce: z.number().default(0),
+      reloadProgress: z.object({
+        phase: z.union([z.const('idle'), z.const('running'), z.const('done')]).default('idle'),
+        current: z.string().default(''),
+        index: z.number().default(0),
+        total: z.number().default(0),
+        message: z.string().default(''),
+      }).default({ phase: 'idle', current: '', index: 0, total: 0, message: '' }),
     }), {
-      base: { catalogUrls: resolved.catalogUrls, reloadNonce: 0 },
+      base: {
+        catalogUrls: resolved.catalogUrls,
+        reloadNonce: 0,
+        reloadProgress: { phase: 'idle', current: '', index: 0, total: 0, message: '' },
+      },
     })
   })
   pinClientAutoReloadOff(ctx)

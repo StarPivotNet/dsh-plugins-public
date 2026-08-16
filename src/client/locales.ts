@@ -43,6 +43,8 @@ export const zh = {
   cancel: '取消',
   cards: '可配置插件',
   configureEmpty: '这个部署没有可配置的插件。',
+  reloadProgress: '正在重载插件',
+  reloadDone: '重载完成',
 } satisfies Record<string, string>
 
 export type MarketplaceLocaleKey = keyof typeof zh
@@ -90,4 +92,6 @@ export const en = {
   cancel: 'Cancel',
   cards: 'Configurable plugins',
   configureEmpty: 'This deployment exposes no plugin settings.',
+  reloadProgress: 'Reloading plugins',
+  reloadDone: 'Reload finished',
 } satisfies Record<MarketplaceLocaleKey, string>

@@ -15,7 +15,6 @@ export const SKELETON_LEAF_IDS = new Set([
   'cordis-client-runner',
   'commands',
   'settings',
-  'plugin-marketplace',
   'session',
   'agent',
   'agent-loop',
@@ -71,9 +70,48 @@ export function leafEntryId(id: string): string {
   return parts[parts.length - 1] ?? id
 }
 
-export function isSkeletonEntry(id: string, moduleName: string): boolean {
-  if (SKELETON_LEAF_IDS.has(leafEntryId(id))) return true
+export function isMarketplaceEntry(id: string, moduleName: string): boolean {
   return packageNameOf(moduleName) === '@starpivot/dsh-plugin-marketplace'
+    || leafEntryId(id) === 'plugin-marketplace'
+    || leafEntryId(id) === 'ui-settings-plugin-marketplace'
+}
+
+export function isSkeletonEntry(id: string, moduleName: string): boolean {
+  if (isMarketplaceEntry(id, moduleName)) return false
+  return SKELETON_LEAF_IDS.has(leafEntryId(id))
+}
+
+export function partitionReloadEntries(entries: readonly ReloadableEntry[]): {
+  readonly others: readonly ReloadableEntry[]
+  readonly marketplace: readonly ReloadableEntry[]
+} {
+  const others: ReloadableEntry[] = []
+  const marketplace: ReloadableEntry[] = []
+  for (const entry of entries) {
+    if (isMarketplaceEntry(entry.id, entry.moduleName)) marketplace.push(entry)
+    else others.push(entry)
+  }
+  return { others, marketplace }
+}
+
+export interface ReloadProgress {
+  readonly phase: 'idle' | 'running' | 'done'
+  readonly current: string
+  readonly index: number
+  readonly total: number
+  readonly message: string
+}
+
+export const IDLE_RELOAD_PROGRESS: ReloadProgress = {
+  phase: 'idle', current: '', index: 0, total: 0, message: '',
+}
+
+export async function writeReloadProgress(
+  settings: { update?: (ns: unknown, patch: object) => Promise<unknown> } | undefined,
+  ns: unknown,
+  progress: ReloadProgress,
+): Promise<void> {
+  await settings?.update?.(ns, { reloadProgress: progress })
 }
 
 export function normalizeQuery(raw: string): string {

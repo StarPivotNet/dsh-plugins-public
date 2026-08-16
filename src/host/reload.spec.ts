@@ -1,4 +1,7 @@
-import { isSkeletonEntry, matchReloadTarget, reloadHostEntry, selectReloadEntries } from './reload.ts'
+import {
+  isMarketplaceEntry, isSkeletonEntry, matchReloadTarget, partitionReloadEntries,
+  reloadHostEntry, selectReloadEntries,
+} from './reload.ts'
 import { resolveUpdateTarget } from './update.ts'
 import { rebootBlocked, REBOOT_ENV } from './reboot.ts'
 
@@ -32,6 +35,14 @@ const namedCore = selectReloadEntries([
 ], { kind: 'one', entry: { id: 'connection', moduleName: '@deepseek-ai/dsh-client-connection' } })
 assert(!namedCore.ok, 'named skeleton requires reboot')
 assert(!isSkeletonEntry('ui-skill', '@deepseek-ai/dsh-client-ui-skill'), 'overlay ui plugin is reloadable')
+assert(isMarketplaceEntry('plugin-marketplace', '@starpivot/dsh-plugin-marketplace/host'), 'marketplace host')
+assert(!isSkeletonEntry('plugin-marketplace', '@starpivot/dsh-plugin-marketplace/host'), 'marketplace is reloadable last')
+const split = partitionReloadEntries([
+  { id: 'plain', moduleName: 'plain-lib', enabled: true, async refresh() {} },
+  { id: 'plugin-marketplace', moduleName: '@starpivot/dsh-plugin-marketplace/host', enabled: true, async refresh() {} },
+])
+assert(split.others.map(entry => entry.id).join(',') === 'plain', 'others first')
+assert(split.marketplace.map(entry => entry.id).join(',') === 'plugin-marketplace', 'marketplace last')
 assert(resolveUpdateTarget(['@starpivot/dsh-plugin-marketplace', 'plain-lib'], '').kind === 'all', 'update all')
 assert(resolveUpdateTarget(['plain-lib'], 'plain-lib').kind === 'one', 'update one')
 assert(resolveUpdateTarget(['plain-lib'], 'cordis:include').kind === 'none', 'inbox cannot update')

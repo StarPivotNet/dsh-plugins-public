@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 export const REBOOT_ENV = 'DSH_MARKETPLACE_REBOOT'
-export const REBOOT_COOLDOWN_MS = 15_000
 
 export interface RebootSpec {
   readonly parentPid: number
@@ -20,14 +19,7 @@ export interface RebootSpec {
   readonly childTimeoutMs: number
 }
 
-export function rebootBlocked(now = Date.now(), env: NodeJS.ProcessEnv = process.env): string | undefined {
-  const raw = env[REBOOT_ENV]
-  if (raw === undefined || raw.length === 0) return undefined
-  const started = Number(raw)
-  if (!Number.isFinite(started)) return undefined
-  if (now - started < REBOOT_COOLDOWN_MS) {
-    return '刚刚重启过，请稍后再试'
-  }
+export function rebootBlocked(_now = Date.now(), _env: NodeJS.ProcessEnv = process.env): string | undefined {
   return undefined
 }
 

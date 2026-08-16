@@ -408,7 +408,7 @@ function InstalledPage(props: {
             <h3>{t('installedHeading')}</h3>
             <span>{props.filtered.length}</span>
           </div>
-          <ul className={css.list}>
+          <ul className={css.cards}>
             {props.filtered.map((entry) => (
               <li className={css.card} key={entry.packageName} data-plugin-name={entry.packageName}>
                 <div className={css.cardTop}>

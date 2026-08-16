@@ -5,7 +5,7 @@
   flex-direction: column;
   gap: 12px;
   width: 100%;
-  max-width: 1180px;
+  max-width: none;
   color: var(--dsw-alias-label-primary);
 }
 
@@ -154,9 +154,9 @@
 }
 
 .cards {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -206,15 +206,17 @@
 }
 
 .card {
+  box-sizing: border-box;
+  flex: 0 0 calc((100% - 32px) / 5);
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 10px;
   background: var(--dsw-alias-bg-layer-3);
-  padding: 12px 14px;
+  padding: 10px 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .cardTop {
@@ -227,18 +229,24 @@
 .cardTitle {
   min-width: 0;
   margin: 0;
-  font-size: 14px;
-  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  line-height: 18px;
   font-weight: 600;
 }
 
 .packageName,
 .description {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 11px;
+  line-height: 16px;
 }
 
 .packageName {

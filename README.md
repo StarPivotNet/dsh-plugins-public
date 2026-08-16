@@ -19,7 +19,7 @@ Git-hosted packages run their `prepare` script on install. If pnpm ≥10 blocks 
 
 After restart, Settings → 插件 becomes:
 
-- **发现** — fetch an operator JSON catalog from `catalogUrl`
+- **发现** — fetch one or more operator JSON catalogs from http(s) marketplace URLs; five plugin cards per row
 - **已安装** — list, uninstall, and toggle single Loader entries
 - the shipped Shell / Agent loop / Web search cards stay under Installed
 
@@ -45,7 +45,7 @@ The Host half registers a loopback Connection RPC channel at `/plugin-marketplac
 }
 ```
 
-Set `catalogUrl` on the `plugin-marketplace` row or in the Discover field (settings namespace `plugin-marketplace`).
+Set `catalogUrls` on the `plugin-marketplace` row or in Discover (settings namespace `plugin-marketplace`). A catalog may also include a top-level `title`. Duplicate package names across markets keep the first listing.
 
 ## Develop
 

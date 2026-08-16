@@ -38,7 +38,7 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'plugin-marketplace: dictionaries')
   ctx.provide('pluginMarketplaceUi', true)
   const t = ctx.locale.bind(NS)
-  const catalogScope = ctx.settingsScope.bind<{ catalogUrl: string }>({ namespace: 'plugin-marketplace' })
+  const catalogScope = ctx.settingsScope.bind<{ catalogUrls: string[] }>({ namespace: 'plugin-marketplace' })
   const callMarketplace = marketplaceCaller(ctx)
 
   const mutation = (value: { ok: true; restartRequired?: true } | { ok: false; message: string }): MarketplaceMutationResult => {
@@ -55,8 +55,8 @@ export function apply(ctx: ClientContext): void {
     )),
     uninstall: async (name) => mutation(await callMarketplace('uninstall', { name })),
     setEnabled: async (entryId, enabled) => mutation(await callMarketplace('setEnabled', { entryId, enabled })),
-    catalogUrl: catalogScope.getSnapshot().value?.catalogUrl ?? '',
-    setCatalogUrl: async (value) => { await catalogScope.set('catalogUrl', value) },
+    catalogUrls: catalogScope.getSnapshot().value?.catalogUrls ?? [],
+    setCatalogUrls: async (value) => { await catalogScope.set('catalogUrls', value) },
   })
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({

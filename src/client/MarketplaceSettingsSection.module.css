@@ -4,7 +4,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-width: 760px;
+  width: 100%;
+  max-width: 1180px;
   color: var(--dsw-alias-label-primary);
 }
 
@@ -152,7 +153,15 @@
   font-variant-numeric: tabular-nums;
 }
 
-.cards,
+.cards {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .list {
   display: flex;
   flex-direction: column;
@@ -160,6 +169,40 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.marketRow {
+  display: flex;
+  gap: 8px;
+}
+
+.sources {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.source[data-ok='false'] {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.sourceLabel {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
 }
 
 .card {

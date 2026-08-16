@@ -1,6 +1,5 @@
 /** Copy dictionaries for the plugin marketplace Settings section. */
 
-/** Simplified Chinese dictionary and key source of truth. */
 export const zh = {
   nav: '插件',
   title: '插件市场',
@@ -10,12 +9,16 @@ export const zh = {
   installedTab: '已安装',
   search: '搜索插件',
   catalog: '可安装插件',
-  catalogEmpty: '目录里还没有插件。',
-  catalogUnconfigured: '尚未配置插件目录。在下方填写运营者提供的目录 URL，或在组合里设置 catalogUrl。',
-  catalogUrl: '目录 URL',
-  catalogUrlHint: '指向一份 version 为 1 的 JSON 目录。留空表示关闭发现。',
-  catalogSave: '保存目录',
+  catalogEmpty: '这些市场里还没有插件。',
+  catalogUnconfigured: '尚未配置远程插件市场。在下方添加一个 http(s) 目录 URL。',
+  markets: '远程市场',
+  marketUrl: '市场 URL',
+  marketUrlHint: '每个市场是一份 version 为 1 的 JSON 目录。可添加多个。',
+  addMarket: '添加市场',
+  removeMarket: '移除',
+  catalogSave: '保存市场',
   catalogSaving: '保存中…',
+  marketFailed: '无法读取',
   install: '安装',
   installing: '安装中…',
   installedTag: '已安装',
@@ -40,10 +43,8 @@ export const zh = {
   cards: '可配置插件',
 } satisfies Record<string, string>
 
-/** Marketplace locale key union. */
 export type MarketplaceLocaleKey = keyof typeof zh
 
-/** English dictionary checked against the Chinese key set. */
 export const en = {
   nav: 'Plugins',
   title: 'Plugin marketplace',
@@ -53,12 +54,16 @@ export const en = {
   installedTab: 'Installed',
   search: 'Search plugins',
   catalog: 'Installable plugins',
-  catalogEmpty: 'The catalog has no plugins yet.',
-  catalogUnconfigured: 'No plugin catalog is configured. Enter the operator catalog URL below, or set catalogUrl in the composition.',
-  catalogUrl: 'Catalog URL',
-  catalogUrlHint: 'An http(s) URL of a version-1 JSON catalog. Leave blank to disable discovery.',
-  catalogSave: 'Save catalog',
+  catalogEmpty: 'These marketplaces have no plugins yet.',
+  catalogUnconfigured: 'No remote marketplace is configured. Add an http(s) catalog URL below.',
+  markets: 'Remote marketplaces',
+  marketUrl: 'Marketplace URL',
+  marketUrlHint: 'Each marketplace is a version-1 JSON catalog. Add as many as you need.',
+  addMarket: 'Add marketplace',
+  removeMarket: 'Remove',
+  catalogSave: 'Save marketplaces',
   catalogSaving: 'Saving…',
+  marketFailed: 'Unavailable',
   install: 'Install',
   installing: 'Installing…',
   installedTag: 'Installed',

@@ -29,10 +29,21 @@ export interface CatalogPlugin {
   readonly description: string
   readonly homepage: string
   readonly kind: CatalogPluginKind
+  readonly sourceUrl: string
+  readonly sourceTitle: string
+}
+
+export interface CatalogSource {
+  readonly url: string
+  readonly title: string
+  readonly ok: boolean
+  readonly error?: string
+  readonly count: number
 }
 
 export interface CatalogSnapshot {
   readonly configured: boolean
+  readonly sources: readonly CatalogSource[]
   readonly entries: readonly CatalogPlugin[]
 }
 

@@ -4,8 +4,11 @@ import type { CatalogPlugin, CatalogPluginKind, CatalogSnapshot } from './types.
 export const MAX_CATALOG_BYTES = 256 * 1024
 const KINDS = new Set<CatalogPluginKind>(['bundle', 'plugin'])
 
-export function parseCatalogDocument(raw: unknown):
-  | { readonly ok: true; readonly snapshot: CatalogSnapshot }
+export function parseCatalogDocument(
+  raw: unknown,
+  sourceUrl: string,
+):
+  | { readonly ok: true; readonly title: string; readonly entries: readonly Omit<CatalogPlugin, 'sourceUrl' | 'sourceTitle'>[] }
   | { readonly ok: false; readonly message: string } {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ok: false, message: 'catalog root must be an object' }
@@ -13,7 +16,12 @@ export function parseCatalogDocument(raw: unknown):
   const document = raw as Record<string, unknown>
   if (document.version !== 1) return { ok: false, message: 'catalog version must be 1' }
   if (!Array.isArray(document.plugins)) return { ok: false, message: 'catalog plugins must be an array' }
-  const entries: CatalogPlugin[] = []
+  const title = typeof document.title === 'string' && document.title.trim().length > 0
+    ? document.title.trim()
+    : typeof document.name === 'string' && document.name.trim().length > 0
+      ? document.name.trim()
+      : sourceTitleFromUrl(sourceUrl)
+  const entries: Omit<CatalogPlugin, 'sourceUrl' | 'sourceTitle'>[] = []
   const seen = new Set<string>()
   for (const [index, item] of document.plugins.entries()) {
     const parsed = parseListing(item, index)
@@ -24,13 +32,13 @@ export function parseCatalogDocument(raw: unknown):
     seen.add(parsed.entry.name)
     entries.push(parsed.entry)
   }
-  return { ok: true, snapshot: { configured: true, entries } }
+  return { ok: true, title, entries }
 }
 
 function parseListing(
   item: unknown,
   index: number,
-): { readonly ok: true; readonly entry: CatalogPlugin } | { readonly ok: false; readonly message: string } {
+): { readonly ok: true; readonly entry: Omit<CatalogPlugin, 'sourceUrl' | 'sourceTitle'> } | { readonly ok: false; readonly message: string } {
   if (item === null || typeof item !== 'object' || Array.isArray(item)) {
     return { ok: false, message: `catalog plugins[${String(index)}] must be an object` }
   }
@@ -84,4 +92,34 @@ export function isCatalogUrl(catalogUrl: string): boolean {
   } catch {
     return false
   }
+}
+
+export function sourceTitleFromUrl(catalogUrl: string): string {
+  try { return new URL(catalogUrl).host }
+  catch { return catalogUrl }
+}
+
+export function normalizeCatalogUrls(raw: unknown, fallback = ''): string[] {
+  const collected: string[] = []
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      if (typeof item === 'string') collected.push(item)
+    }
+  } else if (typeof raw === 'string') {
+    collected.push(...raw.split(/[\n,]/))
+  }
+  if (fallback.length > 0) collected.push(...fallback.split(/[\n,]/))
+  const seen = new Set<string>()
+  const urls: string[] = []
+  for (const item of collected) {
+    const url = item.trim()
+    if (url.length === 0 || seen.has(url)) continue
+    seen.add(url)
+    urls.push(url)
+  }
+  return urls
+}
+
+export function emptyCatalog(): CatalogSnapshot {
+  return { configured: false, sources: [], entries: [] }
 }

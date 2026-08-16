@@ -16,10 +16,15 @@ import {
 } from '@deepseek-ai/dsh-app-boot'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
-import { isCatalogUrl, MAX_CATALOG_BYTES, parseCatalogDocument } from './catalog.ts'
+import {
+  emptyCatalog, isCatalogUrl, MAX_CATALOG_BYTES, normalizeCatalogUrls,
+  parseCatalogDocument, sourceTitleFromUrl,
+} from './catalog.ts'
 import { installSpec, isInstallVersion, isRegistryPackageName } from './names.ts'
 import type {
+  CatalogPlugin,
   CatalogSnapshot,
+  CatalogSource,
   InstalledPlugin,
   InstalledPluginKind,
   InstalledPluginSnapshot,
@@ -52,6 +57,7 @@ const FIBER_PHASE: Record<number, Exclude<PluginFiberPhase, 'mixed'>> = {
 
 export interface Config {
   catalogUrl?: string
+  catalogUrls?: string[]
   catalogTimeoutMs?: number
 }
 
@@ -61,18 +67,22 @@ function fail(code: PluginMarketplaceErrorCode, message: string): PluginMarketpl
 
 export function apply(ctx: Context, config: Config = {}): void {
   const resolved = {
-    catalogUrl: config.catalogUrl ?? '',
+    catalogUrls: normalizeCatalogUrls(config.catalogUrls, config.catalogUrl ?? ''),
     catalogTimeoutMs: config.catalogTimeoutMs ?? 10_000,
   }
-  if (!isCatalogUrl(resolved.catalogUrl)) {
-    throw new Error('plugin-marketplace: catalogUrl must be empty or an http(s) URL')
+  for (const url of resolved.catalogUrls) {
+    if (!isCatalogUrl(url) || url.length === 0) {
+      throw new Error(`plugin-marketplace: catalog URL must be http(s): ${url}`)
+    }
   }
   ctx.inject(['settings'], (settingsCtx) => {
     const settings = settingsCtx.get('settings') as {
       register: (ns: unknown, schema: unknown, options?: { base?: unknown }) => unknown
     }
-    settings.register(SETTINGS_NS, z.object({ catalogUrl: z.string().default('') }), {
-      base: { catalogUrl: resolved.catalogUrl },
+    settings.register(SETTINGS_NS, z.object({
+      catalogUrls: z.array(z.string()).default([]),
+    }), {
+      base: { catalogUrls: resolved.catalogUrls },
     })
   })
 
@@ -135,30 +145,22 @@ export function apply(ctx: Context, config: Config = {}): void {
       return { profileName: profile.name, entries: [...byPackage.values()] }
     },
     async listCatalog(): Promise<CatalogSnapshot> {
-      const catalogUrl = effectiveCatalogUrl(ctx, resolved.catalogUrl)
-      if (catalogUrl.length === 0) return { configured: false, entries: [] }
-      if (!isCatalogUrl(catalogUrl)) throw new Error('catalogUrl must be an http(s) URL')
-      const controller = new AbortController()
-      const timer = setTimeout(() => { controller.abort() }, resolved.catalogTimeoutMs)
-      let response: Response
-      try {
-        response = await fetch(catalogUrl, { signal: controller.signal, redirect: 'follow' })
-      } catch (error) {
-        throw new Error(error instanceof Error ? error.message : String(error))
-      } finally {
-        clearTimeout(timer)
+      const urls = effectiveCatalogUrls(ctx, resolved.catalogUrls)
+      if (urls.length === 0) return emptyCatalog()
+      const sources: CatalogSource[] = []
+      const entries: CatalogPlugin[] = []
+      const seen = new Set<string>()
+      for (const url of urls) {
+        const fetched = await fetchCatalog(url, resolved.catalogTimeoutMs)
+        sources.push(fetched.source)
+        if (!fetched.ok) continue
+        for (const entry of fetched.entries) {
+          if (seen.has(entry.name)) continue
+          seen.add(entry.name)
+          entries.push(entry)
+        }
       }
-      if (!response.ok) throw new Error(`catalog responded ${String(response.status)}`)
-      const buffer = Buffer.from(await response.arrayBuffer())
-      if (buffer.byteLength > MAX_CATALOG_BYTES) {
-        throw new Error(`catalog exceeds ${String(MAX_CATALOG_BYTES)} bytes`)
-      }
-      let parsed: unknown
-      try { parsed = JSON.parse(buffer.toString('utf8')) }
-      catch { throw new Error('catalog is not JSON') }
-      const document = parseCatalogDocument(parsed)
-      if (!document.ok) throw new Error(document.message)
-      return document.snapshot
+      return { configured: true, sources, entries }
     },
     install(request: { name: string; version?: string }): Promise<PluginMutationResult> {
       return serialize(async () => {
@@ -246,11 +248,75 @@ function requireProfile(ctx: Context): ProfileHandle {
   return profile
 }
 
-function effectiveCatalogUrl(ctx: Context, fallback: string): string {
-  const section = (ctx.get('settings') as { get?: (ns: unknown) => { catalogUrl?: string } } | undefined)
-    ?.get?.(SETTINGS_NS)
-  if (typeof section?.catalogUrl === 'string') return section.catalogUrl.trim()
-  return fallback.trim()
+function effectiveCatalogUrls(ctx: Context, fallback: readonly string[]): string[] {
+  const section = (ctx.get('settings') as {
+    get?: (ns: unknown) => { catalogUrls?: unknown; catalogUrl?: unknown }
+  } | undefined)?.get?.(SETTINGS_NS)
+  const fromSettings = normalizeCatalogUrls(section?.catalogUrls ?? section?.catalogUrl)
+  return fromSettings.length > 0 ? fromSettings : [...fallback]
+}
+
+async function fetchCatalog(
+  url: string,
+  timeoutMs: number,
+): Promise<
+  | { readonly ok: true; readonly source: CatalogSource; readonly entries: readonly CatalogPlugin[] }
+  | { readonly ok: false; readonly source: CatalogSource }
+> {
+  if (!isCatalogUrl(url) || url.length === 0) {
+    return {
+      ok: false,
+      source: { url, title: sourceTitleFromUrl(url), ok: false, error: 'URL must be http(s)', count: 0 },
+    }
+  }
+  const controller = new AbortController()
+  const timer = setTimeout(() => { controller.abort() }, timeoutMs)
+  try {
+    const response = await fetch(url, { signal: controller.signal, redirect: 'follow' })
+    if (!response.ok) {
+      return {
+        ok: false,
+        source: { url, title: sourceTitleFromUrl(url), ok: false, error: `HTTP ${String(response.status)}`, count: 0 },
+      }
+    }
+    const buffer = Buffer.from(await response.arrayBuffer())
+    if (buffer.byteLength > MAX_CATALOG_BYTES) {
+      return {
+        ok: false,
+        source: { url, title: sourceTitleFromUrl(url), ok: false, error: 'catalog too large', count: 0 },
+      }
+    }
+    let parsed: unknown
+    try { parsed = JSON.parse(buffer.toString('utf8')) }
+    catch {
+      return {
+        ok: false,
+        source: { url, title: sourceTitleFromUrl(url), ok: false, error: 'catalog is not JSON', count: 0 },
+      }
+    }
+    const document = parseCatalogDocument(parsed, url)
+    if (!document.ok) {
+      return { ok: false, source: { url, title: sourceTitleFromUrl(url), ok: false, error: document.message, count: 0 } }
+    }
+    return {
+      ok: true,
+      source: { url, title: document.title, ok: true, count: document.entries.length },
+      entries: document.entries.map(entry => ({ ...entry, sourceUrl: url, sourceTitle: document.title })),
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      source: {
+        url,
+        title: sourceTitleFromUrl(url),
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+        count: 0,
+      },
+    }
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 function runPnpm(ctx: Context, args: readonly string[]): PluginMutationResult {

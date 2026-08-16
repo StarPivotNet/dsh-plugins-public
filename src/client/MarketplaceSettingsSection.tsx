@@ -18,6 +18,16 @@ export interface MarketplaceCatalogItem {
   readonly description: string
   readonly homepage: string
   readonly kind: 'bundle' | 'plugin'
+  readonly sourceUrl: string
+  readonly sourceTitle: string
+}
+
+export interface MarketplaceCatalogSource {
+  readonly url: string
+  readonly title: string
+  readonly ok: boolean
+  readonly error?: string
+  readonly count: number
 }
 
 /** Installed row projected for the installed page. */
@@ -36,6 +46,7 @@ export interface MarketplaceInstalledItem {
 /** Catalog snapshot the Host returns. */
 export interface MarketplaceCatalogSnapshot {
   readonly configured: boolean
+  readonly sources: readonly MarketplaceCatalogSource[]
   readonly entries: readonly MarketplaceCatalogItem[]
 }
 
@@ -53,8 +64,8 @@ export interface MarketplaceSettingsSectionInjected {
   install: (name: string, version?: string) => Promise<MarketplaceMutationResult>
   uninstall: (name: string) => Promise<MarketplaceMutationResult>
   setEnabled: (entryId: string, enabled: boolean) => Promise<MarketplaceMutationResult>
-  catalogUrl: string
-  setCatalogUrl: (value: string) => Promise<void>
+  catalogUrls: readonly string[]
+  setCatalogUrls: (value: readonly string[]) => Promise<void>
 }
 
 /** Full component props assembled by the Settings slot renderer. */
@@ -79,14 +90,16 @@ function matches(haystacks: readonly string[], query: string): boolean {
 
 /** Render the marketplace Plugins section. */
 export function MarketplaceSettingsSection({
-  t, renderSlot, listInstalled, listCatalog, install, uninstall, setEnabled, catalogUrl, setCatalogUrl,
+  t, renderSlot, listInstalled, listCatalog, install, uninstall, setEnabled, catalogUrls, setCatalogUrls,
 }: MarketplaceSettingsSectionProps): ReactNode {
   const tabsId = useId()
   const [tab, setTab] = useState<TabId>('discover')
   const [query, setQuery] = useState('')
   const [restart, setRestart] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
-  const [draftUrl, setDraftUrl] = useState(catalogUrl)
+  const [draftUrls, setDraftUrls] = useState<string[]>(
+    catalogUrls.length > 0 ? [...catalogUrls] : [''],
+  )
   const [savingUrl, setSavingUrl] = useState(false)
   const [busyName, setBusyName] = useState<string | null>(null)
   const [catalogRequest, setCatalogRequest] = useState(0)
@@ -195,12 +208,14 @@ export function MarketplaceSettingsSection({
             filtered={filteredCatalog}
             installedNames={installedNames}
             busyName={busyName}
-            draftUrl={draftUrl}
+            draftUrls={draftUrls}
             savingUrl={savingUrl}
-            onDraftUrl={setDraftUrl}
+            onDraftUrls={setDraftUrls}
             onSaveUrl={async () => {
               setSavingUrl(true)
-              await setCatalogUrl(draftUrl.trim())
+              const urls = draftUrls.map(url => url.trim()).filter(url => url.length > 0)
+              await setCatalogUrls(urls)
+              setDraftUrls(urls.length > 0 ? urls : [''])
               setSavingUrl(false)
               setCatalog({ status: 'loading' })
               setCatalogRequest(value => value + 1)
@@ -238,28 +253,70 @@ function DiscoverPage(props: {
   filtered: readonly MarketplaceCatalogItem[]
   installedNames: ReadonlySet<string>
   busyName: string | null
-  draftUrl: string
+  draftUrls: readonly string[]
   savingUrl: boolean
-  onDraftUrl: (value: string) => void
+  onDraftUrls: (value: string[]) => void
   onSaveUrl: () => void
   onRetry: () => void
   onInstall: (name: string, version?: string) => void
 }): ReactNode {
   const { t } = props
+  const sources = props.catalog.status === 'ready' ? props.catalog.value.sources : []
   return (
     <>
       <div className={css.field}>
-        <label htmlFor="marketplace-catalog-url">{t('catalogUrl')}</label>
-        <input
-          id="marketplace-catalog-url"
-          value={props.draftUrl}
-          onChange={(event) => { props.onDraftUrl(event.currentTarget.value) }}
-        />
-        <p className={css.hint}>{t('catalogUrlHint')}</p>
-        <button type="button" className={css.button} disabled={props.savingUrl} onClick={props.onSaveUrl}>
-          {props.savingUrl ? t('catalogSaving') : t('catalogSave')}
-        </button>
+        <span id="marketplace-catalog-urls">{t('markets')}</span>
+        {props.draftUrls.map((url, index) => (
+          <div className={css.marketRow} key={`market-${String(index)}`}>
+            <input
+              aria-labelledby="marketplace-catalog-urls"
+              placeholder={t('marketUrl')}
+              value={url}
+              onChange={(event) => {
+                const next = [...props.draftUrls]
+                next[index] = event.currentTarget.value
+                props.onDraftUrls(next)
+              }}
+            />
+            <button
+              type="button"
+              className={css.button}
+              onClick={() => {
+                const next = props.draftUrls.filter((_, itemIndex) => itemIndex !== index)
+                props.onDraftUrls(next.length > 0 ? next : [''])
+              }}
+            >
+              {t('removeMarket')}
+            </button>
+          </div>
+        ))}
+        <p className={css.hint}>{t('marketUrlHint')}</p>
+        <div className={css.actions}>
+          <button
+            type="button"
+            className={css.button}
+            onClick={() => { props.onDraftUrls([...props.draftUrls, '']) }}
+          >
+            {t('addMarket')}
+          </button>
+          <button type="button" className={css.button} disabled={props.savingUrl} onClick={props.onSaveUrl}>
+            {props.savingUrl ? t('catalogSaving') : t('catalogSave')}
+          </button>
+        </div>
       </div>
+      {sources.length > 0 ? (
+        <ul className={css.sources}>
+          {sources.map(source => (
+            <li key={source.url} className={css.source} data-ok={source.ok ? 'true' : 'false'}>
+              <strong>{source.title}</strong>
+              <span>{source.url}</span>
+              {source.ok
+                ? <span>{source.count}</span>
+                : <span>{t('marketFailed')}{source.error !== undefined ? `: ${source.error}` : ''}</span>}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {props.catalog.status === 'loading' ? <p className={css.status}>{t('loading')}</p> : null}
       {props.catalog.status === 'error' ? (
         <div className={css.failure}>
@@ -292,6 +349,7 @@ function DiscoverPage(props: {
                     {already ? <span className={css.tag}>{t('installedTag')}</span> : null}
                   </div>
                   <p className={css.packageName}>{entry.name}{entry.version.length > 0 ? `@${entry.version}` : ''}</p>
+                  <p className={css.sourceLabel}>{entry.sourceTitle}</p>
                   <p className={css.description}>{entry.description}</p>
                   <div className={css.actions}>
                     <button

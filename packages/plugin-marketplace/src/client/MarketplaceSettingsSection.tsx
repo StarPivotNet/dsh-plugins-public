@@ -377,27 +377,29 @@ function DiscoverPage(props: {
               const installing = props.busyName === entry.name
               return (
                 <li className={`${css.card} ${css.catalogCard}`} key={entry.name} data-plugin-name={entry.name}>
-                  <Tooltip
-                    label={entry.description}
-                    side="bottom"
-                    maxWidth={280}
-                    disabled={entry.description.length === 0}
-                  >
-                    <button
-                      type="button"
-                      className={css.cardHit}
-                      aria-haspopup="dialog"
-                      aria-label={t('openDetailsNamed', { title: entry.title })}
-                      onClick={() => { setDetails(entry) }}
+                  <div className={css.cardBody}>
+                    <Tooltip
+                      label={entry.description}
+                      side="bottom"
+                      maxWidth={280}
+                      disabled={entry.description.length === 0}
                     >
-                      {already
-                        ? <span className={css.tag}>{t('installedTag')}</span>
-                        : <span className={css.tag}>{entry.sourceTitle}</span>}
-                      <h3 className={css.cardTitle}>{entry.title}</h3>
-                      <p className={css.packageName}>{packageLabel}</p>
-                      <span className={css.description}>{entry.description}</span>
-                    </button>
-                  </Tooltip>
+                      <button
+                        type="button"
+                        className={css.cardHit}
+                        aria-haspopup="dialog"
+                        aria-label={t('openDetailsNamed', { title: entry.title })}
+                        onClick={() => { setDetails(entry) }}
+                      >
+                        {already
+                          ? <span className={css.tag}>{t('installedTag')}</span>
+                          : <span className={css.tag}>{entry.sourceTitle}</span>}
+                        <h3 className={css.cardTitle}>{entry.title}</h3>
+                        <p className={css.packageName}>{packageLabel}</p>
+                        <span className={css.description}>{entry.description}</span>
+                      </button>
+                    </Tooltip>
+                  </div>
                   <div className={css.cardAside}>
                     <button
                       type="button"
@@ -466,19 +468,21 @@ function InstalledPage(props: {
               const busy = props.busyName === entry.packageName
               return (
                 <li className={`${css.card} ${css.catalogCard}`} key={entry.packageName} data-plugin-name={entry.packageName}>
-                  <Tooltip label={installedHoverLabel(entry.packageName, entry.spec)} side="bottom" maxWidth={360}>
-                    <button
-                      type="button"
-                      className={css.cardHit}
-                      aria-haspopup="dialog"
-                      aria-label={t('openDetailsNamed', { title: entry.packageName })}
-                      onClick={() => { setDetails(entry) }}
-                    >
-                      <span className={css.tag}>{installedKindLabel(t, entry.kind)}</span>
-                      <h3 className={css.cardTitle}>{entry.packageName}</h3>
-                      {entry.spec.length > 0 ? <p className={css.packageName}>{entry.spec}</p> : null}
-                    </button>
-                  </Tooltip>
+                  <div className={css.cardBody}>
+                    <Tooltip label={installedHoverLabel(entry.packageName, entry.spec)} side="bottom" maxWidth={360}>
+                      <button
+                        type="button"
+                        className={css.cardHit}
+                        aria-haspopup="dialog"
+                        aria-label={t('openDetailsNamed', { title: entry.packageName })}
+                        onClick={() => { setDetails(entry) }}
+                      >
+                        <span className={css.tag}>{installedKindLabel(t, entry.kind)}</span>
+                        <h3 className={css.cardTitle}>{entry.packageName}</h3>
+                        {entry.spec.length > 0 ? <p className={css.packageName}>{entry.spec}</p> : null}
+                      </button>
+                    </Tooltip>
+                  </div>
                   <div className={css.cardAside}>
                     {entry.canToggle && entry.entryIds[0] !== undefined ? (
                       <button

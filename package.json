@@ -20,6 +20,7 @@
     "lib/node.js",
     "lib/host.js",
     "lib/client.js",
+    "lib/reboot-watchdog.js",
     "cordis.patch.yml",
     "README.md"
   ],

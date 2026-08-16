@@ -27,6 +27,12 @@ Install accepts one npm registry package name (optional version). Path, `file:`,
 
 The Host half registers a loopback Connection RPC channel at `/plugin-marketplace`. The browser half provides `pluginMarketplaceUi` so the shipped Plugins section unregisters itself.
 
+While this bundle is installed it turns off automatic hot reload (`client-hmr.autoReload` and the Host `hmr` row). Use the slash commands instead:
+
+- `/reload [plugin]` — reload one Loader entry, or every enabled entry when the name is omitted
+- `/update [plugin]` — `pnpm update` a profile dependency, or every dependency when omitted. This does not reload; run `/reload` or `/reboot` afterwards
+- `/reboot` — start a watchdog process, exit this dsh, then start a new dsh with the same argv
+
 ## Catalog JSON
 
 ```json

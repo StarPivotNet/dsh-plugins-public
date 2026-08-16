@@ -19,6 +19,15 @@ await esbuild.build({
   packages: 'external',
 })
 await writeFile(resolve(outDir, 'node.js'), 'export function apply() {}\n')
+await esbuild.build({
+  absWorkingDir: root,
+  entryPoints: ['src/host/reboot-watchdog.ts'],
+  outfile: 'lib/reboot-watchdog.js',
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  target: 'es2022',
+})
 
 const cssPlugin = {
   name: 'css-modules',
@@ -90,4 +99,4 @@ await writeFile(resolve(outDir, 'client.js'), [
   '',
 ].join('\n'))
 
-console.log('built lib/node.js, lib/host.js and lib/client.js')
+console.log('built lib/node.js, lib/host.js, lib/client.js and lib/reboot-watchdog.js')

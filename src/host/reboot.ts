@@ -1,0 +1,101 @@
+/** Spawn the reboot watchdog after it is confirmed alive. */
+
+import { spawn } from 'node:child_process'
+import { chmodSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+export const REBOOT_ENV = 'DSH_MARKETPLACE_REBOOT'
+export const REBOOT_COOLDOWN_MS = 15_000
+
+export interface RebootSpec {
+  readonly parentPid: number
+  readonly execPath: string
+  readonly execArgv: readonly string[]
+  readonly argv: readonly string[]
+  readonly cwd: string
+  readonly env: Record<string, string>
+  readonly healthUrl?: string
+  readonly parentTimeoutMs: number
+  readonly childTimeoutMs: number
+}
+
+export function rebootBlocked(now = Date.now(), env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const raw = env[REBOOT_ENV]
+  if (raw === undefined || raw.length === 0) return undefined
+  const started = Number(raw)
+  if (!Number.isFinite(started)) return undefined
+  if (now - started < REBOOT_COOLDOWN_MS) {
+    return 'dsh just restarted; wait a few seconds before /reboot again'
+  }
+  return undefined
+}
+
+export function buildRebootSpec(options: {
+  port?: number
+  now?: number
+}): RebootSpec {
+  const now = options.now ?? Date.now()
+  const env: Record<string, string> = {}
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined) env[key] = value
+  }
+  env[REBOOT_ENV] = String(now)
+  return {
+    parentPid: process.pid,
+    execPath: process.execPath,
+    execArgv: [...process.execArgv],
+    argv: process.argv.slice(1),
+    cwd: process.cwd(),
+    env,
+    ...(options.port !== undefined ? { healthUrl: `http://127.0.0.1:${String(options.port)}/` } : {}),
+    parentTimeoutMs: 30_000,
+    childTimeoutMs: 30_000,
+  }
+}
+
+export function writeRebootSpec(spec: RebootSpec): string {
+  const path = join(tmpdir(), `dsh-marketplace-reboot-${String(spec.parentPid)}-${spec.env[REBOOT_ENV]}.json`)
+  writeFileSync(path, `${JSON.stringify(spec)}\n`, { encoding: 'utf8', mode: 0o600 })
+  chmodSync(path, 0o600)
+  return path
+}
+
+export function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function waitUntil(
+  check: () => boolean | Promise<boolean>,
+  timeoutMs: number,
+  intervalMs = 200,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (await check()) return true
+    await new Promise(resolve => setTimeout(resolve, intervalMs))
+  }
+  return check()
+}
+
+export async function startWatchdog(watchdogPath: string, specPath: string): Promise<
+  { readonly ok: true; readonly pid: number } | { readonly ok: false; readonly message: string }
+> {
+  const child = spawn(process.execPath, [watchdogPath, specPath], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: false,
+  })
+  if (child.pid === undefined) {
+    return { ok: false, message: 'failed to spawn reboot watchdog' }
+  }
+  child.unref()
+  const alive = await waitUntil(() => processAlive(child.pid!), 2_000)
+  if (!alive) return { ok: false, message: 'reboot watchdog exited before dsh handed off' }
+  return { ok: true, pid: child.pid }
+}

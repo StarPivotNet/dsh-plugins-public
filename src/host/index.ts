@@ -20,6 +20,7 @@ import {
   emptyCatalog, isCatalogUrl, MAX_CATALOG_BYTES, normalizeCatalogUrls,
   parseCatalogDocument, sourceTitleFromUrl,
 } from './catalog.ts'
+import { registerMarketplaceCommands } from './commands.ts'
 import { installSpec, isInstallVersion, isRegistryPackageName } from './names.ts'
 import type {
   CatalogPlugin,
@@ -83,6 +84,19 @@ export function apply(ctx: Context, config: Config = {}): void {
       catalogUrls: z.array(z.string()).default([]),
     }), {
       base: { catalogUrls: resolved.catalogUrls },
+    })
+  })
+  pinClientAutoReloadOff(ctx)
+  ctx.inject(['commands'], (commandCtx) => {
+    registerMarketplaceCommands(commandCtx, {
+      requireProfile: () => requireProfile(commandCtx),
+      webPort: () => (commandCtx.get('webServer') as { port?: number } | undefined)?.port,
+      pinAutoReloadOff: () => { pinClientAutoReloadOff(commandCtx) },
+      exitProcess: () => {
+        const exit = commandCtx.get('appExit') as ((code: number) => void) | undefined
+        if (exit !== undefined) exit(0)
+        else process.exit(0)
+      },
     })
   })
 
@@ -240,6 +254,38 @@ export function apply(ctx: Context, config: Config = {}): void {
       }
     }
   }, { authority: 'loopback' })
+}
+
+const CLIENT_HMR_NS = settingsNamespace('client-hmr')
+
+function pinClientAutoReloadOff(ctx: Context): void {
+  ctx.inject(['settings'], (settingsCtx) => {
+    const settings = settingsCtx.get('settings') as {
+      get?: (ns: unknown) => { autoReload?: boolean }
+      update?: (ns: unknown, patch: object) => Promise<unknown>
+    } | undefined
+    if (settings === undefined) return
+    let previous: boolean | undefined
+    let pinning = false
+    const pin = (): void => {
+      if (pinning) return
+      const section = settings.get?.(CLIENT_HMR_NS)
+      if (section?.autoReload !== true) return
+      if (previous === undefined) previous = true
+      pinning = true
+      void Promise.resolve(settings.update?.(CLIENT_HMR_NS, { autoReload: false })).finally(() => {
+        pinning = false
+      })
+    }
+    pin()
+    const off = settingsCtx.on('settings/updated', (ns: unknown) => {
+      if (String(ns) === 'client-hmr') pin()
+    })
+    settingsCtx.effect(() => () => {
+      off()
+      if (previous === true) void settings.update?.(CLIENT_HMR_NS, { autoReload: true })
+    }, 'plugin-marketplace: pin client-hmr.autoReload off')
+  })
 }
 
 function requireProfile(ctx: Context): ProfileHandle {

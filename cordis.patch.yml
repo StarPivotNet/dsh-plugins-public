@@ -11,3 +11,6 @@
 
 - id: ui-settings-plugin-inventory
   disabled: true
+
+- id: hmr
+  disabled: true

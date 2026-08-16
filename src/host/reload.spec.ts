@@ -1,0 +1,45 @@
+import { matchReloadTarget, reloadHostEntry } from './reload.ts'
+import { resolveUpdateTarget } from './update.ts'
+import { rebootBlocked, REBOOT_ENV } from './reboot.ts'
+
+const entries = [
+  { id: 'plugin-marketplace', moduleName: '@starpivot/dsh-plugin-marketplace/host' },
+  { id: 'llm', moduleName: '@deepseek-ai/dsh-llm' },
+  { id: 'session', moduleName: '@deepseek-ai/dsh-session' },
+]
+
+function assert(cond: unknown, message: string): void {
+  if (!cond) throw new Error(message)
+}
+
+assert(matchReloadTarget(entries, '').kind === 'all', 'empty query reloads all')
+assert(matchReloadTarget(entries, 'llm').kind === 'one', 'id match')
+assert(matchReloadTarget(entries, '@deepseek-ai/dsh-session').kind === 'one', 'module match')
+assert(matchReloadTarget(entries, 'missing').kind === 'none', 'unknown')
+assert(resolveUpdateTarget(['@starpivot/dsh-plugin-marketplace', 'plain-lib'], '').kind === 'all', 'update all')
+assert(resolveUpdateTarget(['plain-lib'], 'plain-lib').kind === 'one', 'update one')
+assert(resolveUpdateTarget(['plain-lib'], 'cordis:include').kind === 'none', 'inbox cannot update')
+assert(rebootBlocked(20_000, { [REBOOT_ENV]: '10000' }) !== undefined, 'cooldown blocks')
+assert(rebootBlocked(40_000, { [REBOOT_ENV]: '10000' }) === undefined, 'cooldown expires')
+
+const calls: string[] = []
+const entry = {
+  id: 'llm',
+  moduleName: '@deepseek-ai/dsh-llm',
+  enabled: true,
+  fiber: {
+    async dispose() { calls.push('dispose') },
+    async await() { calls.push('await') },
+  } as { dispose(): Promise<unknown>; await(): Promise<unknown> } | undefined,
+  async refresh() {
+    calls.push('refresh')
+    this.fiber = {
+      async dispose() { calls.push('dispose2') },
+      async await() { calls.push('await') },
+    }
+  },
+}
+const result = await reloadHostEntry(entry)
+assert(result.ok, 'reload ok')
+assert(calls.join(',') === 'dispose,refresh,await', 'order ' + calls.join(','))
+console.log('host unit checks passed')

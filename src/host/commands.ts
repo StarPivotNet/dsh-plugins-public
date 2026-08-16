@@ -82,28 +82,47 @@ async function handleReload(
   }
   const picked = selectReloadEntries(entries, matched)
   if (!picked.ok) return { kind: 'error', text: picked.message }
-  const registry = (ctx as { registry?: { delete(callback: unknown): void } }).registry
-  const failures: string[] = []
-  let ok = 0
-  for (const entry of picked.selected) {
-    const result = await reloadHostEntry(entry, registry)
-    if (result.ok) ok += 1
-    else failures.push(`${entry.id}: ${result.message}`)
+  if (picked.selected.length === 0) {
+    return { kind: 'success', text: '没有可热重载的 Host 插件。连接骨架请用 /reboot。' }
   }
-  const client = await requestBrowserReload(
+  const names = picked.selected.map(entry => entry.id)
+  const skipped = picked.skipped > 0 ? `跳过 ${String(picked.skipped)} 个连接骨架。` : ''
+  setTimeout(() => {
+    void runDeferredReload(ctx, settingsNs, names)
+  }, 800)
+  return {
+    kind: 'success',
+    text: `将在 800ms 后重载 ${String(names.length)} 个插件：${names.slice(0, 8).join('、')}${names.length > 8 ? '…' : ''}。${skipped}连接骨架请用 /reboot。`,
+  }
+}
+
+async function runDeferredReload(
+  ctx: Context,
+  settingsNs: unknown,
+  entryIds: readonly string[],
+): Promise<void> {
+  const registry = (ctx as { registry?: { delete(callback: unknown): void } }).registry
+  const wanted = new Set(entryIds)
+  const selected = [...ctx.loader.entries()]
+    .filter(entry => !entry.options.group && wanted.has(entry.id))
+    .map((entry): ReloadableEntry => ({
+      id: entry.id,
+      moduleName: String(entry.options.name ?? ''),
+      enabled: !entry.disabled,
+      get fiber() { return entry.fiber },
+      set fiber(value) { entry.fiber = value },
+      refresh: () => entry.refresh(),
+    }))
+  for (const entry of selected) {
+    await reloadHostEntry(entry, registry)
+  }
+  await requestBrowserReload(
     ctx.get('settings') as {
       get?: (ns: unknown) => { reloadNonce?: number }
       update?: (ns: unknown, patch: object) => Promise<unknown>
     } | undefined,
     settingsNs,
   )
-  const skipped = picked.skipped > 0 ? `跳过 ${String(picked.skipped)} 个连接骨架。` : ''
-  const hostLine = ok === 0
-    ? '没有可热重载的 Host 插件。'
-    : `已重载 ${String(ok)} 个 Host 插件。`
-  const summary = `${hostLine}${skipped}${client} 连接骨架请用 /reboot。`
-  if (failures.length === 0) return { kind: 'success', text: summary }
-  return { kind: 'error', text: `${summary} 失败：${failures.join('；')}` }
 }
 
 function handleUpdate(

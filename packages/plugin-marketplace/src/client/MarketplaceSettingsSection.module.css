@@ -86,6 +86,7 @@
 
 .tab:focus-visible,
 .button:focus-visible,
+.iconButton:focus-visible,
 .cardHit:focus-visible,
 .dialogClose:focus-visible,
 .search input:focus-visible,
@@ -184,6 +185,7 @@
 
 .marketRow {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 
@@ -198,15 +200,56 @@
 
 .source {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 8px 12px;
   font-size: 12px;
   line-height: 18px;
   color: var(--dsw-alias-label-secondary);
 }
 
+.sourceMain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sourceActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
 .source[data-ok='false'] {
   color: var(--dsw-alias-state-error-primary);
+}
+
+.iconButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.iconButton:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .sourceLabel {

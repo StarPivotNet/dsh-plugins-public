@@ -4,7 +4,9 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'rea
 import { createPortal } from 'react-dom'
 import {
   IconCloseOutline16,
+  IconEditOutline16,
   IconSearchOutline16,
+  IconTrashOutline16,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
@@ -238,9 +240,9 @@ export function MarketplaceSettingsSection({
             draftUrls={draftUrls}
             savingUrl={savingUrl}
             onDraftUrls={setDraftUrls}
-            onSaveUrl={async () => {
+            onSaveUrl={async (nextUrls) => {
               setSavingUrl(true)
-              const urls = draftUrls.map(url => url.trim()).filter(url => url.length > 0)
+              const urls = (nextUrls ?? draftUrls).map(url => url.trim()).filter(url => url.length > 0)
               await setCatalogUrls(urls)
               setDraftUrls(urls.length > 0 ? urls : [''])
               setSavingUrl(false)
@@ -286,13 +288,40 @@ function DiscoverPage(props: {
   draftUrls: readonly string[]
   savingUrl: boolean
   onDraftUrls: (value: string[]) => void
-  onSaveUrl: () => void
+  onSaveUrl: (urls?: readonly string[]) => void
   onRetry: () => void
   onInstall: (name: string, version?: string) => void
 }): ReactNode {
   const { t } = props
   const [details, setDetails] = useState<MarketplaceCatalogItem | null>(null)
+  const [focusUrl, setFocusUrl] = useState<string | null>(null)
+  const inputRefs = useRef<Array<HTMLInputElement | null>>([])
   const sources = props.catalog.status === 'ready' ? props.catalog.value.sources : []
+  useEffect(() => {
+    if (focusUrl === null) return
+    const index = props.draftUrls.findIndex(item => item.trim() === focusUrl)
+    if (index < 0) return
+    const input = inputRefs.current[index]
+    input?.focus()
+    input?.select()
+    setFocusUrl(null)
+  }, [focusUrl, props.draftUrls])
+  const editSource = (url: string): void => {
+    if (!props.draftUrls.some(item => item.trim() === url)) {
+      const next = [...props.draftUrls]
+      const empty = next.findIndex(item => item.trim().length === 0)
+      if (empty >= 0) next[empty] = url
+      else next.push(url)
+      props.onDraftUrls(next)
+    }
+    setFocusUrl(url)
+  }
+  const removeSource = (url: string): void => {
+    if (!globalThis.confirm(t('confirmRemoveMarket'))) return
+    const next = props.draftUrls.map(item => item.trim()).filter(item => item.length > 0 && item !== url)
+    props.onDraftUrls(next.length > 0 ? next : [''])
+    props.onSaveUrl(next)
+  }
   return (
     <>
       <div className={css.field}>
@@ -300,6 +329,7 @@ function DiscoverPage(props: {
         {props.draftUrls.map((url, index) => (
           <div className={css.marketRow} key={`market-${String(index)}`}>
             <input
+              ref={(node) => { inputRefs.current[index] = node }}
               aria-labelledby="marketplace-catalog-urls"
               placeholder={t('marketUrl')}
               value={url}
@@ -309,16 +339,19 @@ function DiscoverPage(props: {
                 props.onDraftUrls(next)
               }}
             />
-            <button
-              type="button"
-              className={css.button}
-              onClick={() => {
-                const next = props.draftUrls.filter((_, itemIndex) => itemIndex !== index)
-                props.onDraftUrls(next.length > 0 ? next : [''])
-              }}
-            >
-              {t('removeMarket')}
-            </button>
+            <Tooltip label={t('removeMarket')} side="bottom">
+              <button
+                type="button"
+                className={css.iconButton}
+                aria-label={t('removeMarket')}
+                onClick={() => {
+                  const next = props.draftUrls.filter((_, itemIndex) => itemIndex !== index)
+                  props.onDraftUrls(next.length > 0 ? next : [''])
+                }}
+              >
+                <IconTrashOutline16 size={14} />
+              </button>
+            </Tooltip>
           </div>
         ))}
         <p className={css.hint}>{t('marketUrlHint')}</p>
@@ -330,7 +363,7 @@ function DiscoverPage(props: {
           >
             {t('addMarket')}
           </button>
-          <button type="button" className={css.button} disabled={props.savingUrl} onClick={props.onSaveUrl}>
+          <button type="button" className={css.button} disabled={props.savingUrl} onClick={() => { props.onSaveUrl() }}>
             {props.savingUrl ? t('catalogSaving') : t('catalogSave')}
           </button>
         </div>
@@ -339,11 +372,35 @@ function DiscoverPage(props: {
         <ul className={css.sources}>
           {sources.map(source => (
             <li key={source.url} className={css.source} data-ok={source.ok ? 'true' : 'false'}>
-              <strong>{source.title}</strong>
-              <span>{source.url}</span>
-              {source.ok
-                ? <span>{source.count}</span>
-                : <span>{t('marketFailed')}{source.error !== undefined ? `: ${source.error}` : ''}</span>}
+              <div className={css.sourceMain}>
+                <strong>{source.title}</strong>
+                {source.ok
+                  ? <span>{source.count}</span>
+                  : <span>{t('marketFailed')}{source.error !== undefined ? `: ${source.error}` : ''}</span>}
+              </div>
+              <div className={css.sourceActions}>
+                <Tooltip label={t('editMarket')} side="bottom">
+                  <button
+                    type="button"
+                    className={css.iconButton}
+                    aria-label={t('editMarket')}
+                    onClick={() => { editSource(source.url) }}
+                  >
+                    <IconEditOutline16 size={14} />
+                  </button>
+                </Tooltip>
+                <Tooltip label={t('removeMarket')} side="bottom">
+                  <button
+                    type="button"
+                    className={css.iconButton}
+                    aria-label={t('removeMarket')}
+                    disabled={props.savingUrl}
+                    onClick={() => { removeSource(source.url) }}
+                  >
+                    <IconTrashOutline16 size={14} />
+                  </button>
+                </Tooltip>
+              </div>
             </li>
           ))}
         </ul>

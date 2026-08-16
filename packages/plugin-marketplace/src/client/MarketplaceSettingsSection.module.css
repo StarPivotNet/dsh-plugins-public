@@ -167,8 +167,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.list,
-.configList {
+.list {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -177,8 +176,40 @@
   list-style: none;
 }
 
+.configList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .configList > * {
   min-width: 0;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.filter[data-active='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 .marketRow {

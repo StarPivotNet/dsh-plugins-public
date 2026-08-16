@@ -49,7 +49,7 @@ A user who installs `github:StarPivotNet/dsh-plugins-public#path:packages/plugin
 
 | name | version | homepage |
 | --- | --- | --- |
-| `@starpivot/dsh-plugin-marketplace` | `0.1.8` | https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/plugin-marketplace |
+| `@starpivot/dsh-plugin-marketplace` | `0.1.9` | https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/plugin-marketplace |
 | `@dsh-plugin/dsh-auxiliary` | `0.4.2` | https://github.com/dsh-plugins/dsh-auxiliary |
 | `@dsh-plugin/dsh-thought-buddy` | `0.1.1` | https://github.com/dsh-plugins/dsh-thought-buddy |
 | `dsh-find-plugin` | `0.3.6` | https://github.com/awesome-dsh-plugin/dsh-find-plugin |

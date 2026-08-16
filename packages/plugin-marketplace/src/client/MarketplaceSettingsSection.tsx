@@ -577,6 +577,8 @@ function InstalledPage(props: {
 }): ReactNode {
   const { t } = props
   const [details, setDetails] = useState<MarketplaceInstalledItem | null>(null)
+  const [kindFilter, setKindFilter] = useState<'all' | MarketplaceInstalledItem['kind']>('all')
+  const visible = kindFilter === 'all' ? props.filtered : props.filtered.filter(entry => entry.kind === kindFilter)
   return (
     <>
       {props.installed.status === 'loading' ? <p className={css.status}>{t('loading')}</p> : null}
@@ -589,17 +591,35 @@ function InstalledPage(props: {
       {props.installed.status === 'ready' && props.installed.value.length === 0
         ? <p className={css.empty}>{t('installedEmpty')}</p>
         : null}
-      {props.installed.status === 'ready' && props.installed.value.length > 0 && props.filtered.length === 0
+      {props.installed.status === 'ready' && props.installed.value.length > 0 && visible.length === 0
         ? <p className={css.empty}>{t('emptySearch')}</p>
         : null}
-      {props.filtered.length > 0 ? (
+      {visible.length > 0 ? (
         <>
           <div className={css.headingRow}>
             <h3>{t('installedHeading')}</h3>
-            <span>{props.filtered.length}</span>
+            <span>{visible.length}</span>
+          </div>
+          <div className={css.filters} role="group" aria-label={t('installedHeading')}>
+            {([
+              ['all', t('filterAll')],
+              ['inbox', t('filterInbox')],
+              ['bundle', t('filterBundle')],
+              ['dependency', t('filterDependency')],
+            ] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={css.filter}
+                data-active={kindFilter === id ? 'true' : undefined}
+                onClick={() => { setKindFilter(id) }}
+              >
+                {label}
+              </button>
+            ))}
           </div>
           <ul className={`${css.cards} ${css.catalogCards}`}>
-            {props.filtered.map((entry) => {
+            {visible.map((entry) => {
               const busy = props.busyName === entry.packageName
               return (
                 <li className={`${css.card} ${css.catalogCard}`} key={entry.packageName} data-plugin-name={entry.packageName}>

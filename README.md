@@ -27,11 +27,11 @@ Install accepts one npm registry package name (optional version). Path, `file:`,
 
 The Host half registers a loopback Connection RPC channel at `/plugin-marketplace`. The browser half provides `pluginMarketplaceUi` so the shipped Plugins section unregisters itself.
 
-While this bundle is installed it turns off automatic hot reload (`client-hmr.autoReload` and the Host `hmr` row). Use the slash commands instead:
+While this bundle is installed it forces `client-hmr.autoReload=false` and keeps the Host `hmr` row disabled. Reloading the marketplace itself must not turn automatic client swaps back on. Use the slash commands instead:
 
-- `/reload [plugin]` — reload overlay plugins and the marketplace itself (marketplace last). A toast shows the current plugin, then a completion line. Nested inbox ids such as `include:session` stay on the live path and need `/reboot`.
+- `/reload [plugin]` — wait for Host plugins, then settle the command card as `重载完成, 成功重载 N 个插件`. A bare `/reload` does not unload theme/layout/sidebar. Name one overlay UI plugin, such as `/reload ui-conversation`, to swap that page plugin the same way native HMR does. Use `/reboot` only for the skeleton.
 - `/update [plugin]` — `pnpm update` a profile dependency, or every dependency when omitted. This does not reload; run `/reload` or `/reboot` afterwards
-- `/reboot` — start a watchdog process, exit this dsh, then start a new dsh with the same argv
+- `/reboot` — restart the Host process on the same desktop port. After the new Host reconnects, the page reloads itself. A 15s cooldown blocks a second `/reboot`.
 
 ## Catalog JSON
 

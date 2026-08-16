@@ -22,6 +22,8 @@ import {
 } from './catalog.ts'
 import { registerMarketplaceCommands } from './commands.ts'
 import { DEFAULT_CATALOG_URL } from './defaults.ts'
+import { CLIENT_HMR_NAMESPACE, pinAutoReloadOff } from './hmr-pin.ts'
+import { requestBrowserReboot, snapshotFromSettings } from './reload.ts'
 import { installSpec, isInstallVersion, isRegistryPackageName } from './names.ts'
 import type {
   CatalogPlugin,
@@ -35,6 +37,7 @@ import type {
   PluginMarketplaceErrorCode,
   PluginMarketplaceFailure,
   PluginMutationResult,
+  ReloadProgressSnapshot,
   SetEnabledRequest,
 } from './types.ts'
 
@@ -85,28 +88,74 @@ export function apply(ctx: Context, config: Config = {}): void {
     settings.register(SETTINGS_NS, z.object({
       catalogUrls: z.array(z.string()).default([]),
       reloadNonce: z.number().default(0),
+      rebootNonce: z.number().default(0),
+      reloadClientIds: z.array(z.string()).default([]),
+      reloadNames: z.array(z.string()).default([]),
       reloadProgress: z.object({
         phase: z.union([z.const('idle'), z.const('running'), z.const('done')]).default('idle'),
         current: z.string().default(''),
         index: z.number().default(0),
         total: z.number().default(0),
+        ok: z.number().default(0),
+        failed: z.number().default(0),
         message: z.string().default(''),
-      }).default({ phase: 'idle', current: '', index: 0, total: 0, message: '' }),
+      }).default({ phase: 'idle', current: '', index: 0, total: 0, ok: 0, failed: 0, message: '' }),
     }), {
       base: {
         catalogUrls: resolved.catalogUrls,
         reloadNonce: 0,
-        reloadProgress: { phase: 'idle', current: '', index: 0, total: 0, message: '' },
+        rebootNonce: 0,
+        reloadClientIds: [],
+        reloadNames: [],
+        reloadProgress: { phase: 'idle', current: '', index: 0, total: 0, ok: 0, failed: 0, message: '' },
       },
     })
   })
   pinClientAutoReloadOff(ctx)
+  let inflight: Promise<unknown> | undefined
+  let reloadLive: ReloadProgressSnapshot = snapshotFromSettings(
+    (ctx.get('settings') as { get?: (ns: unknown) => {
+      reloadNonce?: number
+      rebootNonce?: number
+      reloadClientIds?: readonly string[]
+      reloadNames?: readonly string[]
+      reloadProgress?: ReloadProgressSnapshot
+    } } | undefined)?.get?.(SETTINGS_NS),
+  )
+  ctx.inject(['settings'], (settingsCtx) => {
+    const settings = settingsCtx.get('settings') as {
+      get?: (ns: unknown) => {
+        reloadNonce?: number
+        rebootNonce?: number
+        reloadClientIds?: readonly string[]
+        reloadNames?: readonly string[]
+        reloadProgress?: ReloadProgressSnapshot
+      }
+      update?: (ns: unknown, patch: object) => Promise<unknown>
+    } | undefined
+    reloadLive = snapshotFromSettings(settings?.get?.(SETTINGS_NS))
+    if (process.env.DSH_MARKETPLACE_REBOOT !== undefined) {
+      void requestBrowserReboot(settings, SETTINGS_NS).then((rebootNonce) => {
+        reloadLive = { ...reloadLive, rebootNonce }
+      }).catch((error: unknown) => {
+        console.error('plugin-marketplace: reboot nonce failed', error)
+      })
+    }
+  })
   ctx.inject(['commands'], (commandCtx) => {
     registerMarketplaceCommands(commandCtx, {
       requireProfile: () => requireProfile(commandCtx),
       webPort: () => (commandCtx.get('webServer') as { port?: number } | undefined)?.port,
-      pinAutoReloadOff: () => { pinClientAutoReloadOff(commandCtx) },
       settingsNs: SETTINGS_NS,
+      publishReload: (progress, extra) => {
+        reloadLive = {
+          ...progress,
+          nonce: extra?.nonce ?? reloadLive.nonce,
+          clientIds: extra?.clientIds ?? reloadLive.clientIds,
+          names: extra?.names ?? reloadLive.names,
+          rebootNonce: extra?.rebootNonce ?? reloadLive.rebootNonce,
+        }
+      },
       exitProcess: () => {
         const exit = commandCtx.get('appExit') as ((code: number) => void) | undefined
         if (exit !== undefined) exit(0)
@@ -114,8 +163,6 @@ export function apply(ctx: Context, config: Config = {}): void {
       },
     })
   })
-
-  let inflight: Promise<unknown> | undefined
   const marketplace = {
     listInstalled(): InstalledPluginSnapshot {
       const profile = requireProfile(ctx)
@@ -259,6 +306,8 @@ export function apply(ctx: Context, config: Config = {}): void {
           return { ok: true, value: await marketplace.uninstall(payload as { name: string }) }
         case 'setEnabled':
           return { ok: true, value: await marketplace.setEnabled(payload as SetEnabledRequest) }
+        case 'reloadStatus':
+          return { ok: true, value: reloadLive }
         default:
           return { ok: false, error: { code: 'NOT_FOUND', message: 'unknown marketplace endpoint' } }
       }
@@ -271,7 +320,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   }, { authority: 'loopback' })
 }
 
-const CLIENT_HMR_NS = settingsNamespace('client-hmr')
+const CLIENT_HMR_NS = settingsNamespace(CLIENT_HMR_NAMESPACE)
 
 function pinClientAutoReloadOff(ctx: Context): void {
   ctx.inject(['settings'], (settingsCtx) => {
@@ -280,25 +329,22 @@ function pinClientAutoReloadOff(ctx: Context): void {
       update?: (ns: unknown, patch: object) => Promise<unknown>
     } | undefined
     if (settings === undefined) return
-    let previous: boolean | undefined
     let pinning = false
     const pin = (): void => {
       if (pinning) return
-      const section = settings.get?.(CLIENT_HMR_NS)
-      if (section?.autoReload !== true) return
-      if (previous === undefined) previous = true
+      const write = pinAutoReloadOff(settings, CLIENT_HMR_NS)
+      if (write === undefined) return
       pinning = true
-      void Promise.resolve(settings.update?.(CLIENT_HMR_NS, { autoReload: false })).finally(() => {
+      void Promise.resolve(write).finally(() => {
         pinning = false
       })
     }
     pin()
     const off = settingsCtx.on('settings/updated', (ns: unknown) => {
-      if (String(ns) === 'client-hmr') pin()
+      if (String(ns) === CLIENT_HMR_NAMESPACE) pin()
     })
     settingsCtx.effect(() => () => {
       off()
-      if (previous === true) void settings.update?.(CLIENT_HMR_NS, { autoReload: true })
     }, 'plugin-marketplace: pin client-hmr.autoReload off')
   })
 }

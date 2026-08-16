@@ -9,8 +9,10 @@ import {
   runProfilePnpm,
 } from '@deepseek-ai/dsh-app-boot'
 import {
-  matchReloadTarget, partitionReloadEntries, reloadHostEntry, requestBrowserReload,
-  selectReloadEntries, writeReloadProgress, type ReloadableEntry,
+  formatReloadAccepted, formatReloadFinished, formatReloadOutcome, matchReloadTarget,
+  partitionReloadEntries, reloadHostEntry, requestBrowserReload, selectClientReloadIds,
+  selectReloadEntries, writeReloadProgress, type ReloadableEntry, type ReloadMatchResult,
+  type ReloadProgress,
 } from './reload.ts'
 import { resolveUpdateTarget } from './update.ts'
 import { buildRebootSpec, rebootBlocked, startWatchdog, writeRebootSpec } from './reboot.ts'
@@ -18,15 +20,20 @@ import { buildRebootSpec, rebootBlocked, startWatchdog, writeRebootSpec } from '
 export function registerMarketplaceCommands(ctx: Context, options: {
   requireProfile: () => { dir: string; installAnchor: string }
   webPort: () => number | undefined
-  pinAutoReloadOff: () => void
   exitProcess: () => void
   settingsNs: unknown
+  publishReload?: (progress: ReloadProgress, extra?: {
+    nonce?: number
+    clientIds?: readonly string[]
+    names?: readonly string[]
+    rebootNonce?: number
+  }) => void
 }): void {
   ctx.commands.register({
     name: 'reload',
     description: '重载插件。不写名字则重载除连接骨架外的全部插件。',
     input: { hint: '[插件名字]' },
-    handler: invocation => handleReload(ctx, options.settingsNs, invocation.rawInput, invocation.agent),
+    handler: invocation => handleReload(ctx, options, invocation.rawInput),
   })
   ctx.commands.register({
     name: 'update',
@@ -38,7 +45,6 @@ export function registerMarketplaceCommands(ctx: Context, options: {
     name: 'reboot',
     description: '通过看门狗重启整个 dsh 进程。',
     handler: async () => {
-      options.pinAutoReloadOff()
       const blocked = rebootBlocked()
       if (blocked !== undefined) return { kind: 'error', text: blocked }
       const spec = buildRebootSpec({ port: options.webPort() })
@@ -49,17 +55,40 @@ export function registerMarketplaceCommands(ctx: Context, options: {
       // Wait for command/done to reach the browser before killing the process.
       // ctx.appExit only disposes the tree and does not exit the web process.
       setTimeout(() => { process.exit(0) }, 800)
-      return { kind: 'success', text: '看门狗已就绪，800ms 后退出并由看门狗拉起新进程…' }
+      return { kind: 'success', text: '看门狗已就绪，800ms 后退出并由看门狗拉起新进程。页面会自动刷新。' }
     },
   })
 }
 
 async function handleReload(
   ctx: Context,
-  settingsNs: unknown,
+  options: {
+    settingsNs: unknown
+    publishReload?: (progress: ReloadProgress, extra?: {
+      nonce?: number
+      clientIds?: readonly string[]
+      names?: readonly string[]
+      rebootNonce?: number
+    }) => void
+  },
   rawInput: string,
-  _agent: unknown,
 ): Promise<{ kind: 'success' | 'error'; text: string }> {
+  const planned = planReload(ctx, rawInput)
+  if (planned.kind !== 'ok') return planned
+  try {
+    return await runReloadQueue(ctx, options, planned.ordered, planned.clientIds)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { kind: 'error', text: `重载失败：${message}` }
+  }
+}
+
+function planReload(
+  ctx: Context,
+  rawInput: string,
+):
+  | { kind: 'success' | 'error'; text: string }
+  | { kind: 'ok'; ordered: ReloadableEntry[]; clientIds: readonly string[]; matched: Extract<ReloadMatchResult, { kind: 'all' } | { kind: 'one' }> } {
   const entries = [...ctx.loader.entries()]
     .filter(entry => !entry.options.group)
     .map((entry): ReloadableEntry => ({
@@ -69,6 +98,10 @@ async function handleReload(
       get fiber() { return entry.fiber },
       set fiber(value) { entry.fiber = value },
       refresh: () => entry.refresh(),
+      reload: async () => {
+        await entry._dispose()
+        await entry.refresh()
+      },
     }))
   const matched = matchReloadTarget(entries, rawInput)
   if (matched.kind === 'none') {
@@ -82,42 +115,149 @@ async function handleReload(
     }
   }
   const picked = selectReloadEntries(entries, matched)
-  if (!picked.ok) return { kind: 'error', text: picked.message }
-  const ordered = orderReloadQueue(picked.selected)
-  if (ordered.length === 0) {
-    return { kind: 'success', text: '没有可热重载的 Host 插件。连接骨架请用 /reboot。' }
+  const clientIds = listClientReloadIds(ctx, matched)
+  if (!picked.ok) {
+    if (clientIds.length > 0) return { kind: 'ok', ordered: [], clientIds, matched }
+    return { kind: 'error', text: picked.message }
   }
+  const ordered = orderReloadQueue(picked.selected)
+  if (ordered.length === 0 && clientIds.length === 0) {
+    return { kind: 'success', text: '没有可热重载的插件。连接骨架请用 /reboot。' }
+  }
+  return { kind: 'ok', ordered, clientIds, matched }
+}
+
+function listClientReloadIds(
+  ctx: Context,
+  matched: Extract<ReloadMatchResult, { kind: 'all' } | { kind: 'one' }>,
+): readonly string[] {
+  const modules = ctx.get('clientModules') as {
+    graph?: () => { entries?: readonly { id?: string }[] }
+  } | undefined
+  const ids = (modules?.graph?.().entries ?? [])
+    .map(entry => entry.id)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)
+  return selectClientReloadIds(ids, matched)
+}
+
+async function publishProgress(
+  ctx: Context,
+  options: {
+    settingsNs: unknown
+    publishReload?: (progress: ReloadProgress, extra?: {
+      nonce?: number
+      clientIds?: readonly string[]
+      names?: readonly string[]
+      rebootNonce?: number
+    }) => void
+  },
+  progress: ReloadProgress,
+  extra?: { nonce?: number; clientIds?: readonly string[]; names?: readonly string[] },
+): Promise<void> {
+  const settings = ctx.get('settings') as {
+    update?: (ns: unknown, patch: object) => Promise<unknown>
+  } | undefined
+  options.publishReload?.(progress, extra)
+  await settings?.update?.(options.settingsNs, {
+    reloadProgress: progress,
+    ...extra?.names === undefined ? {} : { reloadNames: [...extra.names] },
+    ...extra?.clientIds === undefined ? {} : { reloadClientIds: [...extra.clientIds] },
+  })
+}
+
+async function runReloadQueue(
+  ctx: Context,
+  options: {
+    settingsNs: unknown
+    publishReload?: (progress: ReloadProgress, extra?: {
+      nonce?: number
+      clientIds?: readonly string[]
+      names?: readonly string[]
+      rebootNonce?: number
+    }) => void
+  },
+  ordered: readonly ReloadableEntry[],
+  clientIds: readonly string[],
+): Promise<{ kind: 'success' | 'error'; text: string }> {
   const settings = ctx.get('settings') as {
     get?: (ns: unknown) => { reloadNonce?: number }
     update?: (ns: unknown, patch: object) => Promise<unknown>
   } | undefined
-  const registry = (ctx as { registry?: { delete(callback: unknown): void } }).registry
+  const { others, marketplace } = partitionReloadEntries(ordered)
+  const names = [...others, ...marketplace].map(entry => entry.id)
+  for (const id of clientIds) {
+    if (!names.includes(id)) names.push(id)
+  }
+  const accepted = formatReloadAccepted(
+    [...others, ...marketplace],
+    clientIds,
+  )
+  await publishProgress(ctx, options, {
+    phase: 'running',
+    current: others[0]?.id ?? clientIds[0] ?? '',
+    index: 0,
+    total: names.length,
+    ok: 0,
+    failed: 0,
+    message: accepted,
+  }, { clientIds, names })
   const failures: string[] = []
   let ok = 0
-  for (const [index, entry] of ordered.entries()) {
-    await writeReloadProgress(settings, settingsNs, {
+  let index = 0
+  for (const entry of others) {
+    index += 1
+    await publishProgress(ctx, options, {
       phase: 'running',
       current: entry.id,
-      index: index + 1,
-      total: ordered.length,
-      message: `正在重载 ${entry.id}（${String(index + 1)}/${String(ordered.length)}）`,
-    })
-    const result = await reloadHostEntry(entry, registry)
+      index,
+      total: names.length,
+      ok,
+      failed: failures.length,
+      message: `正在重载 ${entry.id}（${String(index)}/${String(names.length)}）`,
+    }, { clientIds, names })
+    const result = await reloadHostEntry(entry)
     if (result.ok) ok += 1
     else failures.push(`${entry.id}: ${result.message}`)
   }
-  const client = await requestBrowserReload(settings, settingsNs)
-  const summary = failures.length === 0
-    ? `重载完成。已重载 ${String(ok)} 个插件。${client}`
-    : `重载完成，${String(ok)} 个成功，失败：${failures.join('；')}。${client}`
-  await writeReloadProgress(settings, settingsNs, {
+  const finished = ok + marketplace.length
+  const summary = formatReloadFinished(finished, failures.length)
+  const text = formatReloadOutcome(summary, names)
+  await publishProgress(ctx, options, {
     phase: 'done',
     current: '',
-    index: ordered.length,
-    total: ordered.length,
+    index: others.length,
+    total: names.length,
+    ok: finished,
+    failed: failures.length,
     message: summary,
-  })
-  return { kind: failures.length === 0 ? 'success' : 'error', text: summary }
+  }, { clientIds, names })
+  // command/done is appended after this handler returns. A microtask would
+  // dispose the marketplace first and drop the settlement, leaving a
+  // non-expandable running row. Wait for the next macrotask instead.
+  setTimeout(() => {
+    void (async () => {
+      for (const entry of marketplace) {
+        await reloadHostEntry(entry)
+      }
+      await requestBrowserReload(settings, options.settingsNs, clientIds, names)
+      const nonce = settings?.get?.(options.settingsNs)?.reloadNonce ?? 0
+      options.publishReload?.({
+        phase: 'done',
+        current: '',
+        index: others.length + marketplace.length,
+        total: names.length,
+        ok: finished,
+        failed: failures.length,
+        message: summary,
+      }, { nonce, clientIds, names })
+    })().catch((error: unknown) => {
+      console.error('plugin-marketplace: trailing reload failed', error)
+    })
+  }, 50)
+  return {
+    kind: failures.length === 0 ? 'success' : 'error',
+    text,
+  }
 }
 
 function orderReloadQueue(entries: readonly ReloadableEntry[]): ReloadableEntry[] {

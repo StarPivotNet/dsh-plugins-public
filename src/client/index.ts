@@ -3,6 +3,7 @@
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import {
@@ -10,11 +11,18 @@ import {
   type MarketplaceMutationResult,
   type MarketplaceSettingsSectionInjected,
 } from './MarketplaceSettingsSection.tsx'
+import { ReloadCommandCard } from './ReloadCommandCard.tsx'
 import { ReloadProgressToast, type ReloadProgress } from './ReloadProgressToast.tsx'
+import { reloadMarketplacePage, type MarketplacePageReloadHost } from './reload-page.ts'
+import {
+  asReloadStatus, hostGenerationAfterLoss, progressFromStatus, sameReloadStatus,
+  type ReloadStatus,
+} from './reload-status.ts'
 import { en, zh } from './locales.ts'
 
 export const NS = 'settings.pluginMarketplace'
-export const inject = ['slots', 'locale', 'settingsScope', 'connection']
+export { MARKETPLACE_CLIENT_PACKAGE } from './reload-page.ts'
+export const inject = ['slots', 'locale', 'settingsScope', 'connection', 'loader', 'modules']
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -43,36 +51,87 @@ export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(NS)
   const catalogScope = ctx.settingsScope.bind<{
     catalogUrls: string[]
-    reloadNonce: number
-    reloadProgress: ReloadProgress
   }>({
     namespace: 'plugin-marketplace',
   })
   const callMarketplace = marketplaceCaller(ctx)
-  let lastReloadNonce = catalogScope.getSnapshot().value?.reloadNonce ?? 0
   const host = document.createElement('div')
   host.dataset.pluginMarketplaceReload = 'true'
   document.body.append(host)
   const root: Root = createRoot(host)
+  let reloadStatus: ReloadStatus | undefined
+  let lastNonce: number | undefined
+  let lastRebootNonce: number | undefined
+  let toastLive = false
+  let pageReload = Promise.resolve()
+  const listeners = new Set<() => void>()
   const renderToast = (): void => {
     root.render(createElement(ReloadProgressToast, {
-      progress: catalogScope.getSnapshot().value?.reloadProgress,
+      progress: progressFromStatus(reloadStatus),
+      live: toastLive,
       t,
     }))
   }
-  renderToast()
-  ctx.effect(() => catalogScope.subscribe(() => {
-    const snapshot = catalogScope.getSnapshot().value
-    const next = snapshot?.reloadNonce ?? lastReloadNonce
-    if (next !== lastReloadNonce) {
-      lastReloadNonce = next
-      void fetch('/plugins/reload', { method: 'POST' }).catch(() => {
-        // The Host already finished /reload; a failed browser swap is visible in HMR logs.
-      })
+  const adoptStatus = (next: ReloadStatus | undefined, triggerPageReload: boolean): void => {
+    if (sameReloadStatus(reloadStatus, next)) return
+    const previous = reloadStatus
+    reloadStatus = next
+    if (lastNonce !== undefined && next !== undefined && (
+      next.phase === 'running' || (next.phase === 'done' && previous?.phase === 'running')
+    )) {
+      toastLive = true
     }
+    for (const listener of listeners) listener()
     renderToast()
-  }), 'plugin-marketplace: browser reload on nonce')
+    const nonce = next?.nonce ?? 0
+    const rebootNonce = next?.rebootNonce ?? 0
+    if (lastNonce === undefined) lastNonce = nonce
+    if (lastRebootNonce === undefined) lastRebootNonce = rebootNonce
+    if (triggerPageReload && rebootNonce > lastRebootNonce) {
+      lastRebootNonce = rebootNonce
+      lastNonce = nonce
+      window.location.reload()
+      return
+    }
+    if (!triggerPageReload || nonce <= lastNonce || next === undefined) return
+    lastNonce = nonce
+    pageReload = pageReload.then(() => reloadMarketplacePage({
+      loader: ctx.get('loader') as MarketplacePageReloadHost['loader'],
+      modules: ctx.get('modules') as MarketplacePageReloadHost['modules'],
+    }, next.clientIds)).catch((error: unknown) => {
+      console.error('plugin-marketplace: page reload failed', error)
+    })
+  }
+  const pollReload = async (): Promise<void> => {
+    try { adoptStatus(asReloadStatus(await callMarketplace('reloadStatus')), true) }
+    catch { /* keep last known status */ }
+  }
+  const connection = ctx.get('connection') as {
+    hostDescription?: {
+      getSnapshot(): unknown
+      subscribe(listener: () => void): () => void
+    }
+  }
+  const hostDescription = connection.hostDescription
+  if (hostDescription !== undefined) {
+    let generation = {
+      seenHost: hostDescription.getSnapshot() !== undefined,
+      lostHost: false,
+    }
+    const offHost = hostDescription.subscribe(() => {
+      generation = hostGenerationAfterLoss({
+        ...generation,
+        up: hostDescription.getSnapshot() !== undefined,
+      })
+      if (generation.reload) window.location.reload()
+    })
+    ctx.effect(() => () => { offHost() }, 'plugin-marketplace: reboot page refresh')
+  }
+  renderToast()
+  void pollReload()
+  const timer = window.setInterval(() => { void pollReload() }, 400)
   ctx.effect(() => () => {
+    window.clearInterval(timer)
     root.unmount()
     host.remove()
   }, 'plugin-marketplace: reload toast')
@@ -94,6 +153,25 @@ export function apply(ctx: ClientContext): void {
     catalogUrls: catalogScope.getSnapshot().value?.catalogUrls ?? [],
     setCatalogUrls: async (value) => { await catalogScope.set('catalogUrls', value) },
   })
+
+  ctx.slots.inject('conversation.chat.commandview', () => ctx.slots.register({
+    name: 'conversation.chat.commandview',
+    key: 'reload',
+    locale: NS,
+  }, (props: { node: { name: string | null; outcome: { kind: 'success' | 'error'; text?: string } | null } }) =>
+    createElement(ReloadCommandCard, {
+      node: props.node,
+      progress: progressFromStatus(reloadStatus),
+      names: reloadStatus?.names ?? [],
+      progressSource: {
+        get: () => progressFromStatus(reloadStatus),
+        names: () => reloadStatus?.names ?? [],
+        subscribe: listener => {
+          listeners.add(listener)
+          return () => { listeners.delete(listener) }
+        },
+      },
+    })))
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',

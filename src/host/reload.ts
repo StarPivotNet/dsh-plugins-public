@@ -37,6 +37,7 @@ export interface ReloadableEntry {
   readonly enabled: boolean
   fiber?: ReloadFiber
   refresh(): Promise<unknown>
+  reload?(): Promise<unknown>
 }
 
 export interface ReloadFiber {
@@ -76,9 +77,72 @@ export function isMarketplaceEntry(id: string, moduleName: string): boolean {
     || leafEntryId(id) === 'ui-settings-plugin-marketplace'
 }
 
+/**
+ * Browser plugins that hold the live page together. Native HMR never
+ * unloads these as a group; swapping them blanks the window.
+ */
+export const CLIENT_SKELETON_PACKAGES = new Set([
+  '@deepseek-ai/dsh-client-connection',
+  '@deepseek-ai/dsh-client-modules',
+  '@deepseek-ai/dsh-client-runtime',
+  '@deepseek-ai/dsh-client-hmr',
+  '@deepseek-ai/dsh-api-remotes',
+  '@deepseek-ai/dsh-cordis-client-runner',
+  '@deepseek-ai/dsh-api-gateway',
+  '@deepseek-ai/dsh-typert-registry',
+  '@deepseek-ai/dsh-client-ui-theme',
+  '@deepseek-ai/dsh-client-locale',
+  '@deepseek-ai/dsh-client-ui-layout',
+  '@deepseek-ai/dsh-client-ui-sidebar',
+  '@deepseek-ai/dsh-client-ui-settings',
+])
+
+export function isClientSkeletonPackage(packageName: string): boolean {
+  return CLIENT_SKELETON_PACKAGES.has(packageName)
+}
+
+export function isMarketplaceClientPackage(packageName: string): boolean {
+  return packageName === '@starpivot/dsh-plugin-marketplace'
+}
+
+export function matchesReloadQuery(
+  packageName: string,
+  matched: { readonly id: string; readonly moduleName: string },
+): boolean {
+  const leaf = leafEntryId(matched.id)
+  return packageName === packageNameOf(matched.moduleName)
+    || packageName === matched.moduleName
+    || packageName === matched.id
+    || leafEntryId(packageName) === leaf
+}
+
+/**
+ * Overlay UI bundles first, marketplace last. Connection/runtime stay mounted.
+ */
+export function selectClientReloadIds(
+  clientIds: readonly string[],
+  matched: Extract<ReloadMatchResult, { kind: 'all' } | { kind: 'one' }>,
+): readonly string[] {
+  const overlay: string[] = []
+  const marketplace: string[] = []
+  for (const id of clientIds) {
+    if (isClientSkeletonPackage(id)) continue
+    if (isMarketplaceClientPackage(id)) marketplace.push(id)
+    else overlay.push(id)
+  }
+  const ordered = [...overlay, ...marketplace]
+  if (matched.kind === 'all') return marketplace
+  return ordered.filter(id => matchesReloadQuery(id, matched.entry))
+}
+
+/** `include:agent-presets` is a tree carrier. Its children stay reloadable. */
+export function isIncludeContainer(id: string): boolean {
+  return /^include:[^:]+$/.test(id)
+}
+
 export function isSkeletonEntry(id: string, moduleName: string): boolean {
   if (isMarketplaceEntry(id, moduleName)) return false
-  return SKELETON_LEAF_IDS.has(leafEntryId(id))
+  return isIncludeContainer(id) || SKELETON_LEAF_IDS.has(leafEntryId(id))
 }
 
 export function partitionReloadEntries(entries: readonly ReloadableEntry[]): {
@@ -99,11 +163,53 @@ export interface ReloadProgress {
   readonly current: string
   readonly index: number
   readonly total: number
+  readonly ok: number
+  readonly failed: number
   readonly message: string
 }
 
 export const IDLE_RELOAD_PROGRESS: ReloadProgress = {
-  phase: 'idle', current: '', index: 0, total: 0, message: '',
+  phase: 'idle', current: '', index: 0, total: 0, ok: 0, failed: 0, message: '',
+}
+
+export function snapshotFromSettings(section: {
+  reloadNonce?: number
+  reloadClientIds?: readonly string[]
+  reloadProgress?: Partial<ReloadProgress>
+  rebootNonce?: number
+} | undefined): {
+  readonly phase: ReloadProgress['phase']
+  readonly current: string
+  readonly index: number
+  readonly total: number
+  readonly ok: number
+  readonly failed: number
+  readonly message: string
+  readonly nonce: number
+  readonly clientIds: readonly string[]
+  readonly names: readonly string[]
+  readonly rebootNonce: number
+} {
+  const progress = section?.reloadProgress
+  const phase = progress?.phase === 'running' || progress?.phase === 'done' ? progress.phase : 'idle'
+  return {
+    phase,
+    current: typeof progress?.current === 'string' ? progress.current : '',
+    index: typeof progress?.index === 'number' ? progress.index : 0,
+    total: typeof progress?.total === 'number' ? progress.total : 0,
+    ok: typeof progress?.ok === 'number' ? progress.ok : 0,
+    failed: typeof progress?.failed === 'number' ? progress.failed : 0,
+    message: typeof progress?.message === 'string' ? progress.message : '',
+    nonce: typeof section?.reloadNonce === 'number' ? section.reloadNonce : 0,
+    clientIds: Array.isArray(section?.reloadClientIds)
+      ? section.reloadClientIds.filter((id): id is string => typeof id === 'string')
+      : [],
+    names: Array.isArray((section as { reloadNames?: unknown } | undefined)?.reloadNames)
+      ? ((section as { reloadNames?: unknown }).reloadNames as unknown[])
+        .filter((id): id is string => typeof id === 'string')
+      : [],
+    rebootNonce: typeof section?.rebootNonce === 'number' ? section.rebootNonce : 0,
+  }
 }
 
 export async function writeReloadProgress(
@@ -135,6 +241,43 @@ export function matchReloadTarget(
   return { kind: 'none', query: rawInput.trim(), suggestions }
 }
 
+export function formatReloadAccepted(
+  entries: readonly { readonly id: string; readonly moduleName?: string }[],
+  clientIds: readonly string[] = [],
+): string {
+  const names = entries.map(entry => entry.id)
+  for (const id of clientIds) {
+    const already = entries.some(entry =>
+      entry.id === id
+      || packageNameOf(entry.moduleName ?? '') === id
+      || leafEntryId(entry.id) === leafEntryId(id))
+    if (!already) names.push(id)
+  }
+  if (names.length === 0) return '没有可热重载的插件。连接骨架请用 /reboot。'
+  return [
+    `正在重载 ${String(names.length)} 个插件`,
+    '',
+    ...names,
+  ].join('\n')
+}
+
+export function formatReloadFinished(
+  ok: number,
+  failed: number,
+): string {
+  if (failed === 0) return `重载完成, 成功重载 ${String(ok)} 个插件`
+  return `重载完成, 成功重载 ${String(ok)} 个插件, 失败 ${String(failed)} 个`
+}
+
+/** First-line summary plus the plugin id list official command cards expand. */
+export function formatReloadOutcome(
+  summary: string,
+  names: readonly string[],
+): string {
+  if (names.length === 0) return summary
+  return [summary, '', ...names].join('\n')
+}
+
 export function selectReloadEntries(
   entries: readonly ReloadableEntry[],
   matched: Extract<ReloadMatchResult, { kind: 'all' } | { kind: 'one' }>,
@@ -156,21 +299,18 @@ export function selectReloadEntries(
 
 export async function reloadHostEntry(
   entry: ReloadableEntry,
-  registry?: { delete(callback: unknown): void },
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!entry.enabled) return { ok: false, message: `条目 ${entry.id} 已停用` }
   try {
+    if (entry.reload !== undefined) {
+      await entry.reload()
+      return { ok: true }
+    }
     const fiber = entry.fiber
     if (fiber !== undefined) {
-      const callback = fiber.runtime?.callback
-      if (registry !== undefined && callback !== undefined) {
-        registry.delete(callback)
-      } else {
-        entry.fiber = undefined
-        await fiber.dispose()
-      }
-      while (fiber.inertia !== undefined) await fiber.inertia
       entry.fiber = undefined
+      await fiber.dispose()
+      while (fiber.inertia !== undefined) await fiber.inertia
     }
     await entry.refresh()
     await entry.fiber?.await()
@@ -182,13 +322,34 @@ export async function reloadHostEntry(
 
 export async function requestBrowserReload(
   settings: {
-    get?: (ns: unknown) => { reloadNonce?: number }
+    get?: (ns: unknown) => { reloadNonce?: number; reloadNames?: readonly string[] }
     update?: (ns: unknown, patch: object) => Promise<unknown>
   } | undefined,
   ns: unknown,
+  clientIds: readonly string[] = [],
+  names: readonly string[] = [],
 ): Promise<string> {
   if (settings?.update === undefined) return '未能请求浏览器重载（settings 不可用）'
-  const current = settings.get?.(ns)?.reloadNonce ?? 0
-  await settings.update(ns, { reloadNonce: current + 1 })
-  return '已请求浏览器重载插件'
+  const current = settings.get?.(ns)
+  await settings.update(ns, {
+    reloadNonce: (current?.reloadNonce ?? 0) + 1,
+    reloadClientIds: [...clientIds],
+    reloadNames: names.length > 0 ? [...names] : [...(current?.reloadNames ?? [])],
+  })
+  return clientIds.length === 0
+    ? '已请求浏览器重载插件市场页面'
+    : `已请求浏览器重载 ${String(clientIds.length)} 个界面插件`
+}
+
+/** Bump a persistent nonce so the desktop page reloads after Host restart. */
+export async function requestBrowserReboot(
+  settings: {
+    get?: (ns: unknown) => { rebootNonce?: number }
+    update?: (ns: unknown, patch: object) => Promise<unknown>
+  } | undefined,
+  ns: unknown,
+): Promise<number> {
+  const next = (settings?.get?.(ns)?.rebootNonce ?? 0) + 1
+  await settings?.update?.(ns, { rebootNonce: next })
+  return next
 }

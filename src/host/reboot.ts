@@ -26,9 +26,30 @@ export function rebootBlocked(now = Date.now(), env: NodeJS.ProcessEnv = process
   const started = Number(raw)
   if (!Number.isFinite(started)) return undefined
   if (now - started < REBOOT_COOLDOWN_MS) {
-    return 'dsh 刚刚重启过，请稍后再运行 /reboot'
+    return 'dsh 刚刚重启过。页面会自动刷新；15 秒内不必再运行 /reboot'
   }
   return undefined
+}
+
+/**
+ * Desktop starts `dsh web --port 0`. Restarting with that argv gets a new
+ * OS port and leaves the Electron window on the dead URL. Pin the live port.
+ */
+export function argvWithPort(argv: readonly string[], port?: number): string[] {
+  const next = [...argv]
+  if (port === undefined) return next
+  const flag = next.findIndex(arg => arg === '--port' || arg.startsWith('--port='))
+  if (flag === -1) return [...next, '--port', String(port)]
+  if (next[flag] === '--port') {
+    if (next[flag + 1] !== undefined && !next[flag + 1]!.startsWith('-')) {
+      next[flag + 1] = String(port)
+      return next
+    }
+    next.splice(flag + 1, 0, String(port))
+    return next
+  }
+  next[flag] = `--port=${String(port)}`
+  return next
 }
 
 export function buildRebootSpec(options: {
@@ -45,7 +66,7 @@ export function buildRebootSpec(options: {
     parentPid: process.pid,
     execPath: process.execPath,
     execArgv: [...process.execArgv],
-    argv: process.argv.slice(1),
+    argv: argvWithPort(process.argv.slice(1), options.port),
     cwd: process.cwd(),
     env,
     ...(options.port !== undefined ? { healthUrl: `http://127.0.0.1:${String(options.port)}/` } : {}),

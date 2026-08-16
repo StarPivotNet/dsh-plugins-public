@@ -7,17 +7,20 @@ export interface ReloadProgress {
   readonly current: string
   readonly index: number
   readonly total: number
+  readonly ok: number
+  readonly failed: number
   readonly message: string
 }
 
 export function ReloadProgressToast(props: {
   progress: ReloadProgress | undefined
   t: (key: MarketplaceLocaleKey) => string
+  live?: boolean
 }): ReactNode {
   const progress = props.progress
   const [visible, setVisible] = useState(false)
   useEffect(() => {
-    if (progress === undefined || progress.phase === 'idle') {
+    if (progress === undefined || progress.phase === 'idle' || props.live !== true) {
       setVisible(false)
       return
     }
@@ -25,7 +28,7 @@ export function ReloadProgressToast(props: {
     if (progress.phase !== 'done') return
     const timer = setTimeout(() => { setVisible(false) }, 4000)
     return () => { clearTimeout(timer) }
-  }, [progress?.phase, progress?.index, progress?.message])
+  }, [progress?.phase, progress?.index, progress?.message, props.live])
   if (!visible || progress === undefined || progress.phase === 'idle') return null
   return (
     <div className={css.reloadToast} role="status">

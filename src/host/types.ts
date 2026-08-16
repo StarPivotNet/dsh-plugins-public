@@ -63,3 +63,17 @@ export type PluginEnableResult = PluginEnableSuccess | PluginMarketplaceFailure
 export interface InstallPluginRequest { readonly name: string; readonly version?: string }
 export interface UninstallPluginRequest { readonly name: string }
 export interface SetEnabledRequest { readonly entryId: string; readonly enabled: boolean }
+
+export interface ReloadProgressSnapshot {
+  readonly phase: 'idle' | 'running' | 'done'
+  readonly current: string
+  readonly index: number
+  readonly total: number
+  readonly ok: number
+  readonly failed: number
+  readonly message: string
+  readonly nonce: number
+  readonly clientIds: readonly string[]
+  readonly names: readonly string[]
+  readonly rebootNonce: number
+}

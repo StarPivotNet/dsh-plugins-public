@@ -138,11 +138,15 @@ export async function reloadHostEntry(
   }
 }
 
-export async function reloadClientPlugins(port: number | undefined): Promise<string> {
-  if (port === undefined || !Number.isInteger(port) || port <= 0) {
-    return '已跳过浏览器插件重载（没有 webServer 端口）'
-  }
-  const response = await fetch(`http://127.0.0.1:${String(port)}/plugins/reload`, { method: 'POST' })
-  if (!response.ok) return `浏览器插件重载失败：HTTP ${String(response.status)}`
-  return '浏览器插件已重载'
+export async function requestBrowserReload(
+  settings: {
+    get?: (ns: unknown) => { reloadNonce?: number }
+    update?: (ns: unknown, patch: object) => Promise<unknown>
+  } | undefined,
+  ns: unknown,
+): Promise<string> {
+  if (settings?.update === undefined) return '未能请求浏览器重载（settings 不可用）'
+  const current = settings.get?.(ns)?.reloadNonce ?? 0
+  await settings.update(ns, { reloadNonce: current + 1 })
+  return '已请求浏览器重载插件'
 }

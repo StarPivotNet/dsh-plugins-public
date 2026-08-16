@@ -9,7 +9,7 @@ import {
   runProfilePnpm,
 } from '@deepseek-ai/dsh-app-boot'
 import {
-  matchReloadTarget, reloadClientPlugins, reloadHostEntry, selectReloadEntries,
+  matchReloadTarget, reloadHostEntry, requestBrowserReload, selectReloadEntries,
   type ReloadableEntry,
 } from './reload.ts'
 import { resolveUpdateTarget } from './update.ts'
@@ -20,12 +20,13 @@ export function registerMarketplaceCommands(ctx: Context, options: {
   webPort: () => number | undefined
   pinAutoReloadOff: () => void
   exitProcess: () => void
+  settingsNs: unknown
 }): void {
   ctx.commands.register({
     name: 'reload',
     description: '重载已安装插件。不写名字则重载全部可替换插件；骨架请用 /reboot。',
     input: { hint: '[插件名字]' },
-    handler: invocation => handleReload(ctx, options.requireProfile(), invocation.rawInput),
+    handler: invocation => handleReload(ctx, options.requireProfile(), options.settingsNs, invocation.rawInput),
   })
   ctx.commands.register({
     name: 'update',
@@ -54,6 +55,7 @@ export function registerMarketplaceCommands(ctx: Context, options: {
 async function handleReload(
   ctx: Context,
   profile: { dir: string },
+  settingsNs: unknown,
   rawInput: string,
 ): Promise<{ kind: 'success' | 'error'; text: string }> {
   const dependencies = Object.keys(readProfileManifest('plugin-marketplace', profile.dir).dependencies ?? {})
@@ -88,10 +90,18 @@ async function handleReload(
     if (result.ok) ok += 1
     else failures.push(`${entry.id}: ${result.message}`)
   }
-  const port = (ctx.get('webServer') as { port?: number } | undefined)?.port
-  const client = await reloadClientPlugins(port)
+  const client = await requestBrowserReload(
+    ctx.get('settings') as {
+      get?: (ns: unknown) => { reloadNonce?: number }
+      update?: (ns: unknown, patch: object) => Promise<unknown>
+    } | undefined,
+    settingsNs,
+  )
   const skipped = picked.skipped > 0 ? `跳过 ${String(picked.skipped)} 个骨架/内置条目。` : ''
-  const summary = `已重载 ${String(ok)} 个 Host 插件。${skipped}${client}`
+  const hostLine = ok === 0
+    ? '没有可热重载的额外 Host 插件。'
+    : `已重载 ${String(ok)} 个 Host 插件。`
+  const summary = `${hostLine}${skipped}${client} 骨架变更请用 /reboot。`
   if (failures.length === 0) return { kind: 'success', text: summary }
   return { kind: 'error', text: `${summary} 失败：${failures.join('；')}` }
 }

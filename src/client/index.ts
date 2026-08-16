@@ -38,8 +38,19 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'plugin-marketplace: dictionaries')
   ctx.provide('pluginMarketplaceUi', true)
   const t = ctx.locale.bind(NS)
-  const catalogScope = ctx.settingsScope.bind<{ catalogUrls: string[] }>({ namespace: 'plugin-marketplace' })
+  const catalogScope = ctx.settingsScope.bind<{ catalogUrls: string[]; reloadNonce: number }>({
+    namespace: 'plugin-marketplace',
+  })
   const callMarketplace = marketplaceCaller(ctx)
+  let lastReloadNonce = catalogScope.getSnapshot().value?.reloadNonce ?? 0
+  ctx.effect(() => catalogScope.subscribe(() => {
+    const next = catalogScope.getSnapshot().value?.reloadNonce ?? lastReloadNonce
+    if (next === lastReloadNonce) return
+    lastReloadNonce = next
+    void fetch('/plugins/reload', { method: 'POST' }).catch(() => {
+      // The Host already finished /reload; a failed browser swap is visible in HMR logs.
+    })
+  }), 'plugin-marketplace: browser reload on nonce')
 
   const mutation = (value: { ok: true; restartRequired?: true } | { ok: false; message: string }): MarketplaceMutationResult => {
     if (!value.ok) return { ok: false, message: value.message }

@@ -82,8 +82,9 @@ export function apply(ctx: Context, config: Config = {}): void {
     }
     settings.register(SETTINGS_NS, z.object({
       catalogUrls: z.array(z.string()).default([]),
+      reloadNonce: z.number().default(0),
     }), {
-      base: { catalogUrls: resolved.catalogUrls },
+      base: { catalogUrls: resolved.catalogUrls, reloadNonce: 0 },
     })
   })
   pinClientAutoReloadOff(ctx)
@@ -92,6 +93,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       requireProfile: () => requireProfile(commandCtx),
       webPort: () => (commandCtx.get('webServer') as { port?: number } | undefined)?.port,
       pinAutoReloadOff: () => { pinClientAutoReloadOff(commandCtx) },
+      settingsNs: SETTINGS_NS,
       exitProcess: () => {
         const exit = commandCtx.get('appExit') as ((code: number) => void) | undefined
         if (exit !== undefined) exit(0)

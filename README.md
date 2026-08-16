@@ -29,7 +29,7 @@ The Host half registers a loopback Connection RPC channel at `/plugin-marketplac
 
 While this bundle is installed it turns off automatic hot reload (`client-hmr.autoReload` and the Host `hmr` row). Use the slash commands instead:
 
-- `/reload [plugin]` — reload extra profile plugins. Bare `/reload` skips the process skeleton (connection, webServer, commands, session…). Named skeleton entries refuse and ask for `/reboot`
+- `/reload [plugin]` — reload extra profile plugins. Bare `/reload` skips the process skeleton (connection, webServer, commands, session…). The browser half POSTs `/plugins/reload` same-origin. Named skeleton entries refuse and ask for `/reboot`
 - `/update [plugin]` — `pnpm update` a profile dependency, or every dependency when omitted. This does not reload; run `/reload` or `/reboot` afterwards
 - `/reboot` — start a watchdog process, exit this dsh, then start a new dsh with the same argv
 

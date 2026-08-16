@@ -158,6 +158,7 @@ export function apply(ctx: ClientContext): void {
     )),
     uninstall: async (name) => mutation(await callMarketplace('uninstall', { name })),
     setEnabled: async (entryId, enabled) => mutation(await callMarketplace('setEnabled', { entryId, enabled })),
+    setPluginNote: async (name, note, tags) => mutation(await callMarketplace('setPluginNote', { name, note, tags })),
     catalogUrls: catalogScope.getSnapshot().value?.catalogUrls ?? [],
     setCatalogUrls: async (value) => { await catalogScope.set('catalogUrls', value) },
   })

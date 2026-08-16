@@ -414,6 +414,47 @@ function listUpdateTargets(dependencies) {
   return [...dependencies].sort((left, right) => left.localeCompare(right)).map((name2) => ({ name: name2 }));
 }
 
+// src/host/plugin-notes.ts
+function emptyNote() {
+  return { note: "", tags: [] };
+}
+function normalizeTags(raw) {
+  const seen = /* @__PURE__ */ new Set();
+  const tags = [];
+  for (const item of raw) {
+    const tag = item.trim();
+    if (tag.length === 0) continue;
+    const key = tag.toLocaleLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tags.push(tag);
+  }
+  return tags;
+}
+function isPluginNotes(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.values(value).every(isPluginNote);
+}
+function isPluginNote(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const row = value;
+  return typeof row.note === "string" && Array.isArray(row.tags) && row.tags.every((tag) => typeof tag === "string");
+}
+function noteOf(notes, packageName) {
+  return notes?.[packageName] ?? emptyNote();
+}
+function writeNote(notes, packageName, next) {
+  const note = next.note.trim();
+  const tags = normalizeTags(next.tags);
+  const current = { ...notes ?? {} };
+  if (note.length === 0 && tags.length === 0) {
+    delete current[packageName];
+    return current;
+  }
+  current[packageName] = { note, tags };
+  return current;
+}
+
 // src/host/commands.ts
 import { fileURLToPath } from "node:url";
 import { dirname, join as join2 } from "node:path";
@@ -783,6 +824,7 @@ function apply(ctx, config = {}) {
     settings.register(SETTINGS_NS, z.object({
       catalogUrls: z.array(z.string()).default([]),
       catalogCache: z.any().default(emptyCache()),
+      pluginNotes: z.any().default({}),
       reloadNonce: z.number().default(0),
       rebootNonce: z.number().default(0),
       reloadClientIds: z.array(z.string()).default([]),
@@ -800,6 +842,7 @@ function apply(ctx, config = {}) {
       base: {
         catalogUrls: resolved.catalogUrls,
         catalogCache: emptyCache(),
+        pluginNotes: {},
         reloadNonce: 0,
         rebootNonce: 0,
         reloadClientIds: [],
@@ -869,7 +912,9 @@ function apply(ctx, config = {}) {
           enabled: true,
           fiberPhase: null,
           canUninstall: packageName !== MARKETPLACE_BUNDLE_PACKAGE,
-          canToggle: false
+          canToggle: false,
+          note: "",
+          tags: []
         });
       }
       for (const entry of ctx.loader.entries()) {
@@ -898,10 +943,19 @@ function apply(ctx, config = {}) {
           enabled,
           fiberPhase,
           canUninstall: false,
-          canToggle: entry.id !== MARKETPLACE_HOST_ENTRY_ID && entry.id !== MARKETPLACE_CLIENT_ENTRY_ID
+          canToggle: entry.id !== MARKETPLACE_HOST_ENTRY_ID && entry.id !== MARKETPLACE_CLIENT_ENTRY_ID,
+          note: "",
+          tags: []
         });
       }
-      return { profileName: profile.name, entries: [...byPackage.values()] };
+      const notes = readPluginNotes(ctx);
+      return {
+        profileName: profile.name,
+        entries: [...byPackage.values()].map((entry) => {
+          const annotated = noteOf(notes, entry.packageName);
+          return { ...entry, note: annotated.note, tags: annotated.tags };
+        })
+      };
     },
     listCommandTargets() {
       const reload = listReloadTargets([...ctx.loader.entries()].filter((entry) => !entry.options.group).map((entry) => ({
@@ -999,6 +1053,11 @@ function apply(ctx, config = {}) {
         writeProfilePatches(profile.dir, applyEnablement(patches, request.entryId, request.enabled));
         return { ok: true };
       });
+    },
+    setPluginNote(request) {
+      if (request.name.trim().length === 0) return fail("package-invalid", "note requires a package name");
+      writePluginNotes(ctx, writeNote(readPluginNotes(ctx), request.name, request));
+      return { ok: true };
     }
   };
   async function serialize(work) {
@@ -1028,6 +1087,8 @@ function apply(ctx, config = {}) {
           return { ok: true, value: await marketplace.uninstall(payload) };
         case "setEnabled":
           return { ok: true, value: await marketplace.setEnabled(payload) };
+        case "setPluginNote":
+          return { ok: true, value: marketplace.setPluginNote(payload) };
         case "reloadStatus":
           return { ok: true, value: reloadLive };
         default:
@@ -1072,6 +1133,17 @@ function requireProfile(ctx) {
 }
 function settingsSection(ctx) {
   return ctx.get("settings")?.get?.(SETTINGS_NS);
+}
+function readPluginNotes(ctx) {
+  const raw = settingsSection(ctx)?.pluginNotes;
+  return isPluginNotes(raw) ? raw : {};
+}
+function writePluginNotes(ctx, notes) {
+  const settings = ctx.get("settings");
+  if (settings?.update === void 0) return;
+  void Promise.resolve(settings.update(SETTINGS_NS, { pluginNotes: notes })).catch((error) => {
+    console.error("plugin-marketplace: plugin notes write failed", error);
+  });
 }
 function readCatalogCache(ctx) {
   const raw = settingsSection(ctx)?.catalogCache;

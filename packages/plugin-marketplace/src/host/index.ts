@@ -25,6 +25,7 @@ import {
   pruneCacheToUrls, snapshotFromCache, type CatalogCache,
 } from './catalog-cache.ts'
 import { listReloadTargets, listUpdateTargets } from './command-targets.ts'
+import { isPluginNotes, noteOf, writeNote, type PluginNotes } from './plugin-notes.ts'
 import { registerMarketplaceCommands } from './commands.ts'
 import { DEFAULT_CATALOG_URL } from './defaults.ts'
 import { CLIENT_HMR_NAMESPACE, pinAutoReloadOff } from './hmr-pin.ts'
@@ -93,6 +94,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     settings.register(SETTINGS_NS, z.object({
       catalogUrls: z.array(z.string()).default([]),
       catalogCache: z.any().default(emptyCache()),
+      pluginNotes: z.any().default({}),
       reloadNonce: z.number().default(0),
       rebootNonce: z.number().default(0),
       reloadClientIds: z.array(z.string()).default([]),
@@ -110,6 +112,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       base: {
         catalogUrls: resolved.catalogUrls,
         catalogCache: emptyCache(),
+        pluginNotes: {},
         reloadNonce: 0,
         rebootNonce: 0,
         reloadClientIds: [],
@@ -192,6 +195,8 @@ export function apply(ctx: Context, config: Config = {}): void {
           fiberPhase: null,
           canUninstall: packageName !== MARKETPLACE_BUNDLE_PACKAGE,
           canToggle: false,
+          note: '',
+          tags: [],
         })
       }
       for (const entry of ctx.loader.entries()) {
@@ -223,9 +228,18 @@ export function apply(ctx: Context, config: Config = {}): void {
           fiberPhase,
           canUninstall: false,
           canToggle: entry.id !== MARKETPLACE_HOST_ENTRY_ID && entry.id !== MARKETPLACE_CLIENT_ENTRY_ID,
+          note: '',
+          tags: [],
         })
       }
-      return { profileName: profile.name, entries: [...byPackage.values()] }
+      const notes = readPluginNotes(ctx)
+      return {
+        profileName: profile.name,
+        entries: [...byPackage.values()].map((entry) => {
+          const annotated = noteOf(notes, entry.packageName)
+          return { ...entry, note: annotated.note, tags: annotated.tags }
+        }),
+      }
     },
     listCommandTargets(): { reload: ReturnType<typeof listReloadTargets>; update: ReturnType<typeof listUpdateTargets> } {
       const reload = listReloadTargets([...ctx.loader.entries()]
@@ -328,6 +342,11 @@ export function apply(ctx: Context, config: Config = {}): void {
         return { ok: true }
       })
     },
+    setPluginNote(request: { name: string; note: string; tags: readonly string[] }): PluginEnableResult {
+      if (request.name.trim().length === 0) return fail('package-invalid', 'note requires a package name')
+      writePluginNotes(ctx, writeNote(readPluginNotes(ctx), request.name, request))
+      return { ok: true }
+    },
   }
 
   async function serialize<T extends PluginMutationResult | PluginEnableResult>(work: () => Promise<T>): Promise<T> {
@@ -355,6 +374,8 @@ export function apply(ctx: Context, config: Config = {}): void {
           return { ok: true, value: await marketplace.uninstall(payload as { name: string }) }
         case 'setEnabled':
           return { ok: true, value: await marketplace.setEnabled(payload as SetEnabledRequest) }
+        case 'setPluginNote':
+          return { ok: true, value: marketplace.setPluginNote(payload as { name: string; note: string; tags: readonly string[] }) }
         case 'reloadStatus':
           return { ok: true, value: reloadLive }
         default:
@@ -408,14 +429,31 @@ function settingsSection(ctx: Context): {
   catalogUrls?: unknown
   catalogUrl?: unknown
   catalogCache?: unknown
+  pluginNotes?: unknown
 } | undefined {
   return (ctx.get('settings') as {
     get?: (ns: unknown) => {
       catalogUrls?: unknown
       catalogUrl?: unknown
       catalogCache?: unknown
+      pluginNotes?: unknown
     }
   } | undefined)?.get?.(SETTINGS_NS)
+}
+
+function readPluginNotes(ctx: Context): PluginNotes {
+  const raw = settingsSection(ctx)?.pluginNotes
+  return isPluginNotes(raw) ? raw : {}
+}
+
+function writePluginNotes(ctx: Context, notes: PluginNotes): void {
+  const settings = ctx.get('settings') as {
+    update?: (ns: unknown, patch: object) => Promise<unknown>
+  } | undefined
+  if (settings?.update === undefined) return
+  void Promise.resolve(settings.update(SETTINGS_NS, { pluginNotes: notes })).catch((error: unknown) => {
+    console.error('plugin-marketplace: plugin notes write failed', error)
+  })
 }
 
 function readCatalogCache(ctx: Context): CatalogCache | undefined {

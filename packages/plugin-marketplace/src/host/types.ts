@@ -13,6 +13,8 @@ export interface InstalledPlugin {
   readonly fiberPhase: PluginFiberPhase
   readonly canUninstall: boolean
   readonly canToggle: boolean
+  readonly note: string
+  readonly tags: readonly string[]
 }
 
 export interface InstalledPluginSnapshot {

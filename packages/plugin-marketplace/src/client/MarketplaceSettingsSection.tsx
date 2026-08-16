@@ -14,6 +14,7 @@ import type {
   InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import { catalogPackageLabel, installedHoverLabel } from './catalog-label.ts'
+import { allTags, parseTagInput } from '../host/plugin-notes.ts'
 import { confirmInstallMessage } from './confirm-install.ts'
 import type { MarketplaceLocaleKey } from './locales.ts'
 import css from './MarketplaceSettingsSection.module.css'
@@ -49,6 +50,8 @@ export interface MarketplaceInstalledItem {
   readonly fiberPhase: string | null
   readonly canUninstall: boolean
   readonly canToggle: boolean
+  readonly note: string
+  readonly tags: readonly string[]
 }
 
 /** Catalog snapshot the Host returns. */
@@ -76,6 +79,7 @@ export interface MarketplaceSettingsSectionInjected {
   install: (name: string, version?: string) => Promise<MarketplaceMutationResult>
   uninstall: (name: string) => Promise<MarketplaceMutationResult>
   setEnabled: (entryId: string, enabled: boolean) => Promise<MarketplaceMutationResult>
+  setPluginNote: (name: string, note: string, tags: readonly string[]) => Promise<MarketplaceMutationResult>
   catalogUrls: readonly string[]
   setCatalogUrls: (value: readonly string[]) => Promise<void>
 }
@@ -121,7 +125,7 @@ function installedKindLabel(
 
 /** Render the marketplace Plugins section. */
 export function MarketplaceSettingsSection({
-  t, renderSlot, listInstalled, listCatalog, refreshCatalog, install, uninstall, setEnabled, catalogUrls, setCatalogUrls,
+  t, renderSlot, listInstalled, listCatalog, refreshCatalog, install, uninstall, setEnabled, setPluginNote, catalogUrls, setCatalogUrls,
 }: MarketplaceSettingsSectionProps): ReactNode {
   const tabsId = useId()
   const [tab, setTab] = useState<TabId>('discover')
@@ -173,7 +177,12 @@ export function MarketplaceSettingsSection({
     [installedEntries],
   )
   const filteredCatalog = catalogEntries.filter(entry => matches([entry.name, entry.title, entry.description], normalizedQuery))
-  const filteredInstalled = installedEntries.filter(entry => matches([entry.packageName, entry.spec], normalizedQuery))
+  const filteredInstalled = installedEntries.filter(entry => matches([
+    entry.packageName,
+    entry.spec,
+    entry.note,
+    ...entry.tags,
+  ], normalizedQuery))
 
   const refreshCatalogNow = async (url?: string): Promise<void> => {
     setRefreshingUrl(url ?? 'all')
@@ -291,6 +300,7 @@ export function MarketplaceSettingsSection({
             }}
             onUninstall={name => void runMutation(name, () => uninstall(name))}
             onToggle={(entryId, enabled, packageName) => void runMutation(packageName, () => setEnabled(entryId, enabled))}
+            onSaveNote={(name, note, tags) => void runMutation(name, () => setPluginNote(name, note, tags))}
           />
         ) : null}
         {tab === 'configure' ? (
@@ -574,11 +584,18 @@ function InstalledPage(props: {
   onRetry: () => void
   onUninstall: (name: string) => void
   onToggle: (entryId: string, enabled: boolean, packageName: string) => void
+  onSaveNote: (name: string, note: string, tags: readonly string[]) => void
 }): ReactNode {
   const { t } = props
   const [details, setDetails] = useState<MarketplaceInstalledItem | null>(null)
   const [kindFilter, setKindFilter] = useState<'all' | MarketplaceInstalledItem['kind']>('all')
-  const visible = kindFilter === 'all' ? props.filtered : props.filtered.filter(entry => entry.kind === kindFilter)
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const tags = allTags(Object.fromEntries(props.filtered.map(entry => [entry.packageName, { note: entry.note, tags: entry.tags }])))
+  const visible = props.filtered.filter((entry) => {
+    if (kindFilter !== 'all' && entry.kind !== kindFilter) return false
+    if (tagFilter !== null && !entry.tags.some(tag => tag.toLocaleLowerCase() === tagFilter.toLocaleLowerCase())) return false
+    return true
+  })
   return (
     <>
       {props.installed.status === 'loading' ? <p className={css.status}>{t('loading')}</p> : null}
@@ -615,6 +632,23 @@ function InstalledPage(props: {
               </button>
             ))}
           </div>
+          {tags.length > 0 ? (
+            <div className={css.filters} role="group" aria-label={t('filterTags')}>
+              {tags.map(tag => (
+                <button
+                  key={tag}
+                  type="button"
+                  className={css.filter}
+                  data-active={tagFilter?.toLocaleLowerCase() === tag.toLocaleLowerCase() ? 'true' : undefined}
+                  onClick={() => {
+                    setTagFilter(current => current?.toLocaleLowerCase() === tag.toLocaleLowerCase() ? null : tag)
+                  }}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {visible.length === 0 ? <p className={css.empty}>{t('emptySearch')}</p> : (
           <>
           <ul className={`${css.cards} ${css.catalogCards}`}>
@@ -634,6 +668,12 @@ function InstalledPage(props: {
                         <span className={css.tag}>{installedKindLabel(t, entry.kind)}</span>
                         <h3 className={css.cardTitle}>{entry.packageName}</h3>
                         {entry.spec.length > 0 ? <p className={css.packageName}>{entry.spec}</p> : null}
+                        {entry.note.length > 0 ? <p className={css.notePreview}>{entry.note}</p> : null}
+                        {entry.tags.length > 0 ? (
+                          <span className={css.tagRow}>
+                            {entry.tags.map(tag => <span className={css.noteTag} key={tag}>{tag}</span>)}
+                          </span>
+                        ) : null}
                       </button>
                     </Tooltip>
                   </div>
@@ -677,6 +717,7 @@ function InstalledPage(props: {
               onUninstall={() => {
                 if (globalThis.confirm(t('confirmUninstall'))) props.onUninstall(details.packageName)
               }}
+              onSaveNote={(note, tags) => { props.onSaveNote(details.packageName, note, tags) }}
             />
           ) : null}
           </>
@@ -808,8 +849,15 @@ function InstalledDetailsDialog(props: {
   onClose: () => void
   onToggle: (entryId: string) => void
   onUninstall: () => void
+  onSaveNote: (note: string, tags: readonly string[]) => void
 }): ReactNode {
   const { t, entry } = props
+  const [note, setNote] = useState(entry.note)
+  const [tagDraft, setTagDraft] = useState(entry.tags.join(', '))
+  useEffect(() => {
+    setNote(entry.note)
+    setTagDraft(entry.tags.join(', '))
+  }, [entry.note, entry.packageName, entry.tags])
   const rows = [
     { label: t('detailsPackage'), value: entry.packageName, mono: true },
     { label: t('detailsKind'), value: installedKindLabel(t, entry.kind) },
@@ -830,6 +878,14 @@ function InstalledDetailsDialog(props: {
       onClose={props.onClose}
       actions={(
         <>
+          <button
+            type="button"
+            className={css.button}
+            disabled={props.busy}
+            onClick={() => { props.onSaveNote(note, parseTagInput(tagDraft)) }}
+          >
+            {t('saveNote')}
+          </button>
           {entry.canToggle && entry.entryIds[0] !== undefined ? (
             <button
               type="button"
@@ -852,7 +908,25 @@ function InstalledDetailsDialog(props: {
           ) : null}
         </>
       )}
-    />
+    >
+      <label className={css.field}>
+        <span>{t('noteLabel')}</span>
+        <textarea
+          className={css.noteInput}
+          value={note}
+          placeholder={t('notePlaceholder')}
+          onChange={(event) => { setNote(event.currentTarget.value) }}
+        />
+      </label>
+      <label className={css.field}>
+        <span>{t('tagsLabel')}</span>
+        <input
+          value={tagDraft}
+          placeholder={t('tagsPlaceholder')}
+          onChange={(event) => { setTagDraft(event.currentTarget.value) }}
+        />
+      </label>
+    </DetailsDialog>
   )
 }
 

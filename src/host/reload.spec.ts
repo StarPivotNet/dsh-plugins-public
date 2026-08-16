@@ -17,18 +17,21 @@ assert(matchReloadTarget(entries, 'llm').kind === 'one', 'id match')
 assert(matchReloadTarget(entries, '@deepseek-ai/dsh-session').kind === 'one', 'module match')
 assert(matchReloadTarget(entries, 'missing').kind === 'none', 'unknown')
 assert(isSkeletonEntry('connection', '@deepseek-ai/dsh-client-connection'), 'connection is skeleton')
+assert(isSkeletonEntry('include:session', '@deepseek-ai/dsh-session'), 'nested session is skeleton')
 assert(!isSkeletonEntry('plain-plugin', 'plain-lib'), 'extra plugin is not skeleton')
 const selectedAll = selectReloadEntries([
-  { id: 'connection', moduleName: '@deepseek-ai/dsh-client-connection', enabled: true, async refresh() {} },
-  { id: 'llm', moduleName: '@deepseek-ai/dsh-llm', enabled: true, async refresh() {} },
+  { id: 'include:session', moduleName: '@deepseek-ai/dsh-session', enabled: true, async refresh() {} },
+  { id: 'include:llm', moduleName: '@deepseek-ai/dsh-llm', enabled: true, async refresh() {} },
+  { id: 'ui-skill', moduleName: '@deepseek-ai/dsh-client-ui-skill', enabled: true, async refresh() {} },
   { id: 'plain', moduleName: 'plain-lib', enabled: true, async refresh() {} },
 ], { kind: 'all' })
-assert(selectedAll.ok && selectedAll.selected.map(entry => entry.id).join(',') === 'llm,plain', 'all reloads inbox plus extras')
+assert(selectedAll.ok && selectedAll.selected.map(entry => entry.id).join(',') === 'ui-skill,plain', 'all skips nested session/llm')
+assert(isSkeletonEntry('include:llm', '@deepseek-ai/dsh-llm'), 'nested llm is skeleton')
 const namedCore = selectReloadEntries([
   { id: 'connection', moduleName: '@deepseek-ai/dsh-client-connection', enabled: true, async refresh() {} },
 ], { kind: 'one', entry: { id: 'connection', moduleName: '@deepseek-ai/dsh-client-connection' } })
 assert(!namedCore.ok, 'named skeleton requires reboot')
-assert(!isSkeletonEntry('llm', '@deepseek-ai/dsh-llm'), 'inbox llm is reloadable')
+assert(!isSkeletonEntry('ui-skill', '@deepseek-ai/dsh-client-ui-skill'), 'overlay ui plugin is reloadable')
 assert(resolveUpdateTarget(['@starpivot/dsh-plugin-marketplace', 'plain-lib'], '').kind === 'all', 'update all')
 assert(resolveUpdateTarget(['plain-lib'], 'plain-lib').kind === 'one', 'update one')
 assert(resolveUpdateTarget(['plain-lib'], 'cordis:include').kind === 'none', 'inbox cannot update')

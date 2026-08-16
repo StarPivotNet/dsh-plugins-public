@@ -29,7 +29,7 @@ The Host half registers a loopback Connection RPC channel at `/plugin-marketplac
 
 While this bundle is installed it turns off automatic hot reload (`client-hmr.autoReload` and the Host `hmr` row). Use the slash commands instead:
 
-- `/reload [plugin]` — reload inbox and extra plugins after the command result is written. Bare `/reload` only skips the live connection skeleton (webServer, connection, commands, settings, marketplace). Named skeleton entries refuse and ask for `/reboot`.
+- `/reload [plugin]` — after the command result is written, reload overlay/extra plugins. Nested inbox ids such as `include:session` stay on the live path and need `/reboot`. Named skeleton entries refuse.
 - `/update [plugin]` — `pnpm update` a profile dependency, or every dependency when omitted. This does not reload; run `/reload` or `/reboot` afterwards
 - `/reboot` — start a watchdog process, exit this dsh, then start a new dsh with the same argv
 

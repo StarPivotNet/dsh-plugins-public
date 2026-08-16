@@ -1,7 +1,7 @@
 /** Match Loader entries and reload plugins without tearing down the GUI transport. */
 
-/** Only the live HTTP / command path. Inbox plugins stay reloadable. */
-export const SKELETON_ENTRY_IDS = new Set([
+/** Live HTTP, session, and command path. Extra / overlay plugins stay reloadable. */
+export const SKELETON_LEAF_IDS = new Set([
   'webserver',
   'connection',
   'client-hmr',
@@ -16,6 +16,20 @@ export const SKELETON_ENTRY_IDS = new Set([
   'commands',
   'settings',
   'plugin-marketplace',
+  'session',
+  'agent',
+  'agent-loop',
+  'llm',
+  'typert',
+  'typert-loader',
+  'typert-gateway',
+  'storage',
+  'storage-json',
+  'storage-domain',
+  'session-persistence-jsonl',
+  'include',
+  'timer',
+  'hmr',
 ])
 
 export interface ReloadableEntry {
@@ -52,8 +66,13 @@ export function packageNameOf(moduleName: string): string {
   return moduleName.split('/')[0] ?? moduleName
 }
 
+export function leafEntryId(id: string): string {
+  const parts = id.split(':')
+  return parts[parts.length - 1] ?? id
+}
+
 export function isSkeletonEntry(id: string, moduleName: string): boolean {
-  if (SKELETON_ENTRY_IDS.has(id)) return true
+  if (SKELETON_LEAF_IDS.has(leafEntryId(id))) return true
   return packageNameOf(moduleName) === '@starpivot/dsh-plugin-marketplace'
 }
 

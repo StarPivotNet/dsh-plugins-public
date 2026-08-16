@@ -1,5 +1,6 @@
-/** Match Loader entries and reload only replaceable plugins. */
+/** Match Loader entries and reload plugins without tearing down the GUI transport. */
 
+/** Only the live HTTP / command path. Inbox plugins stay reloadable. */
 export const SKELETON_ENTRY_IDS = new Set([
   'webserver',
   'connection',
@@ -14,16 +15,7 @@ export const SKELETON_ENTRY_IDS = new Set([
   'cordis-client-runner',
   'commands',
   'settings',
-  'session',
-  'agent',
-  'agent-loop',
   'plugin-marketplace',
-  'timer',
-  'hmr',
-  'storage',
-  'storage-json',
-  'storage-domain',
-  'session-persistence-jsonl',
 ])
 
 export interface ReloadableEntry {
@@ -65,10 +57,6 @@ export function isSkeletonEntry(id: string, moduleName: string): boolean {
   return packageNameOf(moduleName) === '@starpivot/dsh-plugin-marketplace'
 }
 
-export function isExtraEntry(moduleName: string, dependencies: readonly string[]): boolean {
-  return dependencies.includes(packageNameOf(moduleName))
-}
-
 export function normalizeQuery(raw: string): string {
   return raw.trim().toLocaleLowerCase()
 }
@@ -93,7 +81,6 @@ export function matchReloadTarget(
 export function selectReloadEntries(
   entries: readonly ReloadableEntry[],
   matched: Extract<ReloadMatchResult, { kind: 'all' } | { kind: 'one' }>,
-  dependencies: readonly string[],
 ):
   | { readonly ok: true; readonly selected: readonly ReloadableEntry[]; readonly skipped: number }
   | { readonly ok: false; readonly message: string } {
@@ -101,14 +88,12 @@ export function selectReloadEntries(
     const entry = entries.find(item => item.id === matched.entry.id)
     if (entry === undefined) return { ok: false, message: `没有匹配 ${JSON.stringify(matched.entry.id)} 的插件。` }
     if (isSkeletonEntry(entry.id, entry.moduleName)) {
-      return { ok: false, message: `${entry.id} 是进程骨架，不能热重载。请运行 /reboot。` }
+      return { ok: false, message: `${entry.id} 维持当前连接，不能热重载。请运行 /reboot。` }
     }
     return { ok: true, selected: [entry], skipped: 0 }
   }
   const selected = entries.filter(entry =>
-    entry.enabled
-    && !isSkeletonEntry(entry.id, entry.moduleName)
-    && isExtraEntry(entry.moduleName, dependencies))
+    entry.enabled && !isSkeletonEntry(entry.id, entry.moduleName))
   return { ok: true, selected, skipped: entries.filter(entry => entry.enabled).length - selected.length }
 }
 

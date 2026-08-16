@@ -24,9 +24,9 @@ export function registerMarketplaceCommands(ctx: Context, options: {
 }): void {
   ctx.commands.register({
     name: 'reload',
-    description: '重载已安装插件。不写名字则重载全部可替换插件；骨架请用 /reboot。',
+    description: '重载插件。不写名字则重载除连接骨架外的全部插件。',
     input: { hint: '[插件名字]' },
-    handler: invocation => handleReload(ctx, options.requireProfile(), options.settingsNs, invocation.rawInput),
+    handler: invocation => handleReload(ctx, options.settingsNs, invocation.rawInput),
   })
   ctx.commands.register({
     name: 'update',
@@ -46,19 +46,19 @@ export function registerMarketplaceCommands(ctx: Context, options: {
       const watchdogPath = join(dirname(fileURLToPath(import.meta.url)), 'reboot-watchdog.js')
       const started = await startWatchdog(watchdogPath, specPath)
       if (!started.ok) return { kind: 'error', text: started.message }
-      setTimeout(() => { options.exitProcess() }, 0)
-      return { kind: 'success', text: '看门狗已就绪，正在退出以便重启…' }
+      // Wait for command/done to reach the browser before killing the process.
+      // ctx.appExit only disposes the tree and does not exit the web process.
+      setTimeout(() => { process.exit(0) }, 800)
+      return { kind: 'success', text: '看门狗已就绪，800ms 后退出并由看门狗拉起新进程…' }
     },
   })
 }
 
 async function handleReload(
   ctx: Context,
-  profile: { dir: string },
   settingsNs: unknown,
   rawInput: string,
 ): Promise<{ kind: 'success' | 'error'; text: string }> {
-  const dependencies = Object.keys(readProfileManifest('plugin-marketplace', profile.dir).dependencies ?? {})
   const entries = [...ctx.loader.entries()]
     .filter(entry => !entry.options.group)
     .map((entry): ReloadableEntry => ({
@@ -80,7 +80,7 @@ async function handleReload(
       text: `有多个插件匹配 ${JSON.stringify(matched.query)}：${matched.matches.map(entry => entry.id).join('、')}`,
     }
   }
-  const picked = selectReloadEntries(entries, matched, dependencies)
+  const picked = selectReloadEntries(entries, matched)
   if (!picked.ok) return { kind: 'error', text: picked.message }
   const registry = (ctx as { registry?: { delete(callback: unknown): void } }).registry
   const failures: string[] = []
@@ -97,11 +97,11 @@ async function handleReload(
     } | undefined,
     settingsNs,
   )
-  const skipped = picked.skipped > 0 ? `跳过 ${String(picked.skipped)} 个骨架/内置条目。` : ''
+  const skipped = picked.skipped > 0 ? `跳过 ${String(picked.skipped)} 个连接骨架。` : ''
   const hostLine = ok === 0
-    ? '没有可热重载的额外 Host 插件。'
+    ? '没有可热重载的 Host 插件。'
     : `已重载 ${String(ok)} 个 Host 插件。`
-  const summary = `${hostLine}${skipped}${client} 骨架变更请用 /reboot。`
+  const summary = `${hostLine}${skipped}${client} 连接骨架请用 /reboot。`
   if (failures.length === 0) return { kind: 'success', text: summary }
   return { kind: 'error', text: `${summary} 失败：${failures.join('；')}` }
 }

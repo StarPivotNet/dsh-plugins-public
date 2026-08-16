@@ -20,13 +20,15 @@ assert(isSkeletonEntry('connection', '@deepseek-ai/dsh-client-connection'), 'con
 assert(!isSkeletonEntry('plain-plugin', 'plain-lib'), 'extra plugin is not skeleton')
 const selectedAll = selectReloadEntries([
   { id: 'connection', moduleName: '@deepseek-ai/dsh-client-connection', enabled: true, async refresh() {} },
+  { id: 'llm', moduleName: '@deepseek-ai/dsh-llm', enabled: true, async refresh() {} },
   { id: 'plain', moduleName: 'plain-lib', enabled: true, async refresh() {} },
-], { kind: 'all' }, ['plain-lib'])
-assert(selectedAll.ok && selectedAll.selected.map(entry => entry.id).join(',') === 'plain', 'all skips skeleton')
+], { kind: 'all' })
+assert(selectedAll.ok && selectedAll.selected.map(entry => entry.id).join(',') === 'llm,plain', 'all reloads inbox plus extras')
 const namedCore = selectReloadEntries([
   { id: 'connection', moduleName: '@deepseek-ai/dsh-client-connection', enabled: true, async refresh() {} },
-], { kind: 'one', entry: { id: 'connection', moduleName: '@deepseek-ai/dsh-client-connection' } }, [])
+], { kind: 'one', entry: { id: 'connection', moduleName: '@deepseek-ai/dsh-client-connection' } })
 assert(!namedCore.ok, 'named skeleton requires reboot')
+assert(!isSkeletonEntry('llm', '@deepseek-ai/dsh-llm'), 'inbox llm is reloadable')
 assert(resolveUpdateTarget(['@starpivot/dsh-plugin-marketplace', 'plain-lib'], '').kind === 'all', 'update all')
 assert(resolveUpdateTarget(['plain-lib'], 'plain-lib').kind === 'one', 'update one')
 assert(resolveUpdateTarget(['plain-lib'], 'cordis:include').kind === 'none', 'inbox cannot update')

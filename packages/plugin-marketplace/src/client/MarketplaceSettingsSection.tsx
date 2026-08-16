@@ -591,10 +591,7 @@ function InstalledPage(props: {
       {props.installed.status === 'ready' && props.installed.value.length === 0
         ? <p className={css.empty}>{t('installedEmpty')}</p>
         : null}
-      {props.installed.status === 'ready' && props.installed.value.length > 0 && visible.length === 0
-        ? <p className={css.empty}>{t('emptySearch')}</p>
-        : null}
-      {visible.length > 0 ? (
+      {props.installed.status === 'ready' && props.installed.value.length > 0 ? (
         <>
           <div className={css.headingRow}>
             <h3>{t('installedHeading')}</h3>
@@ -618,6 +615,8 @@ function InstalledPage(props: {
               </button>
             ))}
           </div>
+          {visible.length === 0 ? <p className={css.empty}>{t('emptySearch')}</p> : (
+          <>
           <ul className={`${css.cards} ${css.catalogCards}`}>
             {visible.map((entry) => {
               const busy = props.busyName === entry.packageName
@@ -680,6 +679,8 @@ function InstalledPage(props: {
               }}
             />
           ) : null}
+          </>
+          )}
         </>
       ) : null}
     </>

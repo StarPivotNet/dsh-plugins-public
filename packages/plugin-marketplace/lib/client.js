@@ -66,7 +66,7 @@ function confirmInstallMessage(t, entry) {
 }
 
 // src/client/MarketplaceSettingsSection.module.css
-var css = '.DYfBnq_section{width:100%;max-width:none;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px;display:flex}.DYfBnq_heading{margin:0;font-size:18px;font-weight:600}.DYfBnq_status,.DYfBnq_empty,.DYfBnq_restart{color:var(--dsw-alias-label-tertiary);margin:0;font-size:13px;line-height:20px}.DYfBnq_restart{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:8px 12px}.DYfBnq_failure{color:var(--dsw-alias-state-error-primary);align-items:center;gap:10px;font-size:13px;line-height:20px;display:flex}.DYfBnq_failure p{margin:0}.DYfBnq_tabs{border-bottom:1px solid var(--dsw-alias-border-l2);align-items:flex-end;gap:22px;margin-top:2px;display:flex}.DYfBnq_tab{color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;background:0 0;border:0;padding:7px 1px 9px;font-size:13px;line-height:20px;position:relative}.DYfBnq_tab:hover,.DYfBnq_tab[data-active=true]{color:var(--dsw-alias-label-primary)}.DYfBnq_tab[data-active=true]:after,.DYfBnq_tab:focus-visible:after{background:var(--dsw-alias-label-primary);content:"";border-radius:2px 2px 0 0;height:2px;position:absolute;bottom:-1px;left:0;right:0}.DYfBnq_tab:focus-visible,.DYfBnq_button:focus-visible,.DYfBnq_iconButton:focus-visible,.DYfBnq_cardHit:focus-visible,.DYfBnq_dialogClose:focus-visible,.DYfBnq_search input:focus-visible,.DYfBnq_field input:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.DYfBnq_panel{flex-direction:column;gap:12px;min-width:0;padding-top:2px;display:flex}.DYfBnq_search{width:100%;color:var(--dsw-alias-label-tertiary);align-items:center;display:flex;position:relative}.DYfBnq_search>svg{pointer-events:none;position:absolute;left:12px}.DYfBnq_search input,.DYfBnq_field input{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);width:100%;height:36px;color:var(--dsw-alias-label-primary);font:inherit;border-radius:8px;outline:none;padding:0 12px;font-size:13px}.DYfBnq_search input{padding-left:36px}.DYfBnq_headingRow{align-items:baseline;gap:7px;padding:0 2px;display:flex}.DYfBnq_headingRow h3{margin:0;font-size:13px;font-weight:600;line-height:20px}.DYfBnq_headingRow span{color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums;font-size:12px;line-height:18px}.DYfBnq_cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none;display:grid}.DYfBnq_catalogCards{grid-template-columns:repeat(2,minmax(0,1fr))}.DYfBnq_list{flex-direction:column;gap:10px;margin:0;padding:0;list-style:none;display:flex}.DYfBnq_configList{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none;display:grid}.DYfBnq_configList>*{min-width:0}.DYfBnq_filters{flex-wrap:wrap;gap:6px;display:flex}.DYfBnq_filter{border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);font:inherit;cursor:pointer;background:0 0;border-radius:999px;padding:3px 10px;font-size:12px;line-height:18px}.DYfBnq_filter[data-active=true]{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.DYfBnq_marketRow{align-items:center;gap:8px;display:flex}.DYfBnq_sources{flex-direction:column;gap:6px;margin:0;padding:0;list-style:none;display:flex}.DYfBnq_source{color:var(--dsw-alias-label-secondary);align-items:center;gap:8px 12px;font-size:12px;line-height:18px;display:flex}.DYfBnq_sourceMain{flex-wrap:wrap;flex:1;align-items:baseline;gap:8px 12px;min-width:0;display:flex}.DYfBnq_sourceActions{flex:none;align-items:center;gap:2px;display:flex}.DYfBnq_source[data-ok=false]{color:var(--dsw-alias-state-error-primary)}.DYfBnq_iconButton{width:28px;height:28px;color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:none;border-radius:8px;flex:none;justify-content:center;align-items:center;padding:0;display:inline-flex}.DYfBnq_iconButton:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.DYfBnq_iconButton:disabled{opacity:.55;cursor:default}.DYfBnq_spin{animation:.8s linear infinite DYfBnq_marketplace-spin}@media (prefers-reduced-motion:reduce){.DYfBnq_spin{animation:none}}@keyframes DYfBnq_marketplace-spin{to{transform:rotate(360deg)}}.DYfBnq_sourceLabel{color:var(--dsw-alias-label-tertiary);margin:0;font-size:11px;line-height:16px}.DYfBnq_card{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:10px;flex-direction:column;gap:6px;min-width:0;padding:10px 12px;display:flex;overflow:hidden}.DYfBnq_catalogCard{flex-direction:column;gap:8px;display:flex}.DYfBnq_catalogCard:hover{background:var(--dsw-alias-interactive-bg-hover)}.DYfBnq_cardBody{min-width:0;max-width:100%}.DYfBnq_cardHit{width:100%;min-width:0;color:inherit;font:inherit;text-align:left;cursor:pointer;background:0 0;border:0;flex-direction:column;align-items:flex-start;gap:6px;margin:0;padding:0;display:flex}.DYfBnq_cardAside{flex-wrap:wrap;align-items:center;gap:6px;display:flex}.DYfBnq_cardAside .DYfBnq_button{white-space:nowrap}.DYfBnq_cardTitle{text-overflow:ellipsis;white-space:nowrap;min-width:0;margin:0;font-size:13px;font-weight:600;line-height:18px;overflow:hidden}.DYfBnq_packageName,.DYfBnq_description{min-width:0;color:var(--dsw-alias-label-secondary);margin:0;font-size:11px;line-height:16px;overflow:hidden}.DYfBnq_packageName{font-family:var(--ds-font-family-code);text-overflow:ellipsis;white-space:nowrap}.DYfBnq_description{-webkit-line-clamp:2;-webkit-box-orient:vertical;width:100%;display:-webkit-box}.DYfBnq_actions{flex-wrap:wrap;gap:6px;margin-top:auto;display:flex}.DYfBnq_button{border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;background:0 0;border-radius:6px;padding:4px 10px;font-size:12px;line-height:18px}.DYfBnq_button:disabled{opacity:.55;cursor:default}.DYfBnq_tag{text-overflow:ellipsis;background:var(--dsw-alias-bg-layer-1);max-width:100%;min-height:20px;color:var(--dsw-alias-label-secondary);white-space:nowrap;border-radius:5px;align-self:flex-start;align-items:center;padding:1px 6px;font-size:11px;line-height:16px;display:inline-flex;overflow:hidden}.DYfBnq_field{flex-direction:column;gap:6px;display:flex}.DYfBnq_field label{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}.DYfBnq_visuallyHidden{clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}.DYfBnq_dialogRoot{z-index:1100;justify-content:center;align-items:center;padding:24px;display:flex;position:fixed;inset:0}.DYfBnq_dialogMask{background:var(--dsw-alias-bg-mask-1);backdrop-filter:var(--dsw-mask-blur);position:absolute;inset:0}.DYfBnq_dialog{z-index:1;border:1px solid var(--dsw-alias-border-inverted);background:var(--dsw-alias-bg-layer-2);width:min(440px,100%);max-height:min(640px,100vh - 48px);box-shadow:var(--dsw-shadow-lv3);border-radius:16px;flex-direction:column;gap:16px;padding:20px 20px 18px;display:flex;position:relative;overflow:auto}.DYfBnq_dialogHeader{justify-content:space-between;align-items:flex-start;gap:8px;display:flex}.DYfBnq_dialogTitle{min-width:0;margin:0;font-size:16px;font-weight:600;line-height:24px}.DYfBnq_dialogClose{cursor:pointer;width:28px;height:28px;color:var(--dsw-alias-label-secondary);background:0 0;border:none;border-radius:8px;flex:none;justify-content:center;align-items:center;display:inline-flex}.DYfBnq_dialogClose:hover{background:var(--dsw-alias-interactive-bg-hover)}.DYfBnq_dialogMeta{flex-direction:column;gap:8px;margin:0;display:flex}.DYfBnq_dialogMeta>div{grid-template-columns:56px minmax(0,1fr);align-items:start;gap:10px;display:grid}.DYfBnq_dialogMeta dt{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}.DYfBnq_dialogMeta dd{overflow-wrap:anywhere;white-space:pre-wrap;min-width:0;color:var(--dsw-alias-label-primary);margin:0;font-size:13px;line-height:18px}.DYfBnq_dialogMeta a{color:inherit}.DYfBnq_dialogCode{font-family:var(--ds-font-family-code);font-size:12px}.DYfBnq_dialogDescription{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary);margin:0;font-size:13px;line-height:20px}.DYfBnq_dialogFooter{justify-content:flex-end;gap:8px;display:flex}.DYfBnq_reloadToast{z-index:1200;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);max-width:360px;box-shadow:var(--dsw-shadow-lv3);color:var(--dsw-alias-label-primary);border-radius:10px;flex-direction:column;gap:4px;padding:10px 14px;font-size:12px;line-height:18px;display:flex;position:fixed;bottom:24px;right:24px}.DYfBnq_reloadToast strong{font-size:13px}';
+var css = '.DYfBnq_section{width:100%;max-width:none;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px;display:flex}.DYfBnq_heading{margin:0;font-size:18px;font-weight:600}.DYfBnq_status,.DYfBnq_empty,.DYfBnq_restart{color:var(--dsw-alias-label-tertiary);margin:0;font-size:13px;line-height:20px}.DYfBnq_restart{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:8px 12px}.DYfBnq_failure{color:var(--dsw-alias-state-error-primary);align-items:center;gap:10px;font-size:13px;line-height:20px;display:flex}.DYfBnq_failure p{margin:0}.DYfBnq_tabs{border-bottom:1px solid var(--dsw-alias-border-l2);align-items:flex-end;gap:22px;margin-top:2px;display:flex}.DYfBnq_tab{color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;background:0 0;border:0;padding:7px 1px 9px;font-size:13px;line-height:20px;position:relative}.DYfBnq_tab:hover,.DYfBnq_tab[data-active=true]{color:var(--dsw-alias-label-primary)}.DYfBnq_tab[data-active=true]:after,.DYfBnq_tab:focus-visible:after{background:var(--dsw-alias-label-primary);content:"";border-radius:2px 2px 0 0;height:2px;position:absolute;bottom:-1px;left:0;right:0}.DYfBnq_tab:focus-visible,.DYfBnq_button:focus-visible,.DYfBnq_iconButton:focus-visible,.DYfBnq_cardHit:focus-visible,.DYfBnq_dialogClose:focus-visible,.DYfBnq_search input:focus-visible,.DYfBnq_field input:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.DYfBnq_panel{flex-direction:column;gap:12px;min-width:0;padding-top:2px;display:flex}.DYfBnq_search{width:100%;color:var(--dsw-alias-label-tertiary);align-items:center;display:flex;position:relative}.DYfBnq_search>svg{pointer-events:none;position:absolute;left:12px}.DYfBnq_search input,.DYfBnq_field input{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);width:100%;height:36px;color:var(--dsw-alias-label-primary);font:inherit;border-radius:8px;outline:none;padding:0 12px;font-size:13px}.DYfBnq_search input{padding-left:36px}.DYfBnq_headingRow{align-items:baseline;gap:7px;padding:0 2px;display:flex}.DYfBnq_headingRow h3{margin:0;font-size:13px;font-weight:600;line-height:20px}.DYfBnq_headingRow span{color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums;font-size:12px;line-height:18px}.DYfBnq_cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none;display:grid}.DYfBnq_catalogCards{grid-template-columns:repeat(3,minmax(0,1fr))}.DYfBnq_list{flex-direction:column;gap:10px;margin:0;padding:0;list-style:none;display:flex}.DYfBnq_configList{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none;display:grid}.DYfBnq_configList>*{min-width:0}.DYfBnq_filters{flex-wrap:wrap;gap:6px;display:flex}.DYfBnq_filter{border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);font:inherit;cursor:pointer;background:0 0;border-radius:999px;padding:3px 10px;font-size:12px;line-height:18px}.DYfBnq_filter[data-active=true]{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.DYfBnq_marketRow{align-items:center;gap:8px;display:flex}.DYfBnq_sources{flex-direction:column;gap:6px;margin:0;padding:0;list-style:none;display:flex}.DYfBnq_source{color:var(--dsw-alias-label-secondary);align-items:center;gap:8px 12px;font-size:12px;line-height:18px;display:flex}.DYfBnq_sourceMain{flex-wrap:wrap;flex:1;align-items:baseline;gap:8px 12px;min-width:0;display:flex}.DYfBnq_sourceActions{flex:none;align-items:center;gap:2px;display:flex}.DYfBnq_source[data-ok=false]{color:var(--dsw-alias-state-error-primary)}.DYfBnq_iconButton{width:28px;height:28px;color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:none;border-radius:8px;flex:none;justify-content:center;align-items:center;padding:0;display:inline-flex}.DYfBnq_iconButton:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.DYfBnq_iconButton:disabled{opacity:.55;cursor:default}.DYfBnq_spin{animation:.8s linear infinite DYfBnq_marketplace-spin}@media (prefers-reduced-motion:reduce){.DYfBnq_spin{animation:none}}@keyframes DYfBnq_marketplace-spin{to{transform:rotate(360deg)}}.DYfBnq_sourceLabel{color:var(--dsw-alias-label-tertiary);margin:0;font-size:11px;line-height:16px}.DYfBnq_card{box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:10px;flex-direction:column;gap:6px;min-width:0;padding:10px 12px;display:flex;overflow:hidden}.DYfBnq_catalogCard{flex-direction:column;gap:8px;display:flex}.DYfBnq_catalogCard:hover{background:var(--dsw-alias-interactive-bg-hover)}.DYfBnq_cardBody{min-width:0;max-width:100%}.DYfBnq_cardHit{width:100%;min-width:0;color:inherit;font:inherit;text-align:left;cursor:pointer;background:0 0;border:0;flex-direction:column;align-items:flex-start;gap:6px;margin:0;padding:0;display:flex}.DYfBnq_cardAside{flex-wrap:wrap;align-items:center;gap:6px;display:flex}.DYfBnq_cardAside .DYfBnq_button{white-space:nowrap}.DYfBnq_cardTitle{text-overflow:ellipsis;white-space:nowrap;min-width:0;margin:0;font-size:13px;font-weight:600;line-height:18px;overflow:hidden}.DYfBnq_packageName,.DYfBnq_description{min-width:0;color:var(--dsw-alias-label-secondary);margin:0;font-size:11px;line-height:16px;overflow:hidden}.DYfBnq_packageName{font-family:var(--ds-font-family-code);text-overflow:ellipsis;white-space:nowrap}.DYfBnq_description{-webkit-line-clamp:2;-webkit-box-orient:vertical;width:100%;display:-webkit-box}.DYfBnq_actions{flex-wrap:wrap;gap:6px;margin-top:auto;display:flex}.DYfBnq_button{border:1px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary);font:inherit;cursor:pointer;background:0 0;border-radius:6px;padding:4px 10px;font-size:12px;line-height:18px}.DYfBnq_button:disabled{opacity:.55;cursor:default}.DYfBnq_tag{text-overflow:ellipsis;background:var(--dsw-alias-bg-layer-1);max-width:100%;min-height:20px;color:var(--dsw-alias-label-secondary);white-space:nowrap;border-radius:5px;align-self:flex-start;align-items:center;padding:1px 6px;font-size:11px;line-height:16px;display:inline-flex;overflow:hidden}.DYfBnq_field{flex-direction:column;gap:6px;display:flex}.DYfBnq_field label{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}.DYfBnq_visuallyHidden{clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;width:1px;height:1px;position:absolute;overflow:hidden}.DYfBnq_dialogRoot{z-index:1100;justify-content:center;align-items:center;padding:24px;display:flex;position:fixed;inset:0}.DYfBnq_dialogMask{background:var(--dsw-alias-bg-mask-1);backdrop-filter:var(--dsw-mask-blur);position:absolute;inset:0}.DYfBnq_dialog{z-index:1;border:1px solid var(--dsw-alias-border-inverted);background:var(--dsw-alias-bg-layer-2);width:min(440px,100%);box-shadow:var(--dsw-shadow-lv3);border-radius:16px;flex-direction:column;gap:16px;padding:20px 20px 18px;display:flex;position:relative;overflow:hidden}.DYfBnq_dialogHeader{justify-content:space-between;align-items:flex-start;gap:8px;display:flex}.DYfBnq_dialogTitle{min-width:0;margin:0;font-size:16px;font-weight:600;line-height:24px}.DYfBnq_dialogClose{cursor:pointer;width:28px;height:28px;color:var(--dsw-alias-label-secondary);background:0 0;border:none;border-radius:8px;flex:none;justify-content:center;align-items:center;display:inline-flex}.DYfBnq_dialogClose:hover{background:var(--dsw-alias-interactive-bg-hover)}.DYfBnq_dialogMeta{flex-direction:column;gap:8px;margin:0;display:flex}.DYfBnq_dialogMeta>div{grid-template-columns:56px minmax(0,1fr);align-items:start;gap:10px;display:grid}.DYfBnq_dialogMeta dt{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:18px}.DYfBnq_dialogMeta dd{overflow-wrap:anywhere;white-space:pre-wrap;min-width:0;color:var(--dsw-alias-label-primary);margin:0;font-size:13px;line-height:18px}.DYfBnq_dialogMeta a{color:inherit}.DYfBnq_dialogCode{font-family:var(--ds-font-family-code);font-size:12px}.DYfBnq_dialogDescription{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--dsw-alias-label-primary);margin:0;font-size:13px;line-height:20px}.DYfBnq_dialogFooter{justify-content:flex-end;gap:8px;display:flex}.DYfBnq_reloadToast{z-index:1200;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);max-width:360px;box-shadow:var(--dsw-shadow-lv3);color:var(--dsw-alias-label-primary);border-radius:10px;flex-direction:column;gap:4px;padding:10px 14px;font-size:12px;line-height:18px;display:flex;position:fixed;bottom:24px;right:24px}.DYfBnq_reloadToast strong{font-size:13px}';
 var tagId = "plugin-marketplace/MarketplaceSettingsSection.module.css";
 if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
   const tag = document.createElement("style");
@@ -75,7 +75,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var MarketplaceSettingsSection_default = { "visuallyHidden": "DYfBnq_visuallyHidden", "heading": "DYfBnq_heading", "headingRow": "DYfBnq_headingRow", "actions": "DYfBnq_actions", "panel": "DYfBnq_panel", "status": "DYfBnq_status", "empty": "DYfBnq_empty", "tab": "DYfBnq_tab", "configList": "DYfBnq_configList", "dialogMeta": "DYfBnq_dialogMeta", "catalogCard": "DYfBnq_catalogCard", "reloadToast": "DYfBnq_reloadToast", "dialogMask": "DYfBnq_dialogMask", "dialogHeader": "DYfBnq_dialogHeader", "marketplace-spin": "DYfBnq_marketplace-spin", "dialog": "DYfBnq_dialog", "tag": "DYfBnq_tag", "tabs": "DYfBnq_tabs", "dialogCode": "DYfBnq_dialogCode", "sourceMain": "DYfBnq_sourceMain", "dialogFooter": "DYfBnq_dialogFooter", "sourceLabel": "DYfBnq_sourceLabel", "packageName": "DYfBnq_packageName", "section": "DYfBnq_section", "cards": "DYfBnq_cards", "cardTitle": "DYfBnq_cardTitle", "description": "DYfBnq_description", "filter": "DYfBnq_filter", "card": "DYfBnq_card", "failure": "DYfBnq_failure", "filters": "DYfBnq_filters", "cardBody": "DYfBnq_cardBody", "restart": "DYfBnq_restart", "field": "DYfBnq_field", "catalogCards": "DYfBnq_catalogCards", "dialogTitle": "DYfBnq_dialogTitle", "dialogDescription": "DYfBnq_dialogDescription", "cardHit": "DYfBnq_cardHit", "sourceActions": "DYfBnq_sourceActions", "list": "DYfBnq_list", "cardAside": "DYfBnq_cardAside", "button": "DYfBnq_button", "search": "DYfBnq_search", "source": "DYfBnq_source", "spin": "DYfBnq_spin", "dialogClose": "DYfBnq_dialogClose", "sources": "DYfBnq_sources", "dialogRoot": "DYfBnq_dialogRoot", "marketRow": "DYfBnq_marketRow", "iconButton": "DYfBnq_iconButton" };
+var MarketplaceSettingsSection_default = { "field": "DYfBnq_field", "dialogCode": "DYfBnq_dialogCode", "catalogCards": "DYfBnq_catalogCards", "list": "DYfBnq_list", "headingRow": "DYfBnq_headingRow", "marketplace-spin": "DYfBnq_marketplace-spin", "cardBody": "DYfBnq_cardBody", "dialogFooter": "DYfBnq_dialogFooter", "search": "DYfBnq_search", "tabs": "DYfBnq_tabs", "cardHit": "DYfBnq_cardHit", "source": "DYfBnq_source", "empty": "DYfBnq_empty", "card": "DYfBnq_card", "cardAside": "DYfBnq_cardAside", "restart": "DYfBnq_restart", "dialogClose": "DYfBnq_dialogClose", "tab": "DYfBnq_tab", "status": "DYfBnq_status", "iconButton": "DYfBnq_iconButton", "filters": "DYfBnq_filters", "actions": "DYfBnq_actions", "dialogMask": "DYfBnq_dialogMask", "dialog": "DYfBnq_dialog", "dialogHeader": "DYfBnq_dialogHeader", "dialogDescription": "DYfBnq_dialogDescription", "cardTitle": "DYfBnq_cardTitle", "sourceActions": "DYfBnq_sourceActions", "filter": "DYfBnq_filter", "spin": "DYfBnq_spin", "dialogRoot": "DYfBnq_dialogRoot", "dialogMeta": "DYfBnq_dialogMeta", "description": "DYfBnq_description", "visuallyHidden": "DYfBnq_visuallyHidden", "reloadToast": "DYfBnq_reloadToast", "cards": "DYfBnq_cards", "button": "DYfBnq_button", "section": "DYfBnq_section", "sourceMain": "DYfBnq_sourceMain", "sources": "DYfBnq_sources", "marketRow": "DYfBnq_marketRow", "catalogCard": "DYfBnq_catalogCard", "dialogTitle": "DYfBnq_dialogTitle", "sourceLabel": "DYfBnq_sourceLabel", "heading": "DYfBnq_heading", "tag": "DYfBnq_tag", "panel": "DYfBnq_panel", "configList": "DYfBnq_configList", "packageName": "DYfBnq_packageName", "failure": "DYfBnq_failure" };
 
 // src/client/MarketplaceSettingsSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -565,8 +565,7 @@ function InstalledPage(props) {
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: MarketplaceSettingsSection_default.button, onClick: props.onRetry, children: t("retry") })
     ] }) : null,
     props.installed.status === "ready" && props.installed.value.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.empty, children: t("installedEmpty") }) : null,
-    props.installed.status === "ready" && props.installed.value.length > 0 && visible.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.empty, children: t("emptySearch") }) : null,
-    visible.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+    props.installed.status === "ready" && props.installed.value.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: MarketplaceSettingsSection_default.headingRow, children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t("installedHeading") }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: visible.length })
@@ -589,71 +588,73 @@ function InstalledPage(props) {
         },
         id
       )) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: `${MarketplaceSettingsSection_default.cards} ${MarketplaceSettingsSection_default.catalogCards}`, children: visible.map((entry) => {
-        const busy = props.busyName === entry.packageName;
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: `${MarketplaceSettingsSection_default.card} ${MarketplaceSettingsSection_default.catalogCard}`, "data-plugin-name": entry.packageName, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: MarketplaceSettingsSection_default.cardBody, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Tooltip, { label: installedHoverLabel(entry.packageName, entry.spec), side: "bottom", maxWidth: 360, children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
-            "button",
-            {
-              type: "button",
-              className: MarketplaceSettingsSection_default.cardHit,
-              "aria-haspopup": "dialog",
-              "aria-label": t("openDetailsNamed", { title: entry.packageName }),
-              onClick: () => {
-                setDetails(entry);
-              },
-              children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: MarketplaceSettingsSection_default.tag, children: installedKindLabel(t, entry.kind) }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: MarketplaceSettingsSection_default.cardTitle, children: entry.packageName }),
-                entry.spec.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.packageName, children: entry.spec }) : null
-              ]
+      visible.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.empty, children: t("emptySearch") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: `${MarketplaceSettingsSection_default.cards} ${MarketplaceSettingsSection_default.catalogCards}`, children: visible.map((entry) => {
+          const busy = props.busyName === entry.packageName;
+          return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: `${MarketplaceSettingsSection_default.card} ${MarketplaceSettingsSection_default.catalogCard}`, "data-plugin-name": entry.packageName, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: MarketplaceSettingsSection_default.cardBody, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Tooltip, { label: installedHoverLabel(entry.packageName, entry.spec), side: "bottom", maxWidth: 360, children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+              "button",
+              {
+                type: "button",
+                className: MarketplaceSettingsSection_default.cardHit,
+                "aria-haspopup": "dialog",
+                "aria-label": t("openDetailsNamed", { title: entry.packageName }),
+                onClick: () => {
+                  setDetails(entry);
+                },
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: MarketplaceSettingsSection_default.tag, children: installedKindLabel(t, entry.kind) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: MarketplaceSettingsSection_default.cardTitle, children: entry.packageName }),
+                  entry.spec.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: MarketplaceSettingsSection_default.packageName, children: entry.spec }) : null
+                ]
+              }
+            ) }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: MarketplaceSettingsSection_default.cardAside, children: [
+              entry.canToggle && entry.entryIds[0] !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: MarketplaceSettingsSection_default.button,
+                  disabled: busy,
+                  onClick: () => {
+                    props.onToggle(entry.entryIds[0], !entry.enabled, entry.packageName);
+                  },
+                  children: entry.enabled ? t("disable") : t("enable")
+                }
+              ) : null,
+              entry.canUninstall ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: MarketplaceSettingsSection_default.button,
+                  disabled: busy,
+                  onClick: () => {
+                    if (globalThis.confirm(t("confirmUninstall"))) props.onUninstall(entry.packageName);
+                  },
+                  children: busy ? t("uninstalling") : t("uninstall")
+                }
+              ) : null
+            ] })
+          ] }, entry.packageName);
+        }) }),
+        details !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          InstalledDetailsDialog,
+          {
+            t,
+            entry: details,
+            busy: props.busyName === details.packageName,
+            onClose: () => {
+              setDetails(null);
+            },
+            onToggle: (entryId) => {
+              props.onToggle(entryId, !details.enabled, details.packageName);
+            },
+            onUninstall: () => {
+              if (globalThis.confirm(t("confirmUninstall"))) props.onUninstall(details.packageName);
             }
-          ) }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: MarketplaceSettingsSection_default.cardAside, children: [
-            entry.canToggle && entry.entryIds[0] !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              "button",
-              {
-                type: "button",
-                className: MarketplaceSettingsSection_default.button,
-                disabled: busy,
-                onClick: () => {
-                  props.onToggle(entry.entryIds[0], !entry.enabled, entry.packageName);
-                },
-                children: entry.enabled ? t("disable") : t("enable")
-              }
-            ) : null,
-            entry.canUninstall ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-              "button",
-              {
-                type: "button",
-                className: MarketplaceSettingsSection_default.button,
-                disabled: busy,
-                onClick: () => {
-                  if (globalThis.confirm(t("confirmUninstall"))) props.onUninstall(entry.packageName);
-                },
-                children: busy ? t("uninstalling") : t("uninstall")
-              }
-            ) : null
-          ] })
-        ] }, entry.packageName);
-      }) }),
-      details !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-        InstalledDetailsDialog,
-        {
-          t,
-          entry: details,
-          busy: props.busyName === details.packageName,
-          onClose: () => {
-            setDetails(null);
-          },
-          onToggle: (entryId) => {
-            props.onToggle(entryId, !details.enabled, details.packageName);
-          },
-          onUninstall: () => {
-            if (globalThis.confirm(t("confirmUninstall"))) props.onUninstall(details.packageName);
           }
-        }
-      ) : null
+        ) : null
+      ] })
     ] }) : null
   ] });
 }
@@ -896,7 +897,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css2;
   document.head.appendChild(tag);
 }
-var ReloadCommandCard_default = { "summary": "_998sQa_summary", "root": "_998sQa_root", "title": "_998sQa_title", "chevron": "_998sQa_chevron", "leading": "_998sQa_leading", "body": "_998sQa_body", "separator": "_998sQa_separator", "row": "_998sQa_row" };
+var ReloadCommandCard_default = { "title": "_998sQa_title", "chevron": "_998sQa_chevron", "leading": "_998sQa_leading", "separator": "_998sQa_separator", "body": "_998sQa_body", "row": "_998sQa_row", "summary": "_998sQa_summary", "root": "_998sQa_root" };
 
 // src/client/ReloadCommandCard.tsx
 var import_jsx_runtime2 = require("react/jsx-runtime");
@@ -1122,11 +1123,11 @@ var zh = {
   catalogUnconfigured: "\u5C1A\u672A\u914D\u7F6E\u8FDC\u7A0B\u63D2\u4EF6\u5E02\u573A\u3002\u5728\u4E0B\u65B9\u6DFB\u52A0\u4E00\u4E2A http(s) \u76EE\u5F55 URL\u3002",
   markets: "\u8FDC\u7A0B\u5E02\u573A",
   marketUrl: "\u5E02\u573A URL",
-  addMarket: "\u6DFB\u52A0\u5E02\u573A",
+  addMarket: "\u6DFB\u52A0\u6E90",
   editMarket: "\u7F16\u8F91",
   removeMarket: "\u79FB\u9664",
-  confirmRemoveMarket: "\u79FB\u9664\u8FD9\u4E2A\u8FDC\u7A0B\u5E02\u573A\uFF1F",
-  catalogSave: "\u4FDD\u5B58\u5E02\u573A",
+  confirmRemoveMarket: "\u79FB\u9664\u8FD9\u4E2A\u8FDC\u7A0B\u6E90\uFF1F",
+  catalogSave: "\u4FDD\u5B58\u6E90",
   catalogSaving: "\u4FDD\u5B58\u4E2D\u2026",
   refreshCatalog: "\u62C9\u53D6\u5168\u90E8",
   refreshingCatalog: "\u62C9\u53D6\u4E2D\u2026",
@@ -1194,11 +1195,11 @@ var en = {
   catalogUnconfigured: "No remote marketplace is configured. Add an http(s) catalog URL below.",
   markets: "Remote marketplaces",
   marketUrl: "Marketplace URL",
-  addMarket: "Add marketplace",
+  addMarket: "Add source",
   editMarket: "Edit",
   removeMarket: "Remove",
-  confirmRemoveMarket: "Remove this remote marketplace?",
-  catalogSave: "Save marketplaces",
+  confirmRemoveMarket: "Remove this remote source?",
+  catalogSave: "Save source",
   catalogSaving: "Saving\u2026",
   refreshCatalog: "Fetch all",
   refreshingCatalog: "Fetching\u2026",

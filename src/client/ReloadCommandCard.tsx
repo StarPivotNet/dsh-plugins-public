@@ -9,6 +9,7 @@ export { reloadCardCopy } from './reload-card.ts'
 export interface ReloadProgressSource {
   get(): ReloadProgress | undefined
   names?(): readonly string[]
+  rebootSettled?(): boolean
   subscribe(listener: () => void): () => void
 }
 
@@ -16,6 +17,7 @@ export interface ReloadCommandCardProps {
   readonly node: ReloadCardNode
   readonly progress?: ReloadProgress
   readonly names?: readonly string[]
+  readonly rebootSettled?: boolean
   readonly progressSource?: ReloadProgressSource
 }
 
@@ -26,11 +28,13 @@ function leadingFor(state: 'running' | 'ok' | 'error'): ReactNode {
 function useReloadSnapshot(
   progress: ReloadProgress | undefined,
   names: readonly string[] | undefined,
+  rebootSettled: boolean | undefined,
   source: ReloadProgressSource | undefined,
-): { progress: ReloadProgress | undefined; names: readonly string[] } {
+): { progress: ReloadProgress | undefined; names: readonly string[]; rebootSettled: boolean } {
   let cached = {
     progress: source?.get() ?? progress,
     names: source?.names?.() ?? names ?? [],
+    rebootSettled: source?.rebootSettled?.() ?? rebootSettled === true,
   }
   return useSyncExternalStore(
     listener => source?.subscribe(listener) ?? (() => {}),
@@ -38,22 +42,28 @@ function useReloadSnapshot(
       const next = {
         progress: source?.get() ?? progress,
         names: source?.names?.() ?? names ?? [],
+        rebootSettled: source?.rebootSettled?.() ?? rebootSettled === true,
       }
       if (
         sameReloadProgress(cached.progress, next.progress)
         && cached.names.join('\0') === next.names.join('\0')
+        && cached.rebootSettled === next.rebootSettled
       ) return cached
       cached = next
       return next
     },
-    () => ({ progress, names: names ?? [] }),
+    () => ({ progress, names: names ?? [], rebootSettled: rebootSettled === true }),
   )
 }
 
-export function ReloadCommandCard({ node, progress, names, progressSource }: ReloadCommandCardProps): ReactNode {
+export function ReloadCommandCard({
+  node, progress, names, rebootSettled, progressSource,
+}: ReloadCommandCardProps): ReactNode {
   const [expanded, setExpanded] = useState(false)
-  const live = useReloadSnapshot(progress, names, progressSource)
-  const { summary, body, state } = reloadCardCopy(node, live.progress, live.names)
+  const live = useReloadSnapshot(progress, names, rebootSettled, progressSource)
+  const { summary, body, state } = reloadCardCopy(node, live.progress, live.names, {
+    rebootSettled: live.rebootSettled,
+  })
   const open = expanded && body !== null
   return (
     <div className={css.root} data-variant="others" data-state={state}>

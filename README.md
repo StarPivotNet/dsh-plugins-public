@@ -31,7 +31,7 @@ While this bundle is installed it forces `client-hmr.autoReload=false` and keeps
 
 - `/reload [plugin]` — wait for Host plugins, then settle the command card as `重载完成, 成功重载 N 个插件`. A bare `/reload` does not unload theme/layout/sidebar. Name one overlay UI plugin, such as `/reload ui-conversation`, to swap that page plugin the same way native HMR does. Use `/reboot` only for the skeleton.
 - `/update [plugin]` — `pnpm update` a profile dependency, or every dependency when omitted. This does not reload; run `/reload` or `/reboot` afterwards
-- `/reboot` — restart the Host process on the same desktop port. The card says `正在重启，页面即将刷新`, then the page reloads after the new Host reconnects.
+- `/reboot` — restart the Host process on the same desktop port. The card says `正在重启，页面即将刷新`, then `已重启` after the page reloads.
 
 ## Catalog JSON
 

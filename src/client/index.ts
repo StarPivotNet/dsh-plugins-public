@@ -63,7 +63,7 @@ export function apply(ctx: ClientContext): void {
   let lastNonce: number | undefined
   let lastRebootNonce: number | undefined
   let toastLive = false
-  let rebootNotice = false
+  let rebootSettled = sessionStorage.getItem('dsh-marketplace-rebooted') === '1'
   let pageReload = Promise.resolve()
   const listeners = new Set<() => void>()
   const renderToast = (): void => {
@@ -71,7 +71,6 @@ export function apply(ctx: ClientContext): void {
       progress: progressFromStatus(reloadStatus),
       live: toastLive,
       t,
-      ...rebootNotice ? { notice: { title: t('rebootDone'), detail: t('rebootDoneDetail') } } : {},
     }))
   }
   const adoptStatus = (next: ReloadStatus | undefined, triggerPageReload: boolean): void => {
@@ -121,15 +120,7 @@ export function apply(ctx: ClientContext): void {
       seenHost: hostDescription.getSnapshot() !== undefined,
       lostHost: false,
     }
-    if (sessionStorage.getItem('dsh-marketplace-rebooted') === '1') {
-      sessionStorage.removeItem('dsh-marketplace-rebooted')
-      rebootNotice = true
-      renderToast()
-      window.setTimeout(() => {
-        rebootNotice = false
-        renderToast()
-      }, 4000)
-    }
+    if (rebootSettled) sessionStorage.removeItem('dsh-marketplace-rebooted')
     const offHost = hostDescription.subscribe(() => {
       generation = hostGenerationAfterLoss({
         ...generation,
@@ -168,24 +159,33 @@ export function apply(ctx: ClientContext): void {
     setCatalogUrls: async (value) => { await catalogScope.set('catalogUrls', value) },
   })
 
+  const commandCard = (props: {
+    node: { name: string | null; outcome: { kind: 'success' | 'error'; text?: string } | null }
+  }) => createElement(ReloadCommandCard, {
+    node: props.node,
+    progress: progressFromStatus(reloadStatus),
+    names: reloadStatus?.names ?? [],
+    rebootSettled,
+    progressSource: {
+      get: () => progressFromStatus(reloadStatus),
+      names: () => reloadStatus?.names ?? [],
+      rebootSettled: () => rebootSettled,
+      subscribe: listener => {
+        listeners.add(listener)
+        return () => { listeners.delete(listener) }
+      },
+    },
+  })
   ctx.slots.inject('conversation.chat.commandview', () => ctx.slots.register({
     name: 'conversation.chat.commandview',
     key: 'reload',
     locale: NS,
-  }, (props: { node: { name: string | null; outcome: { kind: 'success' | 'error'; text?: string } | null } }) =>
-    createElement(ReloadCommandCard, {
-      node: props.node,
-      progress: progressFromStatus(reloadStatus),
-      names: reloadStatus?.names ?? [],
-      progressSource: {
-        get: () => progressFromStatus(reloadStatus),
-        names: () => reloadStatus?.names ?? [],
-        subscribe: listener => {
-          listeners.add(listener)
-          return () => { listeners.delete(listener) }
-        },
-      },
-    })))
+  }, commandCard))
+  ctx.slots.inject('conversation.chat.commandview', () => ctx.slots.register({
+    name: 'conversation.chat.commandview',
+    key: 'reboot',
+    locale: NS,
+  }, commandCard))
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',

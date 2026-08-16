@@ -56,4 +56,17 @@ const failed = reloadCardCopy(accepted, {
 })
 assert(failed.summary === '重载完成, 成功重载 27 个插件, 失败 2 个', failed.summary)
 assert(failed.state === 'error', 'failures mark the row as error')
+
+const rebootPending = reloadCardCopy({
+  name: 'reboot',
+  outcome: { kind: 'success', text: '正在重启，页面即将刷新' },
+}, undefined)
+assert(rebootPending.summary === '正在重启，页面即将刷新', rebootPending.summary)
+assert(rebootPending.state === 'running', 'reboot stays pending until the new host is up')
+const rebootDone = reloadCardCopy({
+  name: 'reboot',
+  outcome: { kind: 'success', text: '正在重启，页面即将刷新' },
+}, undefined, [], { rebootSettled: true })
+assert(rebootDone.summary === '已重启', rebootDone.summary)
+assert(rebootDone.state === 'ok', 'reboot card settles after refresh')
 console.log('reload card checks passed')

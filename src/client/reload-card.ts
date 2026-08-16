@@ -47,13 +47,35 @@ function finishedCopy(
   }
 }
 
+export const REBOOT_PENDING = '正在重启，页面即将刷新'
+export const REBOOT_DONE = '已重启'
+
+export function isRebootPending(text: string | undefined): boolean {
+  return text === REBOOT_PENDING || (text?.startsWith('正在重启') ?? false)
+}
+
 export function reloadCardCopy(
   node: ReloadCardNode,
   progress: ReloadProgress | undefined,
   names: readonly string[] = [],
+  options: { readonly rebootSettled?: boolean } = {},
 ): { summary: string; body: string | null; state: 'running' | 'ok' | 'error' } {
   const accepted = node.outcome?.text
   const body = listedBody(accepted, names)
+  if (node.name === 'reboot') {
+    if (accepted === undefined) return { summary: REBOOT_PENDING, body: null, state: 'running' }
+    if (node.outcome?.kind === 'error') {
+      return { summary: accepted.split('\n')[0]?.trimEnd() || '重启失败', body: null, state: 'error' }
+    }
+    if (options.rebootSettled === true || !isRebootPending(accepted)) {
+      return {
+        summary: isRebootPending(accepted) ? REBOOT_DONE : (accepted.split('\n')[0]?.trimEnd() || REBOOT_DONE),
+        body: null,
+        state: 'ok',
+      }
+    }
+    return { summary: REBOOT_PENDING, body: null, state: 'running' }
+  }
   if (accepted !== undefined) {
     const summary = accepted.split('\n')[0]?.trimEnd() || '正在重载插件'
     const done = summary.startsWith('重载完成')

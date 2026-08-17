@@ -662,11 +662,6 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     if (overlayOpen) return null
     return (
       <div className={css.toggleCluster}>
-        <Tooltip label={t('noSession')} side="bottom" delayMs={500}>
-          <button type="button" className={css.toggleButton} disabled aria-label={t('noSession')}>
-            <IconRefreshOutline16 />
-          </button>
-        </Tooltip>
         {!narrow && (
           <Tooltip label={t('noSession')} side="bottom" delayMs={500}>
             <button type="button" className={css.toggleButton} disabled aria-label={t('noSession')}>
@@ -761,6 +756,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       */}
       {!overlayOpen && (
       <div className={css.toggleCluster}>
+        {state.panelOpen && (
         <Tooltip label={t('refresh')} side="bottom" delayMs={500}>
           <button
             type="button"
@@ -771,6 +767,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
             <IconRefreshOutline16 />
           </button>
         </Tooltip>
+        )}
         {!narrow && (
           <Tooltip label={state.bottomOpen ? t('collapseBottomPanel') : t('expandBottomPanel')} side="bottom" delayMs={500}>
             <button

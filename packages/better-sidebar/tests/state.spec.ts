@@ -762,6 +762,20 @@ describe('persisted state sanitization', () => {
   })
 })
 
+describe('tree refresh tick', () => {
+  it('bumpTreeRefresh increments the snapshot tick without changing session state', () => {
+    const store = createSidebarStore()
+    store.setSession('refresh-session')
+    const before = store.getSnapshot()
+    expect(before.treeRefreshTick).toBe(0)
+    store.bumpTreeRefresh()
+    const after = store.getSnapshot()
+    expect(after.treeRefreshTick).toBe(1)
+    expect(after.sessionId).toBe(before.sessionId)
+    expect(after.state).toBe(before.state)
+  })
+})
+
 describe('v0.12.0 store additions', () => {
   // These blocks exercise store reduce/reduceFor (which schedule the
   // localStorage persist through window timers) and sanitizeState (which

@@ -752,6 +752,8 @@ export interface SidebarSnapshot {
    * them — the + menu hides a tab type the moment its switch flips.
    */
   prefs: SidebarPrefs
+  /** Bumped by the tab-strip refresh control; FileTree wipes its cache. */
+  treeRefreshTick: number
 }
 
 /** Default panel width for one viewport: the prefs percent of the window,
@@ -967,6 +969,7 @@ export class SidebarStore {
     sessionId: undefined,
     state: undefined,
     prefs: { ...SIDEBAR_PREFS_DEFAULTS },
+    treeRefreshTick: 0,
   }
   private readonly listeners = new Set<() => void>()
   /** Per-session persist debounce timers (v0.12.0+: one per session, so a
@@ -996,7 +999,7 @@ export class SidebarStore {
   setSession(sessionId: string | undefined): void {
     if (this.snapshot.sessionId === sessionId) return
     if (sessionId === undefined) {
-      this.snapshot = { sessionId: undefined, state: undefined, prefs: this.prefs }
+      this.snapshot = { sessionId: undefined, state: undefined, prefs: this.prefs, treeRefreshTick: this.snapshot.treeRefreshTick }
     } else {
       let state = this.bySession.get(sessionId)
       if (state === undefined) {
@@ -1008,7 +1011,7 @@ export class SidebarStore {
         // pane/split ids can never collide with its tree.
         nextIdCounter = maxCounterId(state)
       }
-      this.snapshot = { sessionId, state, prefs: this.prefs }
+      this.snapshot = { sessionId, state, prefs: this.prefs, treeRefreshTick: this.snapshot.treeRefreshTick }
     }
     this.notify()
   }
@@ -1030,7 +1033,7 @@ export class SidebarStore {
     const draft = structuredClone(state)
     mutator(draft)
     this.bySession.set(sessionId, draft)
-    this.snapshot = { sessionId, state: draft, prefs: this.prefs }
+    this.snapshot = { sessionId, state: draft, prefs: this.prefs, treeRefreshTick: this.snapshot.treeRefreshTick }
     this.schedulePersist(sessionId, draft)
     this.notify()
   }
@@ -1062,8 +1065,14 @@ export class SidebarStore {
     // localStorage.
     if (next === state) return
     this.bySession.set(sessionId, next)
-    this.snapshot = { sessionId, state: next, prefs: this.prefs }
+    this.snapshot = { sessionId, state: next, prefs: this.prefs, treeRefreshTick: this.snapshot.treeRefreshTick }
     this.schedulePersist(sessionId, next)
+    this.notify()
+  }
+
+  /** Bump the explorer refresh tick (the tab-strip refresh control). */
+  bumpTreeRefresh(): void {
+    this.snapshot = { ...this.snapshot, treeRefreshTick: this.snapshot.treeRefreshTick + 1 }
     this.notify()
   }
 

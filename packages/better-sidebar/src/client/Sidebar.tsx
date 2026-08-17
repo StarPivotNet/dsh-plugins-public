@@ -28,7 +28,7 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSyncExternalStore } from 'react'
 import clsx from 'clsx'
-import { IconCloseFill14, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloseFill14, IconRefreshOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context, SidebarSessionList } from '../context-types.ts'
 import { appendToDraft } from './conversation-draft.ts'
 import {
@@ -166,6 +166,26 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     else document.body.removeAttribute('data-dsh-sidebar-collapsed')
     return () => { document.body.removeAttribute('data-dsh-sidebar-collapsed') }
   }, [collapsed])
+
+  // Hide the floating cluster while a shell overlay page occupies the
+  // center (Automation, later Settings-like pages). The overlay layer
+  // itself is pointer-events:none; its children paint over the chat but
+  // the cluster is position:fixed and would otherwise sit on top.
+  const overlayOpen = useSyncExternalStore(
+    useCallback((onStoreChange: () => void) => {
+      const root = document.querySelector('[data-shell-overlay]')
+      if (root === null) return () => {}
+      const notify = (): void => { onStoreChange() }
+      const observer = new MutationObserver(notify)
+      observer.observe(root, { childList: true, subtree: true, attributes: true })
+      return () => { observer.disconnect() }
+    }, []),
+    () => {
+      const root = document.querySelector('[data-shell-overlay]')
+      if (root === null) return false
+      return Array.from(root.children).some(child => child.childElementCount > 0 || (child.textContent ?? '').trim().length > 0)
+    },
+  )
 
   // Position compatibility mode (titleBarCompat pref): Windows frameless
   // windows draw the native title bar (minimize/maximize/close) at the
@@ -639,8 +659,14 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   }, [ctx, sessionId, cwd])
 
   if (state === undefined || sessionId === undefined) {
+    if (overlayOpen) return null
     return (
       <div className={css.toggleCluster}>
+        <Tooltip label={t('noSession')} side="bottom" delayMs={500}>
+          <button type="button" className={css.toggleButton} disabled aria-label={t('noSession')}>
+            <IconRefreshOutline16 />
+          </button>
+        </Tooltip>
         {!narrow && (
           <Tooltip label={t('noSession')} side="bottom" delayMs={500}>
             <button type="button" className={css.toggleButton} disabled aria-label={t('noSession')}>
@@ -733,11 +759,18 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
         right end it really squeezes (the strip reserves its width via CSS),
         so the tabs genuinely yield space to it.
       */}
+      {!overlayOpen && (
       <div className={css.toggleCluster}>
-        {/*
-          Narrow viewports merge the two workbenches into the one drawer —
-          there is no bottom panel, so its toggle button is not offered.
-        */}
+        <Tooltip label={t('refresh')} side="bottom" delayMs={500}>
+          <button
+            type="button"
+            className={css.toggleButton}
+            aria-label={t('refresh')}
+            onClick={() => { store.bumpTreeRefresh() }}
+          >
+            <IconRefreshOutline16 />
+          </button>
+        </Tooltip>
         {!narrow && (
           <Tooltip label={state.bottomOpen ? t('collapseBottomPanel') : t('expandBottomPanel')} side="bottom" delayMs={500}>
             <button
@@ -761,6 +794,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
           </button>
         </Tooltip>
       </div>
+      )}
       {/*
         The right panel stays mounted while collapsed (hidden off-screen) so
         the slide in/out can animate; visibility hides it after the slide

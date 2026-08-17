@@ -4,18 +4,15 @@
  * over either the shared controlled FileTree (empty query) or the flat
  * result list (relative paths; click opens through the caller's mode-aware
  * open). Owns its refresh tick: the icon next to the search input clears
- * the tree cache. A collapse control sits next to refresh so the right
- * sidebar can be closed from the file tree itself (the top-right cluster
- * can sit under a desktop title bar). EditorHost docks it as the tab's
- * right panel (wrapped in a drag-resize handle) and provides the file
- * context-menu open escapes.
+ * the tree cache. The explorer refresh control lives in the tab-strip
+ * cluster; this panel only consumes the shared tick. EditorHost docks it
+ * as the tab's right panel (wrapped in a drag-resize handle) and provides
+ * the file context-menu open escapes.
  */
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { IconRefreshOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { api } from './api.ts'
 import { FileTree } from './FileTree.tsx'
-import { IconPanelRightOutline16 } from './icons.tsx'
 import { t } from './locales.ts'
 import { resolveSidebarPath } from './produced-files.ts'
 import css from './sidebar.module.css'
@@ -31,17 +28,16 @@ export function TreePanel(props: {
   /** File context-menu "open to the side" (passed through to FileTree). */
   onOpenFileSide?: (path: string) => void
   onReferenceFile: (path: string) => void
-  /** Collapse the right sidebar from this tree header. */
-  onCollapseSidebar?: () => void
+  /** Shared explorer refresh tick from the tab-strip control. */
+  refreshTick?: number
   /** Full-window presentation: the panel fills its host instead of docking
    *  at a fixed width. */
   full?: boolean
 }) {
-  const { sessionId, cwd, expanded, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, onReferenceFile, onCollapseSidebar, full } = props
+  const { sessionId, cwd, expanded, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, onReferenceFile, refreshTick = 0, full } = props
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<{ matches: string[]; truncated: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [refreshTick, setRefreshTick] = useState(0)
 
   const needle = query.trim()
   useEffect(() => {
@@ -77,26 +73,6 @@ export function TreePanel(props: {
           spellCheck={false}
           onChange={(event) => { setQuery(event.target.value) }}
         />
-        <button
-          type="button"
-          className={css.iconButton}
-          aria-label={t('refresh')}
-          title={t('refresh')}
-          onClick={() => { setRefreshTick(tick => tick + 1) }}
-        >
-          <IconRefreshOutline16 size={14} />
-        </button>
-        {onCollapseSidebar !== undefined && (
-          <button
-            type="button"
-            className={css.iconButton}
-            aria-label={t('collapse')}
-            title={t('collapse')}
-            onClick={onCollapseSidebar}
-          >
-            <IconPanelRightOutline16 size={14} />
-          </button>
-        )}
       </div>
       {needle === '' ? (
         <FileTree

@@ -284,32 +284,14 @@ describe('EditorHost (files window)', () => {
     }
   })
 
-  it('the tree header collapse button calls onCollapseSidebar', () => {
+  it('the tree panel has no local collapse or refresh buttons', () => {
     const { store, ctx, homeTab } = setup()
-    const clicks: number[] = []
-    const container = document.createElement('div')
-    document.body.append(container)
-    const root = createRoot(container)
-    act(() => {
-      root.render(createElement(EditorHost, {
-        ctx,
-        store,
-        scope: { sessionId: 'editor-home-session' },
-        tab: homeTab(),
-        expanded: [],
-        onToggleDir: () => {},
-        onReferenceFile: () => {},
-        onCollapseSidebar: () => { clicks.push(1) },
-      }))
-    })
+    const { container, unmount } = mountHost(ctx, store, homeTab)
     try {
-      const collapse = container.querySelector('button[aria-label="Collapse sidebar"]')
-      expect(collapse).not.toBeNull()
-      act(() => { collapse!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
-      expect(clicks).toEqual([1])
+      expect(container.querySelector('button[aria-label="Collapse sidebar"]')).toBeNull()
+      expect(container.querySelector('button[aria-label="Refresh"]')).toBeNull()
     } finally {
-      act(() => { root.unmount() })
-      container.remove()
+      unmount()
     }
   })
 })

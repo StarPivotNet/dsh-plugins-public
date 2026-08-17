@@ -92,10 +92,8 @@ export function EditorHost(props: {
   expanded: string[]
   onToggleDir: (path: string) => void
   onReferenceFile: (path: string) => void
-  /** Collapse the right sidebar from the files-window tree header. */
-  onCollapseSidebar?: () => void
 }) {
-  const { ctx, store, scope, tab, expanded, onToggleDir, onReferenceFile, onCollapseSidebar } = props
+  const { ctx, store, scope, tab, expanded, onToggleDir, onReferenceFile } = props
   const path = tab.path ?? ''
   const title = tab.title
   const [load, setLoad] = useState<EditorLoad>({ status: 'loading' })
@@ -106,6 +104,10 @@ export function EditorHost(props: {
   const inPlace = useSyncExternalStore(
     useCallback((callback: () => void) => store.subscribe(callback), [store]),
     useCallback(() => store.getSnapshot().prefs.editorExplorer, [store]),
+  )
+  const treeRefreshTick = useSyncExternalStore(
+    useCallback((callback: () => void) => store.subscribe(callback), [store]),
+    useCallback(() => store.getSnapshot().treeRefreshTick, [store]),
   )
   // A path-less tab shows the empty-state hint in merged mode — and in split
   // mode it is the standalone explorer (tree-only, see the render below).
@@ -275,7 +277,7 @@ export function EditorHost(props: {
           onOpenFileNewTab={openFileNewTab}
           onOpenFileSide={openFileSide}
           onReferenceFile={onReferenceFile}
-          onCollapseSidebar={onCollapseSidebar}
+          refreshTick={treeRefreshTick}
         />
       </div>
     )
@@ -369,7 +371,7 @@ export function EditorHost(props: {
               onOpenFileNewTab={openFileNewTab}
               onOpenFileSide={openFileSide}
               onReferenceFile={onReferenceFile}
-              onCollapseSidebar={onCollapseSidebar}
+              refreshTick={treeRefreshTick}
             />
           </div>
         )}

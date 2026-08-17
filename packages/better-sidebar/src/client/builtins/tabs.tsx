@@ -9,7 +9,7 @@
  */
 import { IconBranchOutline16, IconCodeOutline16, IconFolderOpen16, IconPanelLeftOutline16, IconThinkOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context } from '../../context-types.ts'
-import { allLeaves, isAgentTabId, togglePanel, type SidebarState } from '../state.ts'
+import { allLeaves, isAgentTabId, type SidebarState } from '../state.ts'
 import { t } from '../locales.ts'
 import { openSidebarFile } from '../intercept.tsx'
 import { EditorHost } from '../EditorHost.tsx'
@@ -106,7 +106,6 @@ export function builtinTabs(ctx: Context): readonly TabDescriptor[] {
           expanded={expanded ?? []}
           onToggleDir={onToggleDir ?? (() => { /* no-op */ })}
           onReferenceFile={onReferenceFile ?? (() => { /* no-op */ })}
-          onCollapseSidebar={() => { store.reduce(togglePanel) }}
         />
       ),
     },

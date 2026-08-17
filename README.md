@@ -6,6 +6,7 @@ Public out-of-tree DeepSeek Harness plugins. One installable plugin per director
 | --- | --- | --- |
 | [`packages/plugin-marketplace`](packages/plugin-marketplace) | `@starpivot/dsh-plugin-marketplace` | Settings plugin marketplace |
 | [`packages/session-import`](packages/session-import) | `@starpivot/dsh-session-import` | Import Cursor, Codex, and Claude Code sessions and skills |
+| [`packages/better-sidebar`](packages/better-sidebar) | `@starpivot/dsh-better-sidebar` | VS Code-like right sidebar; collapse stays in the file tree |
 
 ## Install
 

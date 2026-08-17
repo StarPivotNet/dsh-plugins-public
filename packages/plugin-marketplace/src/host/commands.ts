@@ -15,7 +15,7 @@ import {
   type ReloadProgress,
 } from './reload.ts'
 import { resolveUpdateTarget } from './update.ts'
-import { buildRebootSpec, rebootBlocked, startWatchdog, writeRebootSpec } from './reboot.ts'
+import { buildRebootSpec, desktopOwnsHost, rebootBlocked, startWatchdog, writeRebootSpec } from './reboot.ts'
 
 export function registerMarketplaceCommands(ctx: Context, options: {
   requireProfile: () => { dir: string; installAnchor: string }
@@ -47,11 +47,13 @@ export function registerMarketplaceCommands(ctx: Context, options: {
     handler: async () => {
       const blocked = rebootBlocked()
       if (blocked !== undefined) return { kind: 'error', text: blocked }
-      const spec = buildRebootSpec({ port: options.webPort() })
-      const specPath = writeRebootSpec(spec)
-      const watchdogPath = join(dirname(fileURLToPath(import.meta.url)), 'reboot-watchdog.js')
-      const started = await startWatchdog(watchdogPath, specPath)
-      if (!started.ok) return { kind: 'error', text: started.message }
+      if (!desktopOwnsHost()) {
+        const spec = buildRebootSpec({ port: options.webPort() })
+        const specPath = writeRebootSpec(spec)
+        const watchdogPath = join(dirname(fileURLToPath(import.meta.url)), 'reboot-watchdog.js')
+        const started = await startWatchdog(watchdogPath, specPath)
+        if (!started.ok) return { kind: 'error', text: started.message }
+      }
       scheduleRebootExit(ctx)
       return { kind: 'success', text: '正在重启，页面即将刷新' }
     },

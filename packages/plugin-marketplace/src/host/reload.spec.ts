@@ -11,7 +11,7 @@ import {
 } from './reload.ts'
 import { listReloadTargets, listUpdateTargets } from './command-targets.ts'
 import { resolveUpdateTarget } from './update.ts'
-import { argvWithPort, rebootBlocked, REBOOT_ENV } from './reboot.ts'
+import { argvWithPort, desktopOwnsHost, rebootBlocked, REBOOT_ENV } from './reboot.ts'
 import { pinAutoReloadOff } from './hmr-pin.ts'
 
 const entries = [
@@ -127,6 +127,8 @@ assert(resolveUpdateTarget(['@starpivot/dsh-plugin-marketplace', 'plain-lib'], '
 assert(resolveUpdateTarget(['plain-lib'], 'plain-lib').kind === 'one', 'update one')
 assert(resolveUpdateTarget(['plain-lib'], 'cordis:include').kind === 'none', 'inbox cannot update')
 assert(rebootBlocked(20_000, { [REBOOT_ENV]: '10000' }) === undefined, 'reboot is never cooled down')
+assert(desktopOwnsHost({ DSH_DESKTOP: '1' }), 'desktop Host exits without a watchdog')
+assert(!desktopOwnsHost({}), 'a terminal Host still needs the watchdog')
 assert(argvWithPort(['web', '--port', '0'], 57758).join(' ') === 'web --port 57758', 'reboot keeps the live desktop port')
 assert(argvWithPort(['web', '--port=0'], 57758).join(' ') === 'web --port=57758', 'equals port form is rewritten')
 assert(argvWithPort(['web'], 57758).join(' ') === 'web --port 57758', 'missing port is added')

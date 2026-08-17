@@ -490,8 +490,12 @@ import { chmodSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 var REBOOT_ENV = "DSH_MARKETPLACE_REBOOT";
+var DESKTOP_HOST_ENV = "DSH_DESKTOP";
 function rebootBlocked(_now = Date.now(), _env = process.env) {
   return void 0;
+}
+function desktopOwnsHost(env = process.env) {
+  return env[DESKTOP_HOST_ENV] === "1";
 }
 function argvWithPort(argv, port) {
   const next = [...argv];
@@ -586,11 +590,13 @@ function registerMarketplaceCommands(ctx, options) {
     handler: async () => {
       const blocked = rebootBlocked();
       if (blocked !== void 0) return { kind: "error", text: blocked };
-      const spec = buildRebootSpec({ port: options.webPort() });
-      const specPath = writeRebootSpec(spec);
-      const watchdogPath = join2(dirname(fileURLToPath(import.meta.url)), "reboot-watchdog.js");
-      const started = await startWatchdog(watchdogPath, specPath);
-      if (!started.ok) return { kind: "error", text: started.message };
+      if (!desktopOwnsHost()) {
+        const spec = buildRebootSpec({ port: options.webPort() });
+        const specPath = writeRebootSpec(spec);
+        const watchdogPath = join2(dirname(fileURLToPath(import.meta.url)), "reboot-watchdog.js");
+        const started = await startWatchdog(watchdogPath, specPath);
+        if (!started.ok) return { kind: "error", text: started.message };
+      }
       scheduleRebootExit(ctx);
       return { kind: "success", text: "\u6B63\u5728\u91CD\u542F\uFF0C\u9875\u9762\u5373\u5C06\u5237\u65B0" };
     }

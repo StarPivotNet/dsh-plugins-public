@@ -32,7 +32,7 @@ While this bundle is installed it forces `client-hmr.autoReload=false` and keeps
 
 - `/reload [plugin]` — wait for Host plugins, then settle the command card as `重载完成, 成功重载 N 个插件`. A bare `/reload` does not unload theme/layout/sidebar. Choosing a name from the popup, or typing `/reload ui-conversation`, swaps that page plugin the same way native HMR does. Use `/reboot` only for the skeleton.
 - `/update [plugin]` — `pnpm update` a profile dependency, or every dependency when omitted. The same popup lists profile dependencies. This does not reload; run `/reload` or `/reboot` afterwards
-- `/reboot` — restart the Host process on the same desktop port. The card says `正在重启，页面即将刷新` until the new process is serving plugins, then the page reloads and the card becomes `已重启`. A websocket reconnect is not a reboot.
+- `/reboot` — restart the Host process. In a terminal Host the watchdog respawns on the same port. A desktop-owned Host (`DSH_DESKTOP=1`) only exits; the Electron window starts the next Host. The card says `正在重启，页面即将刷新` until the new process is serving plugins, then the page reloads and the card becomes `已重启`. A websocket reconnect is not a reboot.
 
 ## Catalog JSON
 

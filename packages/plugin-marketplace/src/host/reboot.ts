@@ -19,8 +19,15 @@ export interface RebootSpec {
   readonly childTimeoutMs: number
 }
 
+export const DESKTOP_HOST_ENV = 'DSH_DESKTOP'
+
 export function rebootBlocked(_now = Date.now(), _env: NodeJS.ProcessEnv = process.env): string | undefined {
   return undefined
+}
+
+/** Whether this Host is owned by the desktop window. `/reboot` then only exits. */
+export function desktopOwnsHost(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[DESKTOP_HOST_ENV] === '1'
 }
 
 /**

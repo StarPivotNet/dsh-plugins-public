@@ -204,9 +204,3 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-declare module '@deepseek-ai/dsh-client-ui-slots' {
-  interface LocaleNamespaceMap {
-    /** Session import copy. */
-    'settings.sessionImport': SessionImportKey
-  }
-}

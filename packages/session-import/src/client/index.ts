@@ -4,10 +4,17 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { SessionImportSection, type SessionImportSectionInjected } from './SessionImportSection.tsx'
-import { en, zh } from './locales.ts'
+import { en, zh, type SessionImportKey } from './locales.ts'
 
 export const NS = 'settings.sessionImport'
 export const inject = ['slots', 'locale', 'connection']
+
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface LocaleNamespaceMap {
+    /** Session import Settings page. */
+    'settings.sessionImport': SessionImportKey
+  }
+}
 
 type RpcResult<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string } }
 
@@ -24,8 +31,13 @@ function sessionImportCaller(ctx: ClientContext): <T>(method: string, body?: unk
   }
 }
 
+/**
+ * Register the Import settings section once `settings.section` is declared.
+ * @param ctx - client root context.
+ */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'session-import: dictionaries')
+  const t = ctx.locale.bind(NS)
   const call = sessionImportCaller(ctx)
   const injected = (): SessionImportSectionInjected => ({
     listSessions: source => call('listSessions', source === undefined ? {} : { source }),
@@ -37,7 +49,7 @@ export function apply(ctx: ClientContext): void {
     name: 'settings.section',
     id: 'session-import',
     order: 16,
-    label: () => ctx.locale.bind(NS)('nav'),
+    label: () => t('nav'),
     locale: NS,
     inject: injected,
   }, SessionImportSection))

@@ -41,7 +41,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var SessionImportSection_default = { "tab": "YmEt6W_tab", "toolbar": "YmEt6W_toolbar", "title": "YmEt6W_title", "status": "YmEt6W_status", "tabs": "YmEt6W_tabs", "row": "YmEt6W_row", "meta": "YmEt6W_meta", "section": "YmEt6W_section", "tag": "YmEt6W_tag", "heading": "YmEt6W_heading", "button": "YmEt6W_button", "failure": "YmEt6W_failure", "empty": "YmEt6W_empty", "intro": "YmEt6W_intro", "list": "YmEt6W_list", "select": "YmEt6W_select", "hint": "YmEt6W_hint", "search": "YmEt6W_search" };
+var SessionImportSection_default = { "hint": "YmEt6W_hint", "section": "YmEt6W_section", "empty": "YmEt6W_empty", "tag": "YmEt6W_tag", "button": "YmEt6W_button", "list": "YmEt6W_list", "select": "YmEt6W_select", "title": "YmEt6W_title", "row": "YmEt6W_row", "status": "YmEt6W_status", "failure": "YmEt6W_failure", "heading": "YmEt6W_heading", "toolbar": "YmEt6W_toolbar", "search": "YmEt6W_search", "tabs": "YmEt6W_tabs", "tab": "YmEt6W_tab", "intro": "YmEt6W_intro", "meta": "YmEt6W_meta" };
 
 // src/client/SessionImportSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -276,6 +276,7 @@ function sessionImportCaller(ctx) {
 }
 function apply(ctx) {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), "session-import: dictionaries");
+  const t = ctx.locale.bind(NS);
   const call = sessionImportCaller(ctx);
   const injected = () => ({
     listSessions: (source) => call("listSessions", source === void 0 ? {} : { source }),
@@ -287,7 +288,7 @@ function apply(ctx) {
     name: "settings.section",
     id: "session-import",
     order: 16,
-    label: () => ctx.locale.bind(NS)("nav"),
+    label: () => t("nav"),
     locale: NS,
     inject: injected
   }, SessionImportSection));

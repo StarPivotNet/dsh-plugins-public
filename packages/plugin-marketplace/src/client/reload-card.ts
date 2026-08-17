@@ -67,9 +67,12 @@ export function reloadCardCopy(
     if (node.outcome?.kind === 'error') {
       return { summary: accepted.split('\n')[0]?.trimEnd() || '重启失败', body: null, state: 'error' }
     }
-    if (options.rebootSettled === true || !isRebootPending(accepted)) {
+    if (options.rebootSettled === true && isRebootPending(accepted)) {
+      return { summary: REBOOT_DONE, body: null, state: 'ok' }
+    }
+    if (!isRebootPending(accepted)) {
       return {
-        summary: isRebootPending(accepted) ? REBOOT_DONE : (accepted.split('\n')[0]?.trimEnd() || REBOOT_DONE),
+        summary: accepted.split('\n')[0]?.trimEnd() || REBOOT_DONE,
         body: null,
         state: 'ok',
       }

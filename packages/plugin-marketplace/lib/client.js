@@ -132,7 +132,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var MarketplaceSettingsSection_default = { "tagSuggest": "DYfBnq_tagSuggest", "noteInput": "DYfBnq_noteInput", "iconButton": "DYfBnq_iconButton", "cardTitle": "DYfBnq_cardTitle", "sources": "DYfBnq_sources", "marketplace-spin": "DYfBnq_marketplace-spin", "tagRow": "DYfBnq_tagRow", "cardBody": "DYfBnq_cardBody", "configList": "DYfBnq_configList", "dialogMask": "DYfBnq_dialogMask", "dialogFooter": "DYfBnq_dialogFooter", "cardAside": "DYfBnq_cardAside", "sourceMain": "DYfBnq_sourceMain", "marketRow": "DYfBnq_marketRow", "tagInput": "DYfBnq_tagInput", "catalogCard": "DYfBnq_catalogCard", "actions": "DYfBnq_actions", "spin": "DYfBnq_spin", "dialogDescription": "DYfBnq_dialogDescription", "tagEditor": "DYfBnq_tagEditor", "panel": "DYfBnq_panel", "failure": "DYfBnq_failure", "tab": "DYfBnq_tab", "hint": "DYfBnq_hint", "dialogClose": "DYfBnq_dialogClose", "filters": "DYfBnq_filters", "tagRemove": "DYfBnq_tagRemove", "dialog": "DYfBnq_dialog", "sourceLabel": "DYfBnq_sourceLabel", "tabs": "DYfBnq_tabs", "filter": "DYfBnq_filter", "status": "DYfBnq_status", "reloadToast": "DYfBnq_reloadToast", "updatedAt": "DYfBnq_updatedAt", "noteTag": "DYfBnq_noteTag", "packageName": "DYfBnq_packageName", "description": "DYfBnq_description", "headingRow": "DYfBnq_headingRow", "notePreview": "DYfBnq_notePreview", "catalogCards": "DYfBnq_catalogCards", "search": "DYfBnq_search", "dialogHeader": "DYfBnq_dialogHeader", "visuallyHidden": "DYfBnq_visuallyHidden", "field": "DYfBnq_field", "sourceActions": "DYfBnq_sourceActions", "list": "DYfBnq_list", "restart": "DYfBnq_restart", "cardHit": "DYfBnq_cardHit", "empty": "DYfBnq_empty", "dialogRoot": "DYfBnq_dialogRoot", "dialogTitle": "DYfBnq_dialogTitle", "button": "DYfBnq_button", "heading": "DYfBnq_heading", "source": "DYfBnq_source", "cards": "DYfBnq_cards", "tag": "DYfBnq_tag", "dialogMeta": "DYfBnq_dialogMeta", "section": "DYfBnq_section", "dialogCode": "DYfBnq_dialogCode", "card": "DYfBnq_card" };
+var MarketplaceSettingsSection_default = { "visuallyHidden": "DYfBnq_visuallyHidden", "filter": "DYfBnq_filter", "notePreview": "DYfBnq_notePreview", "updatedAt": "DYfBnq_updatedAt", "cardBody": "DYfBnq_cardBody", "dialogMask": "DYfBnq_dialogMask", "reloadToast": "DYfBnq_reloadToast", "list": "DYfBnq_list", "empty": "DYfBnq_empty", "source": "DYfBnq_source", "cardAside": "DYfBnq_cardAside", "catalogCards": "DYfBnq_catalogCards", "noteInput": "DYfBnq_noteInput", "dialogClose": "DYfBnq_dialogClose", "marketRow": "DYfBnq_marketRow", "actions": "DYfBnq_actions", "panel": "DYfBnq_panel", "tagRemove": "DYfBnq_tagRemove", "tagSuggest": "DYfBnq_tagSuggest", "dialogMeta": "DYfBnq_dialogMeta", "catalogCard": "DYfBnq_catalogCard", "tag": "DYfBnq_tag", "cardHit": "DYfBnq_cardHit", "card": "DYfBnq_card", "marketplace-spin": "DYfBnq_marketplace-spin", "section": "DYfBnq_section", "restart": "DYfBnq_restart", "packageName": "DYfBnq_packageName", "heading": "DYfBnq_heading", "dialogTitle": "DYfBnq_dialogTitle", "tab": "DYfBnq_tab", "tabs": "DYfBnq_tabs", "status": "DYfBnq_status", "filters": "DYfBnq_filters", "hint": "DYfBnq_hint", "tagInput": "DYfBnq_tagInput", "tagRow": "DYfBnq_tagRow", "sources": "DYfBnq_sources", "dialogCode": "DYfBnq_dialogCode", "dialogDescription": "DYfBnq_dialogDescription", "search": "DYfBnq_search", "cards": "DYfBnq_cards", "sourceMain": "DYfBnq_sourceMain", "dialogRoot": "DYfBnq_dialogRoot", "failure": "DYfBnq_failure", "dialogFooter": "DYfBnq_dialogFooter", "headingRow": "DYfBnq_headingRow", "sourceLabel": "DYfBnq_sourceLabel", "dialog": "DYfBnq_dialog", "button": "DYfBnq_button", "noteTag": "DYfBnq_noteTag", "tagEditor": "DYfBnq_tagEditor", "spin": "DYfBnq_spin", "dialogHeader": "DYfBnq_dialogHeader", "field": "DYfBnq_field", "configList": "DYfBnq_configList", "cardTitle": "DYfBnq_cardTitle", "iconButton": "DYfBnq_iconButton", "sourceActions": "DYfBnq_sourceActions", "description": "DYfBnq_description" };
 
 // src/client/MarketplaceSettingsSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -1146,9 +1146,12 @@ function reloadCardCopy(node, progress, names = [], options = {}) {
     if (node.outcome?.kind === "error") {
       return { summary: accepted.split("\n")[0]?.trimEnd() || "\u91CD\u542F\u5931\u8D25", body: null, state: "error" };
     }
-    if (options.rebootSettled === true || !isRebootPending(accepted)) {
+    if (options.rebootSettled === true && isRebootPending(accepted)) {
+      return { summary: REBOOT_DONE, body: null, state: "ok" };
+    }
+    if (!isRebootPending(accepted)) {
       return {
-        summary: isRebootPending(accepted) ? REBOOT_DONE : accepted.split("\n")[0]?.trimEnd() || REBOOT_DONE,
+        summary: accepted.split("\n")[0]?.trimEnd() || REBOOT_DONE,
         body: null,
         state: "ok"
       };
@@ -1179,7 +1182,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css2;
   document.head.appendChild(tag);
 }
-var ReloadCommandCard_default = { "body": "_998sQa_body", "summary": "_998sQa_summary", "root": "_998sQa_root", "separator": "_998sQa_separator", "chevron": "_998sQa_chevron", "title": "_998sQa_title", "row": "_998sQa_row", "leading": "_998sQa_leading" };
+var ReloadCommandCard_default = { "row": "_998sQa_row", "separator": "_998sQa_separator", "leading": "_998sQa_leading", "title": "_998sQa_title", "body": "_998sQa_body", "root": "_998sQa_root", "summary": "_998sQa_summary", "chevron": "_998sQa_chevron" };
 
 // src/client/ReloadCommandCard.tsx
 var import_jsx_runtime2 = require("react/jsx-runtime");
@@ -1216,9 +1219,10 @@ function ReloadCommandCard({
   progressSource
 }) {
   const [expanded, setExpanded] = (0, import_react2.useState)(false);
+  const [seenAtMount] = (0, import_react2.useState)(() => node.outcome !== null);
   const live = useReloadSnapshot(progress, names, rebootSettled, progressSource);
   const { summary, body, state } = reloadCardCopy(node, live.progress, live.names, {
-    rebootSettled: live.rebootSettled
+    rebootSettled: live.rebootSettled && seenAtMount
   });
   const open = expanded && body !== null;
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: ReloadCommandCard_default.root, "data-variant": "others", "data-state": state, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
@@ -1376,14 +1380,17 @@ function progressFromStatus(status) {
     message: status.message
   };
 }
-function hostGenerationAfterLoss(state) {
-  let seenHost = state.seenHost;
-  let lostHost = state.lostHost;
-  if (seenHost && !state.up) lostHost = true;
-  if (state.up) seenHost = true;
-  const reload = lostHost && state.up;
-  if (reload) lostHost = false;
-  return { seenHost, lostHost, reload };
+function storedRebootNonce(raw = sessionStorageValue()) {
+  if (raw === null || raw === "" || raw === "1") return void 0;
+  const nonce = Number(raw);
+  return Number.isFinite(nonce) ? nonce : void 0;
+}
+function sessionStorageValue() {
+  try {
+    return sessionStorage.getItem("dsh-marketplace-rebooted");
+  } catch {
+    return null;
+  }
 }
 function sameReloadStatus(left, right) {
   if (left === right) return true;
@@ -1599,10 +1606,20 @@ function apply(ctx) {
   let reloadStatus;
   let lastNonce;
   let lastRebootNonce;
+  let pendingRebootNonce;
   let toastLive = false;
-  let rebootSettled = sessionStorage.getItem("dsh-marketplace-rebooted") === "1";
+  let rebootSettled = storedRebootNonce() !== void 0;
   let pageReload = Promise.resolve();
   const listeners = /* @__PURE__ */ new Set();
+  const connection = ctx.get("connection");
+  const hostIsUp = () => connection.hostDescription?.getSnapshot() !== void 0;
+  const reloadForReboot = (rebootNonce, nonce) => {
+    lastRebootNonce = rebootNonce;
+    lastNonce = nonce;
+    pendingRebootNonce = void 0;
+    sessionStorage.setItem("dsh-marketplace-rebooted", String(rebootNonce));
+    window.location.reload();
+  };
   const renderToast = () => {
     root.render((0, import_react4.createElement)(ReloadProgressToast, {
       progress: progressFromStatus(reloadStatus),
@@ -1624,11 +1641,13 @@ function apply(ctx) {
     if (lastNonce === void 0) lastNonce = nonce;
     if (lastRebootNonce === void 0) lastRebootNonce = rebootNonce;
     if (triggerPageReload && rebootNonce > lastRebootNonce) {
+      if (hostIsUp()) {
+        reloadForReboot(rebootNonce, nonce);
+        return;
+      }
       lastRebootNonce = rebootNonce;
       lastNonce = nonce;
-      sessionStorage.setItem("dsh-marketplace-rebooted", "1");
-      window.location.reload();
-      return;
+      pendingRebootNonce = rebootNonce;
     }
     if (!triggerPageReload || nonce <= lastNonce || next === void 0) return;
     lastNonce = nonce;
@@ -1645,22 +1664,15 @@ function apply(ctx) {
     } catch {
     }
   };
-  const connection = ctx.get("connection");
+  try {
+    sessionStorage.removeItem("dsh-marketplace-rebooted");
+  } catch {
+  }
   const hostDescription = connection.hostDescription;
   if (hostDescription !== void 0) {
-    let generation = {
-      seenHost: hostDescription.getSnapshot() !== void 0,
-      lostHost: false
-    };
-    if (rebootSettled) sessionStorage.removeItem("dsh-marketplace-rebooted");
     const offHost = hostDescription.subscribe(() => {
-      generation = hostGenerationAfterLoss({
-        ...generation,
-        up: hostDescription.getSnapshot() !== void 0
-      });
-      if (!generation.reload) return;
-      sessionStorage.setItem("dsh-marketplace-rebooted", "1");
-      window.location.reload();
+      if (pendingRebootNonce === void 0 || !hostIsUp()) return;
+      reloadForReboot(pendingRebootNonce, lastNonce ?? 0);
     });
     ctx.effect(() => () => {
       offHost();

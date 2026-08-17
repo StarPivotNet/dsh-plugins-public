@@ -610,7 +610,7 @@ function scheduleRebootExit(ctx) {
       }
       process.exit(0);
     })();
-  }, 0);
+  }, 400);
 }
 async function handleReload(ctx, options, rawInput) {
   const planned = planReload(ctx, rawInput);
@@ -869,13 +869,15 @@ function apply(ctx, config = {}) {
   ctx.inject(["settings"], (settingsCtx) => {
     const settings = settingsCtx.get("settings");
     reloadLive = snapshotFromSettings(settings?.get?.(SETTINGS_NS));
-    if (process.env.DSH_MARKETPLACE_REBOOT !== void 0) {
-      void requestBrowserReboot(settings, SETTINGS_NS).then((rebootNonce) => {
-        reloadLive = { ...reloadLive, rebootNonce };
-      }).catch((error) => {
-        console.error("plugin-marketplace: reboot nonce failed", error);
-      });
-    }
+  });
+  ctx.inject(["settings", "webServer"], (readyCtx) => {
+    if (process.env.DSH_MARKETPLACE_REBOOT === void 0) return;
+    const settings = readyCtx.get("settings");
+    void requestBrowserReboot(settings, SETTINGS_NS).then((rebootNonce) => {
+      reloadLive = { ...reloadLive, rebootNonce };
+    }).catch((error) => {
+      console.error("plugin-marketplace: reboot nonce failed", error);
+    });
   });
   ctx.inject(["commands"], (commandCtx) => {
     registerMarketplaceCommands(commandCtx, {

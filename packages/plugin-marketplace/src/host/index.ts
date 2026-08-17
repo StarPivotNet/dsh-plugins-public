@@ -144,13 +144,21 @@ export function apply(ctx: Context, config: Config = {}): void {
       update?: (ns: unknown, patch: object) => Promise<unknown>
     } | undefined
     reloadLive = snapshotFromSettings(settings?.get?.(SETTINGS_NS))
-    if (process.env.DSH_MARKETPLACE_REBOOT !== undefined) {
-      void requestBrowserReboot(settings, SETTINGS_NS).then((rebootNonce) => {
-        reloadLive = { ...reloadLive, rebootNonce }
-      }).catch((error: unknown) => {
-        console.error('plugin-marketplace: reboot nonce failed', error)
-      })
-    }
+  })
+  // Bump only after the web server can serve /plugins bundles. Doing this
+  // at settings registration races the still-composing client graph and
+  // the page reloads into "Failed to load plugins".
+  ctx.inject(['settings', 'webServer'], (readyCtx) => {
+    if (process.env.DSH_MARKETPLACE_REBOOT === undefined) return
+    const settings = readyCtx.get('settings') as {
+      get?: (ns: unknown) => { rebootNonce?: number }
+      update?: (ns: unknown, patch: object) => Promise<unknown>
+    } | undefined
+    void requestBrowserReboot(settings, SETTINGS_NS).then((rebootNonce) => {
+      reloadLive = { ...reloadLive, rebootNonce }
+    }).catch((error: unknown) => {
+      console.error('plugin-marketplace: reboot nonce failed', error)
+    })
   })
   ctx.inject(['commands'], (commandCtx) => {
     registerMarketplaceCommands(commandCtx, {

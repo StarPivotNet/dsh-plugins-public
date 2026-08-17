@@ -17,8 +17,8 @@ import { ReloadCommandCard } from './ReloadCommandCard.tsx'
 import { ReloadProgressToast, type ReloadProgress } from './ReloadProgressToast.tsx'
 import { reloadMarketplacePage, type MarketplacePageReloadHost } from './reload-page.ts'
 import {
-  asReloadStatus, hostGenerationAfterLoss, progressFromStatus, sameReloadStatus,
-  type ReloadStatus,
+  asReloadStatus, progressFromStatus, sameReloadStatus,
+  storedRebootNonce, type ReloadStatus,
 } from './reload-status.ts'
 import { en, zh } from './locales.ts'
 
@@ -64,10 +64,25 @@ export function apply(ctx: ClientContext): void {
   let reloadStatus: ReloadStatus | undefined
   let lastNonce: number | undefined
   let lastRebootNonce: number | undefined
+  let pendingRebootNonce: number | undefined
   let toastLive = false
-  let rebootSettled = sessionStorage.getItem('dsh-marketplace-rebooted') === '1'
+  let rebootSettled = storedRebootNonce() !== undefined
   let pageReload = Promise.resolve()
   const listeners = new Set<() => void>()
+  const connection = ctx.get('connection') as {
+    hostDescription?: {
+      getSnapshot(): unknown
+      subscribe(listener: () => void): () => void
+    }
+  }
+  const hostIsUp = (): boolean => connection.hostDescription?.getSnapshot() !== undefined
+  const reloadForReboot = (rebootNonce: number, nonce: number): void => {
+    lastRebootNonce = rebootNonce
+    lastNonce = nonce
+    pendingRebootNonce = undefined
+    sessionStorage.setItem('dsh-marketplace-rebooted', String(rebootNonce))
+    window.location.reload()
+  }
   const renderToast = (): void => {
     root.render(createElement(ReloadProgressToast, {
       progress: progressFromStatus(reloadStatus),
@@ -90,12 +105,17 @@ export function apply(ctx: ClientContext): void {
     const rebootNonce = next?.rebootNonce ?? 0
     if (lastNonce === undefined) lastNonce = nonce
     if (lastRebootNonce === undefined) lastRebootNonce = rebootNonce
+    // Only a new Host process bumps rebootNonce. A websocket reconnect is
+    // not a reboot: reloading then races the still-composing plugin graph
+    // and blanks the window on a missing /plugins bundle.
     if (triggerPageReload && rebootNonce > lastRebootNonce) {
+      if (hostIsUp()) {
+        reloadForReboot(rebootNonce, nonce)
+        return
+      }
       lastRebootNonce = rebootNonce
       lastNonce = nonce
-      sessionStorage.setItem('dsh-marketplace-rebooted', '1')
-      window.location.reload()
-      return
+      pendingRebootNonce = rebootNonce
     }
     if (!triggerPageReload || nonce <= lastNonce || next === undefined) return
     lastNonce = nonce
@@ -110,27 +130,13 @@ export function apply(ctx: ClientContext): void {
     try { adoptStatus(asReloadStatus(await callMarketplace('reloadStatus')), true) }
     catch { /* keep last known status */ }
   }
-  const connection = ctx.get('connection') as {
-    hostDescription?: {
-      getSnapshot(): unknown
-      subscribe(listener: () => void): () => void
-    }
-  }
+  try { sessionStorage.removeItem('dsh-marketplace-rebooted') }
+  catch { /* private mode */ }
   const hostDescription = connection.hostDescription
   if (hostDescription !== undefined) {
-    let generation = {
-      seenHost: hostDescription.getSnapshot() !== undefined,
-      lostHost: false,
-    }
-    if (rebootSettled) sessionStorage.removeItem('dsh-marketplace-rebooted')
     const offHost = hostDescription.subscribe(() => {
-      generation = hostGenerationAfterLoss({
-        ...generation,
-        up: hostDescription.getSnapshot() !== undefined,
-      })
-      if (!generation.reload) return
-      sessionStorage.setItem('dsh-marketplace-rebooted', '1')
-      window.location.reload()
+      if (pendingRebootNonce === undefined || !hostIsUp()) return
+      reloadForReboot(pendingRebootNonce, lastNonce ?? 0)
     })
     ctx.effect(() => () => { offHost() }, 'plugin-marketplace: reboot page refresh')
   }

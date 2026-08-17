@@ -60,9 +60,12 @@ export function ReloadCommandCard({
   node, progress, names, rebootSettled, progressSource,
 }: ReloadCommandCardProps): ReactNode {
   const [expanded, setExpanded] = useState(false)
+  // A leftover rebootSettled flag belongs to the command that was already
+  // on the page. A later /reboot in the same document must stay pending.
+  const [seenAtMount] = useState(() => node.outcome !== null)
   const live = useReloadSnapshot(progress, names, rebootSettled, progressSource)
   const { summary, body, state } = reloadCardCopy(node, live.progress, live.names, {
-    rebootSettled: live.rebootSettled,
+    rebootSettled: live.rebootSettled && seenAtMount,
   })
   const open = expanded && body !== null
   return (

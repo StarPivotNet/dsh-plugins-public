@@ -1,4 +1,4 @@
-import { asReloadStatus, hostGenerationAfterLoss, progressFromStatus } from './reload-status.ts'
+import { asReloadStatus, hostGenerationAfterLoss, progressFromStatus, storedRebootNonce } from './reload-status.ts'
 
 function assert(cond: unknown, message: string): void {
   if (!cond) throw new Error(message)
@@ -25,4 +25,7 @@ assert(asReloadStatus({ phase: 'nope' }) === undefined, 'rejects unknown phase')
 assert(hostGenerationAfterLoss({ seenHost: false, lostHost: false, up: false }).reload === false, 'boot without host does not reload')
 assert(hostGenerationAfterLoss({ seenHost: true, lostHost: false, up: false }).lostHost === true, 'host loss is remembered')
 assert(hostGenerationAfterLoss({ seenHost: true, lostHost: true, up: true }).reload === true, 'new host generation reloads the page')
+assert(storedRebootNonce(null) === undefined, 'missing storage is not a settled reboot')
+assert(storedRebootNonce('1') === undefined, 'legacy boolean flag is leftover, not a nonce')
+assert(storedRebootNonce('7') === 7, 'numeric nonce settles the card')
 console.log('reload status checks passed')

@@ -50,7 +50,25 @@ export function progressFromStatus(status: ReloadStatus | undefined): ReloadProg
   }
 }
 
-/** After the Host process dies and a new generation connects, refresh the page. */
+/**
+ * Read the reboot nonce stored just before a post-reboot page load.
+ * The old boolean flag `'1'` is leftover from a failed or reconnect-triggered
+ * reload and must not settle a later `/reboot` card.
+ * @param raw - `sessionStorage` value, or null when unset.
+ * @returns the nonce, or undefined when the value is missing or stale.
+ */
+export function storedRebootNonce(raw: string | null = sessionStorageValue()): number | undefined {
+  if (raw === null || raw === '' || raw === '1') return undefined
+  const nonce = Number(raw)
+  return Number.isFinite(nonce) ? nonce : undefined
+}
+
+function sessionStorageValue(): string | null {
+  try { return sessionStorage.getItem('dsh-marketplace-rebooted') }
+  catch { return null }
+}
+
+/** After the Host process dies and a new generation connects. */
 export function hostGenerationAfterLoss(state: {
   seenHost: boolean
   lostHost: boolean

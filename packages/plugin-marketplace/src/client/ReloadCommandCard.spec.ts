@@ -63,6 +63,12 @@ const rebootPending = reloadCardCopy({
 }, undefined)
 assert(rebootPending.summary === '正在重启，页面即将刷新', rebootPending.summary)
 assert(rebootPending.state === 'running', 'reboot stays pending until the new host is up')
+const leftover = reloadCardCopy({
+  name: 'reboot',
+  outcome: { kind: 'success', text: '正在重启，页面即将刷新' },
+}, undefined, [], { rebootSettled: false })
+assert(leftover.summary === '正在重启，页面即将刷新', leftover.summary)
+assert(leftover.state === 'running', 'a leftover reboot flag must not settle the card')
 const rebootDone = reloadCardCopy({
   name: 'reboot',
   outcome: { kind: 'success', text: '正在重启，页面即将刷新' },

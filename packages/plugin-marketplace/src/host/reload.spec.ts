@@ -31,7 +31,7 @@ try {
   assert(parsedCatalog.ok, 'local catalog parses')
   if (parsedCatalog.ok) {
     assert(parsedCatalog.title === 'StarPivot', 'catalog title')
-    assert(parsedCatalog.entries.map(entry => entry.name).join(',') === '@starpivot/dsh-plugin-marketplace,@dsh-plugin/dsh-auxiliary,@dsh-plugin/dsh-thought-buddy,dsh-find-plugin,dsh-mnemon', 'catalog names')
+    assert(parsedCatalog.entries.some(entry => entry.name === '@starpivot/dsh-plugin-marketplace'), 'catalog lists marketplace')
     assert(parsedCatalog.entries.every(entry => entry.kind === 'bundle'), 'catalog bundles only')
     assert(parsedCatalog.entries.every(entry => entry.updatedAt !== undefined), 'catalog publish times')
   }

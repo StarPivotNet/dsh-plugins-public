@@ -60,6 +60,9 @@ export function registerMarketplaceCommands(ctx: Context, options: {
 
 /** Persist command/done, then exit. ctx.appExit does not kill the web process. */
 function scheduleRebootExit(ctx: Context): void {
+  // command/done is appended after this handler returns. Exiting on the
+  // next microtask drops that line and leaves the card looking finished
+  // from a leftover reboot flag instead of still pending.
   setTimeout(() => {
     void (async () => {
       const sessions = ctx.get('sessions') as {
@@ -74,7 +77,7 @@ function scheduleRebootExit(ctx: Context): void {
       }
       process.exit(0)
     })()
-  }, 0)
+  }, 400)
 }
 
 async function handleReload(

@@ -7,6 +7,7 @@ Public out-of-tree DeepSeek Harness plugins. One installable plugin per director
 ```
 packages/
   plugin-marketplace/   @starpivot/dsh-plugin-marketplace
+  session-import/       @starpivot/dsh-session-import
 ```
 
 A new plugin is a new `packages/<name>` folder with its own manifest, patch layer, sources, tests, and build. Install it with `github:StarPivotNet/dsh-plugins-public#path:packages/<name>`.

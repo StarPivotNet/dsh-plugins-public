@@ -5,6 +5,7 @@ Public out-of-tree DeepSeek Harness plugins. One installable plugin per director
 | Directory | Package | What it does |
 | --- | --- | --- |
 | [`packages/plugin-marketplace`](packages/plugin-marketplace) | `@starpivot/dsh-plugin-marketplace` | Settings plugin marketplace |
+| [`packages/session-import`](packages/session-import) | `@starpivot/dsh-session-import` | Import Cursor, Codex, and Claude Code sessions and skills |
 
 ## Install
 

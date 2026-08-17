@@ -17,6 +17,15 @@ importers:
         specifier: ^1.30.0
         version: 1.33.0
 
+  packages/session-import:
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+      lightningcss:
+        specifier: ^1.30.0
+        version: 1.33.0
+
 packages:
 
   '@esbuild/aix-ppc64@0.25.12':

@@ -1,0 +1,62 @@
+{
+  "name": "@starpivot/dsh-session-import",
+  "version": "0.1.0",
+  "description": "Import Cursor, Codex, and Claude Code sessions and skills into DeepSeek Harness",
+  "homepage": "https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/session-import",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "session-import",
+    "claude-code",
+    "codex",
+    "cursor"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StarPivotNet/dsh-plugins-public.git",
+    "directory": "packages/session-import"
+  },
+  "main": "lib/node.js",
+  "exports": {
+    ".": "./lib/node.js",
+    "./host": "./lib/host.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib/node.js",
+    "lib/host.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepublishOnly": "node scripts/build.mjs",
+    "test": "node --experimental-strip-types --test src/convert/text.spec.ts src/convert/events.spec.ts src/convert/claude.spec.ts src/convert/codex.spec.ts src/convert/cursor.spec.ts src/convert/detect.spec.ts src/host/parse-args.spec.ts src/host/skills.spec.ts src/host/import.spec.ts"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-connection"
+      ]
+    }
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "lightningcss": "^1.30.0"
+  }
+}

@@ -1,0 +1,10 @@
+# Install with:
+#   dsh plugin --profile web add @starpivot/dsh-session-import
+# then restart dsh web.
+
+- insert:
+    - id: session-import
+      name: '@starpivot/dsh-session-import/host'
+
+    - id: ui-settings-session-import
+      name: '@starpivot/dsh-session-import'

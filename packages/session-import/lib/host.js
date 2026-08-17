@@ -1,0 +1,1323 @@
+// src/host/index.ts
+import { homedir as homedir3 } from "node:os";
+import { join as join3 } from "node:path";
+import { settingsNamespace } from "@deepseek-ai/dsh-settings";
+import z from "@deepseek-ai/schemastery";
+
+// src/convert/types.ts
+var DEFAULT_CONVERT_LIMITS = {
+  maxToolResultChars: 32e3,
+  maxTextChars: 2e5
+};
+function importedSessionId(source, nativeId) {
+  const safe = nativeId.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return `import-${source}-${safe || "session"}`;
+}
+
+// src/host/import.ts
+import { readFile } from "node:fs/promises";
+
+// src/convert/text.ts
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function asString(value) {
+  return typeof value === "string" && value.length > 0 ? value : void 0;
+}
+function parseTime(value, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value < 1e12 ? Math.round(value * 1e3) : Math.round(value);
+  }
+  if (typeof value === "string" && value.length > 0) {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+function truncateChars(text, maxChars) {
+  if (text.length <= maxChars) return text;
+  if (maxChars <= 1) return "\u2026";
+  let end = maxChars - 1;
+  const unit = text.charCodeAt(end - 1);
+  if (unit >= 55296 && unit <= 56319) end -= 1;
+  return `${text.slice(0, end)}\u2026`;
+}
+function flattenText(value, limits = DEFAULT_CONVERT_LIMITS) {
+  const parts = [];
+  collectText(value, parts);
+  return truncateChars(parts.join("\n"), limits.maxTextChars);
+}
+function collectText(value, parts) {
+  if (typeof value === "string") {
+    if (value.length > 0) parts.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectText(item, parts);
+    return;
+  }
+  if (!isRecord(value)) return;
+  const type = asString(value.type);
+  if (type === "tool_use" || type === "tool-call" || type === "function_call" || type === "custom_tool_call") {
+    return;
+  }
+  const direct = asString(value.text) ?? asString(value.content) ?? asString(value.thinking) ?? asString(value.output) ?? asString(value.message);
+  if (direct !== void 0) {
+    parts.push(direct);
+    return;
+  }
+  if (Array.isArray(value.content)) collectText(value.content, parts);
+  if (Array.isArray(value.summary)) collectText(value.summary, parts);
+}
+function encodeArguments(value) {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value ?? {});
+  } catch {
+    return "{}";
+  }
+}
+function isInstructionDump(text) {
+  const head = text.trimStart();
+  return head.startsWith("# AGENTS.md") || head.startsWith("<INSTRUCTIONS>") || head.startsWith("# Claude Code");
+}
+function fallbackTitle(text, maxChars = 80) {
+  const line = text.replace(/\s+/gu, " ").trim();
+  return line.length === 0 ? "Imported session" : truncateChars(line, maxChars);
+}
+function kebabName(raw) {
+  const normalized = raw.trim().toLowerCase().replace(/\.[a-z0-9]+$/u, "").replace(/[^a-z0-9]+/gu, "-").replace(/^-+|-+$/gu, "");
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalized) ? normalized : void 0;
+}
+
+// src/convert/events.ts
+var SESSION_FORMAT_VERSION = 0;
+function convertConversation(conversation, path, limits = DEFAULT_CONVERT_LIMITS) {
+  const id = importedSessionId(conversation.source, conversation.nativeId);
+  const events = [];
+  let seq = 0;
+  let turn = 0;
+  let openStep = null;
+  let nextStep = 1;
+  let skipped = 0;
+  const pending = /* @__PURE__ */ new Map();
+  const push = (type, data, time, surface) => {
+    events.push({
+      type,
+      seq: seq++,
+      time,
+      data,
+      ...surface === true ? { surfaceOp: "append" } : {}
+    });
+  };
+  const closeStep = (time) => {
+    if (openStep === null || turn === 0) return;
+    for (const [callId, open] of [...pending]) {
+      if (open.turn !== turn || open.step !== openStep) continue;
+      push("tool/result", toolResultEvent(open.turn, open.step, callId, "(imported call had no recorded result)", true, limits), time, true);
+      pending.delete(callId);
+    }
+    push("step/end", { turn, step: openStep }, time);
+    openStep = null;
+    nextStep += 1;
+  };
+  const closeTurn = (time) => {
+    closeStep(time);
+    if (turn === 0) return;
+    pending.clear();
+    push("turn/end", { turn, reason: { kind: "completed" } }, time);
+  };
+  const ensureTurn = (time) => {
+    if (turn !== 0) return;
+    turn = 1;
+    nextStep = 1;
+    push("turn/start", { turn }, time);
+  };
+  const ensureStep = (time) => {
+    ensureTurn(time);
+    if (openStep === null) {
+      openStep = nextStep;
+      push("step/start", { turn, step: openStep }, time);
+    }
+    return openStep;
+  };
+  for (const item of conversation.items) {
+    if (item.kind === "user") {
+      const text = flattenText(item.text, limits);
+      if (text.length === 0) {
+        skipped += 1;
+        continue;
+      }
+      closeTurn(item.time);
+      turn += 1;
+      nextStep = 1;
+      push("turn/start", { turn }, item.time);
+      push("user/message", {
+        id: item.id ?? messageId(conversation.source, conversation.nativeId, seq),
+        role: "user",
+        content: [{ type: "text", text }],
+        source: item.source === "plugin" ? { kind: "plugin", plugin: item.plugin ?? conversation.source, ...item.form === void 0 ? {} : { form: item.form } } : { kind: "user" }
+      }, item.time, true);
+      continue;
+    }
+    if (item.kind === "assistant") {
+      const step = ensureStep(item.time);
+      const content = [];
+      const reasoning = flattenText(item.reasoning, limits);
+      if (reasoning.length > 0) content.push({ type: "reasoning", text: reasoning });
+      const text = flattenText(item.text, limits);
+      if (text.length > 0) content.push({ type: "text", text });
+      for (const call of item.toolCalls) {
+        content.push({
+          type: "tool-call",
+          id: call.callId,
+          name: call.name,
+          arguments: call.arguments
+        });
+        push("tool/call", {
+          turn,
+          step,
+          callId: call.callId,
+          name: call.name,
+          arguments: call.arguments
+        }, item.time);
+        pending.set(call.callId, { turn, step });
+      }
+      if (content.length === 0) content.push({ type: "text", text: "" });
+      push("assistant/message", {
+        turn,
+        step,
+        message: {
+          id: item.id ?? messageId(conversation.source, conversation.nativeId, seq),
+          role: "assistant",
+          content,
+          source: {
+            kind: "model",
+            provider: item.provider ?? conversation.provider ?? conversation.source,
+            model: item.model ?? conversation.model ?? conversation.source
+          }
+        }
+      }, item.time, true);
+      if (pending.size === 0) closeStep(item.time);
+      continue;
+    }
+    const open = pending.get(item.callId);
+    if (open === void 0) {
+      skipped += 1;
+      continue;
+    }
+    pending.delete(item.callId);
+    push("tool/result", toolResultEvent(open.turn, open.step, item.callId, item.text, item.isError, limits), item.time, true);
+    const remaining = [...pending.values()].some((entry) => entry.turn === open.turn && entry.step === open.step);
+    if (!remaining) closeStep(item.time);
+  }
+  const lastTime = conversation.items.at(-1)?.time ?? conversation.updatedAt;
+  closeTurn(lastTime);
+  const firstUser = conversation.items.find((item) => item.kind === "user" && item.source === "user" && item.text.trim().length > 0 && !item.text.trimStart().startsWith("# AGENTS.md") && !item.text.trimStart().startsWith("# Files mentioned"));
+  const title = conversation.title?.trim() || (firstUser === void 0 ? "Imported session" : fallbackTitle(firstUser.text));
+  if (title.length > 0) {
+    push("session/title", {
+      title,
+      messageSeqs: [],
+      source: { kind: "user" }
+    }, conversation.updatedAt || lastTime);
+  }
+  const header = {
+    version: SESSION_FORMAT_VERSION,
+    id,
+    createdAt: conversation.createdAt || lastTime || Date.now(),
+    ...isAbsolutePath(conversation.cwd) ? { cwd: conversation.cwd } : {},
+    seedLength: events.length,
+    delegationDepth: 0
+  };
+  return {
+    source: conversation.source,
+    nativeId: conversation.nativeId,
+    path,
+    title,
+    header,
+    events,
+    skipped
+  };
+}
+function toolResultEvent(turn, step, callId, text, isError, limits) {
+  const body = truncateChars(text, limits.maxToolResultChars);
+  return {
+    turn,
+    step,
+    message: {
+      id: `import-tool-${callId}`,
+      role: "user",
+      source: { kind: "tool", callId },
+      content: [{
+        type: "tool-result",
+        toolCallId: callId,
+        content: [{ type: "text", text: body.length === 0 ? "(empty tool result)" : body }],
+        isError
+      }]
+    }
+  };
+}
+function isAbsolutePath(value) {
+  return value !== void 0 && (value.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(value));
+}
+function messageId(source, nativeId, seq) {
+  return `import-${source}-${nativeId}-${String(seq)}`;
+}
+
+// src/convert/claude.ts
+function convertClaudeSession(text, path, limits = DEFAULT_CONVERT_LIMITS) {
+  const conversation = extractClaudeConversation(text, path, limits);
+  return convertConversation(conversation, path, limits);
+}
+function extractClaudeConversation(text, path, limits = DEFAULT_CONVERT_LIMITS) {
+  const items = [];
+  let nativeId = idFromPath(path);
+  let title;
+  let cwd;
+  let createdAt = 0;
+  let updatedAt = 0;
+  let model;
+  for (const raw of text.split(/\r?\n/u)) {
+    if (raw.trim().length === 0) continue;
+    let record;
+    try {
+      record = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    if (!isRecord(record)) continue;
+    const type = asString(record.type);
+    const time = parseTime(record.timestamp, updatedAt);
+    if (time > updatedAt) updatedAt = time;
+    if (createdAt === 0 && time > 0) createdAt = time;
+    nativeId = asString(record.sessionId) ?? nativeId;
+    cwd = asString(record.cwd) ?? cwd;
+    if (type === "ai-title") title = asString(record.aiTitle) ?? title;
+    if (type === "assistant") {
+      const message = isRecord(record.message) ? record.message : void 0;
+      model = asString(message?.model) ?? model;
+      const extracted = extractAssistant(message, time, limits);
+      if (extracted !== void 0) items.push(extracted);
+      continue;
+    }
+    if (type === "user") {
+      const extracted = extractUser(record, time, limits);
+      items.push(...extracted);
+    }
+  }
+  return {
+    source: "claude",
+    nativeId,
+    title,
+    cwd,
+    createdAt: createdAt || updatedAt,
+    updatedAt: updatedAt || createdAt,
+    model,
+    provider: "anthropic",
+    items
+  };
+}
+function extractAssistant(message, time, limits) {
+  if (message === void 0) return void 0;
+  const content = message.content;
+  const toolCalls = [];
+  const texts = [];
+  const reasoning = [];
+  if (Array.isArray(content)) {
+    for (const block of content) {
+      if (!isRecord(block)) continue;
+      const type = asString(block.type);
+      if (type === "tool_use") {
+        const callId = asString(block.id);
+        const name2 = asString(block.name);
+        if (callId === void 0 || name2 === void 0) continue;
+        toolCalls.push({ callId, name: name2, arguments: encodeArguments(block.input) });
+        continue;
+      }
+      if (type === "thinking") {
+        const text = flattenText(block.thinking ?? block.text, limits);
+        if (text.length > 0) reasoning.push(text);
+        continue;
+      }
+      if (type === "text") {
+        const text = flattenText(block.text, limits);
+        if (text.length > 0) texts.push(text);
+      }
+    }
+  } else {
+    const text = flattenText(content, limits);
+    if (text.length > 0) texts.push(text);
+  }
+  if (texts.length === 0 && reasoning.length === 0 && toolCalls.length === 0) return void 0;
+  return {
+    kind: "assistant",
+    id: asString(message.id),
+    time,
+    text: texts.join("\n"),
+    reasoning: reasoning.join("\n"),
+    model: asString(message.model),
+    provider: "anthropic",
+    toolCalls
+  };
+}
+function extractUser(record, time, limits) {
+  const message = isRecord(record.message) ? record.message : void 0;
+  const content = message?.content ?? record.content;
+  const items = [];
+  if (Array.isArray(content)) {
+    const texts = [];
+    for (const block of content) {
+      if (!isRecord(block)) continue;
+      if (asString(block.type) === "tool_result") {
+        const callId = asString(block.tool_use_id) ?? asString(block.toolUseId);
+        if (callId === void 0) continue;
+        items.push({
+          kind: "tool-result",
+          time,
+          callId,
+          text: flattenText(block.content ?? block.text, limits),
+          isError: block.is_error === true || block.isError === true
+        });
+        continue;
+      }
+      const text2 = flattenText(block, limits);
+      if (text2.length > 0) texts.push(text2);
+    }
+    if (texts.length > 0) {
+      items.push({
+        kind: "user",
+        id: asString(record.uuid),
+        time,
+        text: texts.join("\n"),
+        source: "user"
+      });
+    }
+    return items;
+  }
+  const text = flattenText(content, limits);
+  if (text.length === 0) return items;
+  items.push({
+    kind: "user",
+    id: asString(record.uuid),
+    time,
+    text,
+    source: "user"
+  });
+  return items;
+}
+function idFromPath(path) {
+  const base = path.split(/[\\/]/u).at(-1) ?? "session";
+  return base.replace(/\.jsonl$/u, "");
+}
+
+// src/convert/codex.ts
+function convertCodexSession(text, path, limits = DEFAULT_CONVERT_LIMITS) {
+  return convertConversation(extractCodexConversation(text, path, limits), path, limits);
+}
+function extractCodexConversation(text, path, limits = DEFAULT_CONVERT_LIMITS) {
+  const items = [];
+  let nativeId = idFromPath2(path);
+  let cwd;
+  let createdAt = 0;
+  let updatedAt = 0;
+  let model;
+  let provider;
+  let title;
+  for (const raw of text.split(/\r?\n/u)) {
+    if (raw.trim().length === 0) continue;
+    let record;
+    try {
+      record = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    if (!isRecord(record)) continue;
+    const time = parseTime(record.timestamp, updatedAt);
+    if (time > updatedAt) updatedAt = time;
+    if (createdAt === 0 && time > 0) createdAt = time;
+    const type = asString(record.type);
+    const payload = isRecord(record.payload) ? record.payload : record;
+    if (type === "session_meta") {
+      nativeId = asString(payload.id) ?? asString(payload.session_id) ?? nativeId;
+      cwd = asString(payload.cwd) ?? cwd;
+      model = asString(payload.model) ?? model;
+      provider = asString(payload.model_provider) ?? provider;
+      title = asString(payload.thread_name) ?? asString(payload.agent_nickname) ?? title;
+      continue;
+    }
+    if (type === "turn_context") {
+      model = asString(payload.model) ?? model;
+      cwd = asString(payload.cwd) ?? cwd;
+      continue;
+    }
+    if (type !== "response_item") continue;
+    const item = extractResponseItem(payload, time, limits);
+    if (item !== void 0) items.push(item);
+  }
+  return {
+    source: "codex",
+    nativeId,
+    title,
+    cwd,
+    createdAt: createdAt || updatedAt,
+    updatedAt: updatedAt || createdAt,
+    model,
+    provider: provider ?? "openai",
+    items
+  };
+}
+function extractResponseItem(payload, time, limits) {
+  const type = asString(payload.type);
+  if (type === "message") {
+    const role = asString(payload.role);
+    const text = flattenText(payload.content, limits);
+    if (text.length === 0) return void 0;
+    if (role === "assistant") {
+      return {
+        kind: "assistant",
+        id: asString(payload.id),
+        time,
+        text,
+        reasoning: "",
+        toolCalls: []
+      };
+    }
+    if (role === "developer" || isInstructionDump(text)) {
+      return {
+        kind: "user",
+        id: asString(payload.id),
+        time,
+        text,
+        source: "plugin",
+        plugin: "codex",
+        form: "instructions"
+      };
+    }
+    if (role === "user" || role === void 0) {
+      return {
+        kind: "user",
+        id: asString(payload.id),
+        time,
+        text,
+        source: "user"
+      };
+    }
+    return void 0;
+  }
+  if (type === "reasoning") {
+    const text = flattenText(payload.summary ?? payload.content ?? payload.text, limits);
+    if (text.length === 0) return void 0;
+    return {
+      kind: "assistant",
+      id: asString(payload.id),
+      time,
+      text: "",
+      reasoning: text,
+      toolCalls: []
+    };
+  }
+  if (type === "function_call" || type === "custom_tool_call") {
+    const callId = asString(payload.call_id) ?? asString(payload.id);
+    const name2 = asString(payload.name);
+    if (callId === void 0 || name2 === void 0) return void 0;
+    const args = encodeArguments(payload.arguments ?? payload.input);
+    const call = { callId, name: name2, arguments: args };
+    return {
+      kind: "assistant",
+      id: asString(payload.id),
+      time,
+      text: "",
+      reasoning: "",
+      toolCalls: [call]
+    };
+  }
+  if (type === "function_call_output" || type === "custom_tool_call_output") {
+    const callId = asString(payload.call_id) ?? asString(payload.id);
+    if (callId === void 0) return void 0;
+    return {
+      kind: "tool-result",
+      time,
+      callId,
+      text: flattenText(payload.output ?? payload.content, limits),
+      isError: payload.is_error === true || asString(payload.status) === "failed"
+    };
+  }
+  return void 0;
+}
+function idFromPath2(path) {
+  const base = path.split(/[\\/]/u).at(-1) ?? "session";
+  return base.replace(/^rollout-/, "").replace(/\.jsonl$/u, "");
+}
+
+// src/convert/cursor.ts
+function convertCursorSession(text, path, limits = DEFAULT_CONVERT_LIMITS) {
+  return convertConversation(extractCursorConversation(text, path, limits), path, limits);
+}
+function extractCursorConversation(text, path, limits = DEFAULT_CONVERT_LIMITS) {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      return extractCursorJson(JSON.parse(trimmed), path, limits);
+    } catch {
+    }
+  }
+  return extractCursorJsonl(text, path, limits);
+}
+function extractCursorJson(value, path, limits) {
+  if (Array.isArray(value)) {
+    return conversationFromItems(value.map((item) => extractBubble(item, 0, limits)).filter((item) => item !== void 0), path);
+  }
+  if (!isRecord(value)) {
+    return conversationFromItems([], path);
+  }
+  const bubbles = firstArray(value, [
+    "fullConversationHeadersOnly",
+    "conversation",
+    "messages",
+    "bubbles",
+    "composerId"
+  ]) ?? firstArrayDeep(value);
+  const items = (bubbles ?? []).map((item) => extractBubble(item, parseTime(value.createdAt ?? value.created_at), limits)).filter((item) => item !== void 0);
+  const nativeId = asString(value.composerId) ?? asString(value.composer_id) ?? asString(value.id) ?? idFromPath3(path);
+  return {
+    source: "cursor",
+    nativeId,
+    title: asString(value.name) ?? asString(value.title) ?? asString(value.text),
+    cwd: asString(value.cwd) ?? asString(value.workspaceUri),
+    createdAt: parseTime(value.createdAt ?? value.created_at),
+    updatedAt: parseTime(value.lastUpdatedAt ?? value.updatedAt ?? value.updated_at),
+    model: asString(value.modelName) ?? asString(value.model),
+    provider: "cursor",
+    items
+  };
+}
+function extractCursorJsonl(text, path, limits) {
+  const items = [];
+  let nativeId = idFromPath3(path);
+  let title;
+  let cwd;
+  let createdAt = 0;
+  let updatedAt = 0;
+  for (const raw of text.split(/\r?\n/u)) {
+    if (raw.trim().length === 0) continue;
+    let record;
+    try {
+      record = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    const time = isRecord(record) ? parseTime(record.timestamp ?? record.createdAt, updatedAt) : 0;
+    if (time > updatedAt) updatedAt = time;
+    if (createdAt === 0 && time > 0) createdAt = time;
+    if (isRecord(record)) {
+      nativeId = asString(record.composerId) ?? asString(record.sessionId) ?? nativeId;
+      title = asString(record.title) ?? title;
+      cwd = asString(record.cwd) ?? cwd;
+    }
+    const item = extractBubble(record, time, limits);
+    if (item !== void 0) items.push(item);
+  }
+  return {
+    source: "cursor",
+    nativeId,
+    title,
+    cwd,
+    createdAt: createdAt || updatedAt,
+    updatedAt: updatedAt || createdAt,
+    provider: "cursor",
+    items
+  };
+}
+function extractBubble(value, fallbackTime, limits) {
+  if (!isRecord(value)) return void 0;
+  const time = parseTime(value.timestamp ?? value.createdAt ?? value.time, fallbackTime);
+  const type = (asString(value.type) ?? asString(value.role) ?? "").toLowerCase();
+  if (type === "tool_result" || type === "tool-result" || asString(value.toolCallId) !== void 0 && type.includes("result")) {
+    const callId = asString(value.toolCallId) ?? asString(value.tool_call_id) ?? asString(value.callId);
+    if (callId === void 0) return void 0;
+    return {
+      kind: "tool-result",
+      time,
+      callId,
+      text: flattenText(value.result ?? value.content ?? value.text, limits),
+      isError: value.isError === true || value.is_error === true
+    };
+  }
+  if (type === "ai" || type === "assistant" || type === "1" || value.type === 2) {
+    const toolCalls = extractCursorToolCalls(value);
+    return {
+      kind: "assistant",
+      id: asString(value.bubbleId) ?? asString(value.id),
+      time,
+      text: flattenText(value.text ?? value.content ?? value.richText, limits),
+      reasoning: flattenText(value.thinking ?? value.reasoning, limits),
+      model: asString(value.modelType) ?? asString(value.model),
+      provider: "cursor",
+      toolCalls
+    };
+  }
+  if (type === "user" || type === "human" || type === "0" || value.type === 1 || asString(value.text) !== void 0) {
+    const text = flattenText(value.text ?? value.content ?? value.richText, limits);
+    if (text.length === 0) return void 0;
+    return {
+      kind: "user",
+      id: asString(value.bubbleId) ?? asString(value.id),
+      time,
+      text,
+      source: "user"
+    };
+  }
+  return void 0;
+}
+function extractCursorToolCalls(value) {
+  const calls = [];
+  const raw = value.toolFormerData ?? value.toolCalls ?? value.tool_calls;
+  const list = Array.isArray(raw) ? raw : raw === void 0 ? [] : [raw];
+  for (const item of list) {
+    if (!isRecord(item)) continue;
+    const callId = asString(item.toolCallId) ?? asString(item.id) ?? asString(item.callId);
+    const name2 = asString(item.name) ?? asString(item.toolName) ?? asString(item.tool);
+    if (callId === void 0 || name2 === void 0) continue;
+    calls.push({
+      callId,
+      name: name2,
+      arguments: encodeArguments(item.rawArgs ?? item.params ?? item.arguments ?? item.input)
+    });
+  }
+  return calls;
+}
+function firstArray(value, keys) {
+  for (const key of keys) {
+    const field = value[key];
+    if (Array.isArray(field)) return field;
+  }
+  return void 0;
+}
+function firstArrayDeep(value) {
+  for (const nested of Object.values(value)) {
+    if (!isRecord(nested)) continue;
+    const found = firstArray(nested, ["fullConversationHeadersOnly", "conversation", "messages", "bubbles"]);
+    if (found !== void 0) return found;
+  }
+  return void 0;
+}
+function conversationFromItems(items, path) {
+  const first = items[0]?.time ?? 0;
+  const last = items.at(-1)?.time ?? first;
+  return {
+    source: "cursor",
+    nativeId: idFromPath3(path),
+    createdAt: first,
+    updatedAt: last,
+    provider: "cursor",
+    items
+  };
+}
+function idFromPath3(path) {
+  const base = path.split(/[\\/]/u).at(-1) ?? "session";
+  return base.replace(/\.(jsonl|json)$/u, "");
+}
+
+// src/convert/detect.ts
+function detectSource(path, text) {
+  const normalized = path.replace(/\\/gu, "/");
+  if (normalized.includes("/.claude/projects/") || normalized.includes("/.claude/sessions/")) return "claude";
+  if (normalized.includes("/.codex/sessions/") || /rollout-.*\.jsonl$/u.test(normalized)) return "codex";
+  if (normalized.includes("/.cursor/") || normalized.includes("/User/workspaceStorage/") || normalized.includes("/Cursor/")) {
+    return "cursor";
+  }
+  const first = firstRecord(text);
+  if (first === void 0) return void 0;
+  if (asString(first.sessionId) !== void 0 && (first.type === "user" || first.type === "assistant" || first.type === "mode")) {
+    return "claude";
+  }
+  if (first.type === "session_meta" || first.type === "response_item" || first.type === "event_msg") return "codex";
+  if (asString(first.composerId) !== void 0 || asString(first.bubbleId) !== void 0) return "cursor";
+  if (Array.isArray(first.fullConversationHeadersOnly) || Array.isArray(first.bubbles)) return "cursor";
+  return void 0;
+}
+function firstRecord(text) {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed.split(/\r?\n/u)[0] ?? trimmed);
+      return isRecord(parsed) ? parsed : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  for (const line of trimmed.split(/\r?\n/u)) {
+    if (line.trim().length === 0) continue;
+    try {
+      const parsed = JSON.parse(line);
+      return isRecord(parsed) ? parsed : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  return void 0;
+}
+
+// src/host/import.ts
+async function convertFile(path, source, limits = DEFAULT_CONVERT_LIMITS) {
+  const text = await readFile(path, "utf8");
+  const detected = source ?? detectSource(path, text);
+  if (detected === void 0) {
+    throw new Error(`cannot detect conversation format: ${path}`);
+  }
+  if (detected === "claude") return convertClaudeSession(text, path, limits);
+  if (detected === "codex") return convertCodexSession(text, path, limits);
+  return convertCursorSession(text, path, limits);
+}
+function withWorkspaceCwd(converted, cwd) {
+  if (cwd === void 0 || cwd.length === 0) return converted;
+  return { ...converted, header: { ...converted.header, cwd } };
+}
+async function persistConverted(persistence, converted) {
+  try {
+    await persistence.create(converted.header);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/already/i.test(message)) {
+      return { ok: true, converted, alreadyImported: true };
+    }
+    return { ok: false, path: converted.path, message };
+  }
+  try {
+    await persistence.append(converted.header.id, converted.events);
+    return { ok: true, converted, alreadyImported: false };
+  } catch (error) {
+    return {
+      ok: false,
+      path: converted.path,
+      message: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+async function importDiscovered(persistence, row, limits = DEFAULT_CONVERT_LIMITS) {
+  try {
+    const converted = await convertFile(row.path, row.source, limits);
+    return persistConverted(persistence, converted);
+  } catch (error) {
+    return {
+      ok: false,
+      path: row.path,
+      message: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+// src/host/parse-args.ts
+var SOURCES = /* @__PURE__ */ new Set(["claude", "codex", "cursor"]);
+function parseImportArgs(rawInput) {
+  const rawTokens = rawInput.trim().split(/\s+/u).filter((token) => token.length > 0);
+  const keepCwd = rawTokens.some((token) => token === "--keep-cwd");
+  const tokens = rawTokens.filter((token) => token !== "--keep-cwd");
+  if (tokens.length === 0) return { kind: "help" };
+  const first = tokens[0]?.toLowerCase();
+  if (first === "help" || first === "--help") return { kind: "help" };
+  if (first === "list") {
+    const source2 = parseSource(tokens[1]);
+    return source2 === void 0 && tokens[1] !== void 0 ? { kind: "sessions", query: tokens.slice(1).join(" "), keepCwd } : { kind: "list", source: source2 };
+  }
+  if (first === "skills" || first === "skill") {
+    return { kind: "skills", source: parseSource(tokens[1]) };
+  }
+  if (first === "all") return { kind: "sessions", keepCwd };
+  const source = parseSource(first);
+  if (source !== void 0) {
+    const query = tokens.slice(1).join(" ").trim();
+    return query.length === 0 ? { kind: "sessions", source, keepCwd } : { kind: "sessions", source, query, keepCwd };
+  }
+  return { kind: "sessions", query: tokens.join(" "), keepCwd };
+}
+function parseSource(value) {
+  if (value === void 0) return void 0;
+  const normalized = value.toLowerCase();
+  if (normalized === "claude-code") return "claude";
+  return SOURCES.has(normalized) ? normalized : void 0;
+}
+
+// src/host/scan.ts
+import { homedir } from "node:os";
+import { basename, join } from "node:path";
+import { readdir, stat } from "node:fs/promises";
+function defaultScanRoots(home = homedir()) {
+  return {
+    claude: [
+      join(home, ".claude", "projects"),
+      join(home, ".claude", "sessions")
+    ],
+    codex: [
+      join(home, ".codex", "sessions"),
+      join(home, ".codex", "archived_sessions")
+    ],
+    cursor: [
+      join(home, ".cursor", "projects"),
+      join(home, ".cursor", "chats"),
+      join(home, "Library", "Application Support", "Cursor", "User", "workspaceStorage"),
+      join(home, "AppData", "Roaming", "Cursor", "User", "workspaceStorage")
+    ]
+  };
+}
+async function discoverSessions(roots, signal) {
+  const found = [];
+  await walk(roots.claude, "claude", found, signal);
+  await walk(roots.codex, "codex", found, signal);
+  await walk(roots.cursor, "cursor", found, signal);
+  found.sort((left, right) => right.updatedAt - left.updatedAt || left.path.localeCompare(right.path));
+  return found;
+}
+async function walk(roots, source, found, signal) {
+  for (const root of roots) {
+    signal?.throwIfAborted();
+    await visit(root, source, found, 0, signal);
+  }
+}
+async function visit(path, source, found, depth, signal) {
+  if (depth > 8) return;
+  signal?.throwIfAborted();
+  let entries;
+  try {
+    entries = await readdir(path, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const full = join(path, entry.name);
+    if (entry.isDirectory()) {
+      await visit(full, source, found, depth + 1, signal);
+      continue;
+    }
+    if (!entry.isFile() || !isSessionFile(source, entry.name)) continue;
+    let info;
+    try {
+      info = await stat(full);
+    } catch {
+      continue;
+    }
+    found.push({
+      source,
+      nativeId: nativeIdFromName(source, entry.name),
+      path: full,
+      title: fallbackTitle(nativeIdFromName(source, entry.name)),
+      createdAt: info.birthtimeMs || info.mtimeMs,
+      updatedAt: info.mtimeMs,
+      bytes: info.size
+    });
+  }
+}
+function isSessionFile(source, name2) {
+  const lower = name2.toLowerCase();
+  if (source === "claude") return lower.endsWith(".jsonl");
+  if (source === "codex") return lower.endsWith(".jsonl") && (lower.startsWith("rollout-") || lower.includes("session"));
+  return lower.endsWith(".jsonl") || lower.endsWith(".json") && /composer|transcript|chat|conversation/u.test(lower);
+}
+function nativeIdFromName(source, name2) {
+  const bare = name2.replace(/\.(jsonl|json)$/u, "");
+  if (source === "codex") return bare.replace(/^rollout-\d{4}-\d{2}-\d{2}T[0-9-]+-/, "");
+  return bare;
+}
+function enrichFromPreview(row, text) {
+  const head = text.slice(0, 64e3);
+  let title = row.title;
+  let cwd = row.cwd;
+  let nativeId = row.nativeId;
+  let createdAt = row.createdAt;
+  for (const line of head.split(/\r?\n/u).slice(0, 40)) {
+    if (line.trim().length === 0) continue;
+    let record;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!isRecord(record)) continue;
+    if (typeof record.sessionId === "string") nativeId = record.sessionId;
+    if (typeof record.cwd === "string") cwd = record.cwd;
+    if (typeof record.aiTitle === "string") title = record.aiTitle;
+    if (typeof record.timestamp === "string") {
+      const parsed = Date.parse(record.timestamp);
+      if (Number.isFinite(parsed) && (createdAt === row.createdAt || parsed < createdAt)) createdAt = parsed;
+    }
+    const payload = isRecord(record.payload) ? record.payload : void 0;
+    if (record.type === "session_meta" && payload !== void 0) {
+      if (typeof payload.id === "string") nativeId = payload.id;
+      if (typeof payload.cwd === "string") cwd = payload.cwd;
+      if (typeof payload.thread_name === "string") title = payload.thread_name;
+    }
+    if (record.type === "user" && isRecord(record.message) && typeof record.message.content === "string" && title === row.title) {
+      title = fallbackTitle(record.message.content);
+    }
+  }
+  return { ...row, nativeId, title, cwd, createdAt };
+}
+
+// src/host/skills.ts
+import { mkdir, readFile as readFile2, writeFile } from "node:fs/promises";
+import { basename as basename2, dirname, join as join2 } from "node:path";
+import { homedir as homedir2 } from "node:os";
+function defaultSkillRoots(home = homedir2()) {
+  return {
+    claude: [
+      join2(home, ".claude", "skills"),
+      join2(home, ".claude", "commands")
+    ],
+    codex: [
+      join2(home, ".codex", "skills")
+    ],
+    cursor: [
+      join2(home, ".cursor", "skills"),
+      join2(home, ".cursor", "commands")
+    ]
+  };
+}
+async function discoverSkills(roots, signal) {
+  const found = [];
+  for (const source of ["claude", "codex", "cursor"]) {
+    for (const root of roots[source]) {
+      signal?.throwIfAborted();
+      await visitSkillRoot(root, source, found);
+    }
+  }
+  found.sort((left, right) => left.name.localeCompare(right.name) || left.path.localeCompare(right.path));
+  return found;
+}
+async function copySkill(skill, targetRoot) {
+  const directory = join2(targetRoot, skill.name);
+  const target = join2(directory, "SKILL.md");
+  await mkdir(directory, { recursive: true });
+  let overwritten = false;
+  try {
+    await readFile2(target);
+    overwritten = true;
+  } catch {
+    overwritten = false;
+  }
+  const body = ensureFrontmatter(skill);
+  await writeFile(target, body, "utf8");
+  return { path: target, overwritten };
+}
+async function visitSkillRoot(root, source, found) {
+  const { readdir: readdir2, readFile: readFile4, stat: stat2 } = await import("node:fs/promises");
+  let entries;
+  try {
+    entries = await readdir2(root, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const full = join2(root, entry.name);
+    if (entry.isDirectory()) {
+      const skillFile = join2(full, "SKILL.md");
+      try {
+        const info = await stat2(skillFile);
+        if (!info.isFile()) continue;
+        const parsed = parseSkillFile(await readFile4(skillFile, "utf8"), source, skillFile);
+        if (parsed !== void 0) found.push(parsed);
+      } catch {
+        continue;
+      }
+      continue;
+    }
+    if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) continue;
+    if (entry.name.toLowerCase() === "readme.md") continue;
+    try {
+      const parsed = parseSkillFile(await readFile4(full, "utf8"), source, full);
+      if (parsed !== void 0) found.push(parsed);
+    } catch {
+      continue;
+    }
+  }
+}
+function parseSkillFile(text, source, path) {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/u.exec(text);
+  const front = match?.[1] ?? "";
+  const body = (match?.[2] ?? text).trim();
+  const fields = parseFrontmatter(front);
+  const fromFile = kebabName(path.endsWith("SKILL.md") ? basename2(dirname(path)) : basename2(path));
+  const name2 = kebabName(String(fields.name ?? "")) ?? fromFile;
+  if (name2 === void 0) return void 0;
+  const description = String(fields.description ?? firstHeading(body) ?? name2);
+  return {
+    source,
+    name: name2,
+    description,
+    path,
+    content: body.length === 0 ? text : body
+  };
+}
+function ensureFrontmatter(skill) {
+  if (skill.content.startsWith("---")) {
+    return skill.content.endsWith("\n") ? skill.content : `${skill.content}
+`;
+  }
+  return [
+    "---",
+    `name: ${skill.name}`,
+    `description: ${JSON.stringify(skill.description)}`,
+    "---",
+    "",
+    skill.content.trim(),
+    ""
+  ].join("\n");
+}
+function parseFrontmatter(text) {
+  const fields = {};
+  for (const line of text.split(/\r?\n/u)) {
+    const match = /^([A-Za-z0-9_-]+):\s*(.*)$/u.exec(line);
+    if (match === null) continue;
+    const key = match[1];
+    let value = (match[2] ?? "").trim();
+    if (value.startsWith('"') && value.endsWith('"') || value.startsWith("'") && value.endsWith("'")) {
+      value = value.slice(1, -1);
+    }
+    if (key !== void 0) fields[key] = value;
+  }
+  return fields;
+}
+function firstHeading(body) {
+  const match = /^#\s+(.+)$/mu.exec(body);
+  return match?.[1]?.trim();
+}
+
+// src/host/index.ts
+import { readFile as readFile3 } from "node:fs/promises";
+var name = "session-import";
+var SESSION_IMPORT_SETTINGS_NAMESPACE = "session-import";
+var SETTINGS_NS = settingsNamespace(SESSION_IMPORT_SETTINGS_NAMESPACE);
+var CHANNEL = "/session-import";
+function apply(ctx, config = {}) {
+  const limits = {
+    maxToolResultChars: config.maxToolResultChars ?? DEFAULT_CONVERT_LIMITS.maxToolResultChars,
+    maxTextChars: config.maxTextChars ?? DEFAULT_CONVERT_LIMITS.maxTextChars
+  };
+  const maxFileBytes = config.maxFileBytes ?? 32 * 1024 * 1024;
+  const skillTarget = config.skillTarget ?? join3(homedir3(), ".dsh", "skills");
+  ctx.inject(["settings"], (settingsCtx) => {
+    const settings = settingsCtx.get("settings");
+    settings.register(SETTINGS_NS, z.object({
+      lastImportAt: z.number().default(0)
+    }), { base: { lastImportAt: 0 } });
+  });
+  ctx.inject(["commands"], (commandCtx) => {
+    commandCtx.commands.register({
+      name: "import",
+      description: "Import Cursor, Codex, or Claude Code sessions and skills",
+      input: { hint: "[list|all|skills|claude|codex|cursor|path]" },
+      handler: (invocation) => handleImportCommand(commandCtx, invocation.rawInput, {
+        limits,
+        maxFileBytes,
+        skillTarget,
+        signal: invocation.signal,
+        workspaceCwd: invocation.agent.session.header.cwd
+      })
+    });
+  });
+  ctx.inject(["connection"], (connectionCtx) => {
+    connectionCtx.connection.rpc.handle(CHANNEL, async (endpoint, payload) => {
+      try {
+        switch (endpoint) {
+          case "listSessions":
+            return { ok: true, value: await listSessions(payload, maxFileBytes) };
+          case "importSessions":
+            return { ok: true, value: await importSessions(connectionCtx, payload, limits, maxFileBytes) };
+          case "listSkills":
+            return { ok: true, value: { entries: await discoverSkills(defaultSkillRoots()) } };
+          case "importSkills":
+            return { ok: true, value: await importSkills(payload, skillTarget) };
+          default:
+            return { ok: false, error: { code: "NOT_FOUND", message: "unknown session-import endpoint" } };
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          error: { code: "INTERNAL", message: error instanceof Error ? error.message : String(error) }
+        };
+      }
+    }, { authority: "loopback" });
+  });
+}
+async function handleImportCommand(ctx, rawInput, runtime) {
+  const command = parseImportArgs(rawInput);
+  if (command.kind === "help") {
+    return {
+      kind: "success",
+      text: [
+        "Import foreign agent conversations into this Harness.",
+        "/import list [claude|codex|cursor] \u2014 discover local sessions",
+        "/import all \u2014 import every discovered session into this workspace",
+        "/import claude|codex|cursor \u2014 import one store",
+        "/import skills \u2014 copy Claude/Codex/Cursor skills into ~/.dsh/skills",
+        "/import <path-or-id> \u2014 import one file or native id",
+        "Add --keep-cwd to keep the foreign working directory instead of this workspace."
+      ].join("\n")
+    };
+  }
+  if (command.kind === "list") {
+    const rows2 = await listedSessions(command.source, runtime.maxFileBytes, runtime.signal);
+    if (rows2.length === 0) return { kind: "success", text: "No foreign sessions found." };
+    const lines = rows2.slice(0, 40).map((row) => `${row.source}	${row.title}	${row.nativeId}	${row.path}`);
+    const extra = rows2.length > 40 ? `
+\u2026 ${String(rows2.length - 40)} more` : "";
+    return { kind: "success", text: `Found ${String(rows2.length)} session(s).
+${lines.join("\n")}${extra}` };
+  }
+  if (command.kind === "skills") {
+    const skills = await discoverSkills(defaultSkillRoots(), runtime.signal);
+    const selected2 = command.source === void 0 ? skills : skills.filter((skill) => skill.source === command.source);
+    if (selected2.length === 0) return { kind: "success", text: "No foreign skills found." };
+    let copied = 0;
+    let overwritten = 0;
+    for (const skill of selected2) {
+      const result = await copySkill(skill, runtime.skillTarget);
+      copied += 1;
+      if (result.overwritten) overwritten += 1;
+    }
+    return {
+      kind: "success",
+      text: `Copied ${String(copied)} skill(s) to ${runtime.skillTarget}${overwritten > 0 ? ` (${String(overwritten)} overwritten)` : ""}.`
+    };
+  }
+  const persistence = requirePersistence(ctx);
+  if (persistence === void 0) {
+    return { kind: "error", text: "session persistence is not configured; cannot import conversations." };
+  }
+  const query = command.query;
+  if (query !== void 0 && looksLikePath(query)) {
+    runtime.signal.throwIfAborted();
+    try {
+      const converted = relocate(await convertFile(expandHome(query), command.source, runtime.limits), runtime.workspaceCwd, command.keepCwd);
+      const outcome = await persistConverted(persistence, converted);
+      if (!outcome.ok) return { kind: "error", text: outcome.message };
+      return {
+        kind: "success",
+        text: outcome.alreadyImported ? `Already imported as ${converted.header.id}.` : `Imported ${converted.title} as ${converted.header.id}.`
+      };
+    } catch (error) {
+      return { kind: "error", text: error instanceof Error ? error.message : String(error) };
+    }
+  }
+  const rows = await listedSessions(command.source, runtime.maxFileBytes, runtime.signal);
+  const selected = query === void 0 ? rows : rows.filter((row) => row.nativeId.includes(query) || row.path.includes(query) || row.title.includes(query));
+  if (selected.length === 0) return { kind: "error", text: "No matching foreign sessions." };
+  let imported = 0;
+  let skipped = 0;
+  const failures = [];
+  for (const row of selected) {
+    runtime.signal.throwIfAborted();
+    const outcome = await importOne(persistence, row, runtime.limits, runtime.workspaceCwd, command.keepCwd);
+    if (!outcome.ok) {
+      failures.push(`${row.path}: ${outcome.message}`);
+      continue;
+    }
+    if (outcome.alreadyImported) skipped += 1;
+    else imported += 1;
+  }
+  const failed = failures.length === 0 ? "" : `
+Failed:
+${failures.slice(0, 8).join("\n")}`;
+  return {
+    kind: failures.length > 0 && imported === 0 ? "error" : "success",
+    text: `Imported ${String(imported)}, already present ${String(skipped)}, failed ${String(failures.length)}.${failed}`
+  };
+}
+async function listedSessions(source, maxFileBytes, signal) {
+  const roots = defaultScanRoots();
+  const discovered = await discoverSessions(source === void 0 ? roots : {
+    claude: source === "claude" ? roots.claude : [],
+    codex: source === "codex" ? roots.codex : [],
+    cursor: source === "cursor" ? roots.cursor : []
+  }, signal);
+  const enriched = [];
+  for (const row of discovered) {
+    if (row.bytes > maxFileBytes) continue;
+    try {
+      const preview = await readFile3(row.path, "utf8");
+      enriched.push(enrichFromPreview(row, preview));
+    } catch {
+      enriched.push(row);
+    }
+  }
+  return enriched;
+}
+async function listSessions(request, maxFileBytes) {
+  return { entries: await listedSessions(request.source, maxFileBytes) };
+}
+async function importSessions(ctx, request, limits, maxFileBytes) {
+  const persistence = requirePersistence(ctx);
+  if (persistence === void 0) {
+    throw new Error("session persistence is not configured");
+  }
+  const rows = await listedSessions(request.source, maxFileBytes);
+  const selected = request.paths === void 0 || request.paths.length === 0 ? rows : rows.filter((row) => request.paths.includes(row.path));
+  let imported = 0;
+  let skipped = 0;
+  const failed = [];
+  for (const row of selected) {
+    const outcome = await importOne(persistence, row, limits, process.cwd(), request.keepCwd === true);
+    if (!outcome.ok) {
+      failed.push({ path: row.path, message: outcome.message });
+      continue;
+    }
+    if (outcome.alreadyImported) skipped += 1;
+    else imported += 1;
+  }
+  if (request.paths !== void 0) {
+    for (const path of request.paths) {
+      if (selected.some((row) => row.path === path)) continue;
+      try {
+        const converted = relocate(await convertFile(path, request.source, limits), process.cwd(), request.keepCwd === true);
+        const outcome = await persistConverted(persistence, converted);
+        if (!outcome.ok) failed.push({ path, message: outcome.message });
+        else if (outcome.alreadyImported) skipped += 1;
+        else imported += 1;
+      } catch (error) {
+        failed.push({ path, message: error instanceof Error ? error.message : String(error) });
+      }
+    }
+  }
+  return { imported, skipped, failed };
+}
+async function importSkills(request, skillTarget) {
+  const skills = await discoverSkills(defaultSkillRoots());
+  const selected = request.paths === void 0 || request.paths.length === 0 ? skills : skills.filter((skill) => request.paths.includes(skill.path));
+  let copied = 0;
+  let overwritten = 0;
+  const failed = [];
+  for (const skill of selected) {
+    try {
+      const result = await copySkill(skill, skillTarget);
+      copied += 1;
+      if (result.overwritten) overwritten += 1;
+    } catch (error) {
+      failed.push({ path: skill.path, message: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { copied, overwritten, failed };
+}
+function relocate(converted, workspaceCwd, keepCwd) {
+  return keepCwd ? converted : withWorkspaceCwd(converted, workspaceCwd);
+}
+async function importOne(persistence, row, limits, workspaceCwd, keepCwd) {
+  if (keepCwd) return importDiscovered(persistence, row, limits);
+  const converted = relocate(await convertFile(row.path, row.source, limits), workspaceCwd, false);
+  return persistConverted(persistence, converted);
+}
+function looksLikePath(value) {
+  return value.startsWith("/") || value.startsWith("~") || /^[A-Za-z]:[\\/]/u.test(value);
+}
+function expandHome(value) {
+  if (value === "~") return homedir3();
+  if (value.startsWith("~/")) return join3(homedir3(), value.slice(2));
+  return value;
+}
+function requirePersistence(ctx) {
+  return ctx.get("sessionPersistence");
+}
+export {
+  SESSION_IMPORT_SETTINGS_NAMESPACE,
+  apply,
+  name
+};

@@ -40,7 +40,10 @@ export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(NS)
   const call = sessionImportCaller(ctx)
   const injected = (): SessionImportSectionInjected => ({
-    listSessions: source => call('listSessions', source === undefined ? {} : { source }),
+    listSessions: (source, query) => call('listSessions', {
+      ...(source === undefined ? {} : { source }),
+      ...(query === undefined || query.length === 0 ? {} : { query }),
+    }),
     importSessions: paths => call('importSessions', { paths }),
     listSkills: () => call('listSkills'),
     importSkills: paths => call('importSkills', { paths }),

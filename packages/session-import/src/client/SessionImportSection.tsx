@@ -24,7 +24,7 @@ export interface SessionImportSkill {
 }
 
 export interface SessionImportSectionInjected {
-  listSessions: (source?: SessionImportRow['source']) => Promise<{ entries: readonly SessionImportRow[] }>
+  listSessions: (source?: SessionImportRow['source'], query?: string) => Promise<{ entries: readonly SessionImportRow[]; total?: number }>
   importSessions: (paths: readonly string[]) => Promise<{ imported: number; skipped: number; failed: readonly { path: string; message: string }[] }>
   listSkills: () => Promise<{ entries: readonly SessionImportSkill[] }>
   importSkills: (paths: readonly string[]) => Promise<{ copied: number; overwritten: number; failed: readonly { path: string; message: string }[] }>
@@ -41,23 +41,26 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
   const [source, setSource] = useState<'all' | SessionImportRow['source']>('all')
   const [query, setQuery] = useState('')
   const [rows, setRows] = useState<readonly SessionImportRow[]>([])
+  const [total, setTotal] = useState(0)
   const [skills, setSkills] = useState<readonly SessionImportSkill[]>([])
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
-  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('loading')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [failure, setFailure] = useState('')
 
-  const load = async (): Promise<void> => {
+  const load = async (nextQuery = query): Promise<void> => {
     setStatus('loading')
     setFailure('')
     try {
       if (tab === 'sessions') {
-        const snapshot = await listSessions(source === 'all' ? undefined : source)
+        const snapshot = await listSessions(source === 'all' ? undefined : source, nextQuery.trim() || undefined)
         setRows(snapshot.entries)
+        setTotal(snapshot.total ?? snapshot.entries.length)
       } else {
         const snapshot = await listSkills()
         setSkills(snapshot.entries)
+        setTotal(snapshot.entries.length)
       }
       setStatus('idle')
     } catch {
@@ -145,7 +148,13 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
             <option value="cursor">{t('sourceCursor')}</option>
           </select>
         </label>
-        <input className={css.search} value={query} onChange={event => { setQuery(event.target.value) }} placeholder={t('search')} />
+        <input
+          className={css.search}
+          value={query}
+          onChange={event => { setQuery(event.target.value) }}
+          onKeyDown={event => { if (event.key === 'Enter') void load() }}
+          placeholder={t('search')}
+        />
         <button type="button" className={css.button} disabled={status === 'loading'} onClick={() => { void load() }}>
           {status === 'loading' ? t('refreshing') : t('refresh')}
         </button>
@@ -158,7 +167,9 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
       </div>
       {message.length > 0 ? <p className={css.status}>{message}</p> : null}
       {failure.length > 0 ? <p className={css.failure} role="alert">{failure}</p> : null}
-      {status === 'error' ? (
+      {status === 'loading' ? (
+        <p className={css.empty}>{t('refreshing')}</p>
+      ) : status === 'error' ? (
         <p className={css.failure} role="alert">{t('error')}</p>
       ) : tab === 'sessions' ? (
         visibleRows.length === 0 ? <p className={css.empty}>{t('empty')}</p> : (
@@ -193,6 +204,9 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
           </div>
         )
       )}
+      {status === 'idle' && tab === 'sessions' && total > visibleRows.length ? (
+        <p className={css.hint}>{t('truncated').replace('{shown}', String(visibleRows.length)).replace('{total}', String(total))}</p>
+      ) : null}
       <p className={css.hint}>{t('commandHint')}</p>
     </div>
   )

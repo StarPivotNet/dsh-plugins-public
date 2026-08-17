@@ -112,9 +112,9 @@ function convertConversation(conversation, path, limits = DEFAULT_CONVERT_LIMITS
   };
   const closeStep = (time) => {
     if (openStep === null || turn === 0) return;
-    for (const [callId, open] of [...pending]) {
-      if (open.turn !== turn || open.step !== openStep) continue;
-      push("tool/result", toolResultEvent(open.turn, open.step, callId, "(imported call had no recorded result)", true, limits), time, true);
+    for (const [callId, open2] of [...pending]) {
+      if (open2.turn !== turn || open2.step !== openStep) continue;
+      push("tool/result", toolResultEvent(open2.turn, open2.step, callId, "(imported call had no recorded result)", true, limits), time, true);
       pending.delete(callId);
     }
     push("step/end", { turn, step: openStep }, time);
@@ -201,14 +201,14 @@ function convertConversation(conversation, path, limits = DEFAULT_CONVERT_LIMITS
       if (pending.size === 0) closeStep(item.time);
       continue;
     }
-    const open = pending.get(item.callId);
-    if (open === void 0) {
+    const open2 = pending.get(item.callId);
+    if (open2 === void 0) {
       skipped += 1;
       continue;
     }
     pending.delete(item.callId);
-    push("tool/result", toolResultEvent(open.turn, open.step, item.callId, item.text, item.isError, limits), item.time, true);
-    const remaining = [...pending.values()].some((entry) => entry.turn === open.turn && entry.step === open.step);
+    push("tool/result", toolResultEvent(open2.turn, open2.step, item.callId, item.text, item.isError, limits), item.time, true);
+    const remaining = [...pending.values()].some((entry) => entry.turn === open2.turn && entry.step === open2.step);
     if (!remaining) closeStep(item.time);
   }
   const lastTime = conversation.items.at(-1)?.time ?? conversation.updatedAt;
@@ -842,7 +842,12 @@ function parseSource(value) {
 // src/host/scan.ts
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import { readdir, stat } from "node:fs/promises";
+import { open, readdir, stat } from "node:fs/promises";
+var DEFAULT_LIST_LIMIT = 300;
+var PREVIEW_BYTES = 64e3;
+var STAT_CONCURRENCY = 32;
+var PREVIEW_CONCURRENCY = 16;
+var DISCOVER_CACHE_MS = 3e4;
 function defaultScanRoots(home = homedir()) {
   return {
     claude: [
@@ -869,6 +874,40 @@ async function discoverSessions(roots, signal) {
   found.sort((left, right) => right.updatedAt - left.updatedAt || left.path.localeCompare(right.path));
   return found;
 }
+function filterDiscovered(rows, maxFileBytes, query) {
+  const needle = query?.trim().toLowerCase() ?? "";
+  return rows.filter((row) => {
+    if (row.bytes > maxFileBytes) return false;
+    if (needle.length === 0) return true;
+    return row.title.toLowerCase().includes(needle) || row.path.toLowerCase().includes(needle) || row.nativeId.toLowerCase().includes(needle);
+  });
+}
+async function presentSessions(rows, options) {
+  const filtered = filterDiscovered(rows, options.maxFileBytes, options.query).slice().sort((left, right) => right.updatedAt - left.updatedAt || left.path.localeCompare(right.path));
+  const limit = options.limit ?? DEFAULT_LIST_LIMIT;
+  const slice = filtered.slice(0, Math.max(0, limit));
+  const read = options.readPreview ?? readPreview;
+  const entries = new Array(slice.length);
+  await mapLimit(slice, PREVIEW_CONCURRENCY, async (row, index) => {
+    options.signal?.throwIfAborted();
+    try {
+      entries[index] = enrichFromPreview(row, await read(row.path));
+    } catch {
+      entries[index] = row;
+    }
+  });
+  return { entries, total: filtered.length };
+}
+async function readPreview(path, maxBytes = PREVIEW_BYTES) {
+  const handle = await open(path, "r");
+  try {
+    const buffer = Buffer.alloc(Math.max(1, maxBytes));
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+    return buffer.toString("utf8", 0, bytesRead);
+  } finally {
+    await handle.close();
+  }
+}
 async function walk(roots, source, found, signal) {
   for (const root of roots) {
     signal?.throwIfAborted();
@@ -884,29 +923,46 @@ async function visit(path, source, found, depth, signal) {
   } catch {
     return;
   }
+  const files = [];
+  const directories = [];
   for (const entry of entries) {
     const full = join(path, entry.name);
-    if (entry.isDirectory()) {
-      await visit(full, source, found, depth + 1, signal);
-      continue;
-    }
-    if (!entry.isFile() || !isSessionFile(source, entry.name)) continue;
+    if (entry.isDirectory()) directories.push(full);
+    else if (entry.isFile() && isSessionFile(source, entry.name)) files.push(full);
+  }
+  await mapLimit(files, STAT_CONCURRENCY, async (full) => {
+    signal?.throwIfAborted();
     let info;
     try {
       info = await stat(full);
     } catch {
-      continue;
+      return;
     }
     found.push({
       source,
-      nativeId: nativeIdFromName(source, entry.name),
+      nativeId: nativeIdFromName(source, basename(full)),
       path: full,
-      title: fallbackTitle(nativeIdFromName(source, entry.name)),
+      title: fallbackTitle(nativeIdFromName(source, basename(full))),
       createdAt: info.birthtimeMs || info.mtimeMs,
       updatedAt: info.mtimeMs,
       bytes: info.size
     });
+  });
+  for (const directory of directories) {
+    await visit(directory, source, found, depth + 1, signal);
   }
+}
+async function mapLimit(items, limit, fn) {
+  if (items.length === 0) return;
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      await fn(items[index], index);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
 }
 function isSessionFile(source, name2) {
   const lower = name2.toLowerCase();
@@ -920,7 +976,7 @@ function nativeIdFromName(source, name2) {
   return bare;
 }
 function enrichFromPreview(row, text) {
-  const head = text.slice(0, 64e3);
+  const head = text.slice(0, PREVIEW_BYTES);
   let title = row.title;
   let cwd = row.cwd;
   let nativeId = row.nativeId;
@@ -1000,7 +1056,7 @@ async function copySkill(skill, targetRoot) {
   return { path: target, overwritten };
 }
 async function visitSkillRoot(root, source, found) {
-  const { readdir: readdir2, readFile: readFile4, stat: stat2 } = await import("node:fs/promises");
+  const { readdir: readdir2, readFile: readFile3, stat: stat2 } = await import("node:fs/promises");
   let entries;
   try {
     entries = await readdir2(root, { withFileTypes: true });
@@ -1014,7 +1070,7 @@ async function visitSkillRoot(root, source, found) {
       try {
         const info = await stat2(skillFile);
         if (!info.isFile()) continue;
-        const parsed = parseSkillFile(await readFile4(skillFile, "utf8"), source, skillFile);
+        const parsed = parseSkillFile(await readFile3(skillFile, "utf8"), source, skillFile);
         if (parsed !== void 0) found.push(parsed);
       } catch {
         continue;
@@ -1024,7 +1080,7 @@ async function visitSkillRoot(root, source, found) {
     if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) continue;
     if (entry.name.toLowerCase() === "readme.md") continue;
     try {
-      const parsed = parseSkillFile(await readFile4(full, "utf8"), source, full);
+      const parsed = parseSkillFile(await readFile3(full, "utf8"), source, full);
       if (parsed !== void 0) found.push(parsed);
     } catch {
       continue;
@@ -1083,7 +1139,6 @@ function firstHeading(body) {
 }
 
 // src/host/index.ts
-import { readFile as readFile3 } from "node:fs/promises";
 var name = "session-import";
 var SESSION_IMPORT_SETTINGS_NAMESPACE = "session-import";
 var SETTINGS_NS = settingsNamespace(SESSION_IMPORT_SETTINGS_NAMESPACE);
@@ -1156,12 +1211,15 @@ async function handleImportCommand(ctx, rawInput, runtime) {
     };
   }
   if (command.kind === "list") {
-    const rows2 = await listedSessions(command.source, runtime.maxFileBytes, runtime.signal);
-    if (rows2.length === 0) return { kind: "success", text: "No foreign sessions found." };
-    const lines = rows2.slice(0, 40).map((row) => `${row.source}	${row.title}	${row.nativeId}	${row.path}`);
-    const extra = rows2.length > 40 ? `
-\u2026 ${String(rows2.length - 40)} more` : "";
-    return { kind: "success", text: `Found ${String(rows2.length)} session(s).
+    const listed = await listedSessions(command.source, runtime.maxFileBytes, {
+      signal: runtime.signal,
+      limit: 40
+    });
+    if (listed.total === 0) return { kind: "success", text: "No foreign sessions found." };
+    const lines = listed.entries.map((row) => `${row.source}	${row.title}	${row.nativeId}	${row.path}`);
+    const extra = listed.total > listed.entries.length ? `
+\u2026 ${String(listed.total - listed.entries.length)} more` : "";
+    return { kind: "success", text: `Found ${String(listed.total)} session(s).
 ${lines.join("\n")}${extra}` };
   }
   if (command.kind === "skills") {
@@ -1199,8 +1257,7 @@ ${lines.join("\n")}${extra}` };
       return { kind: "error", text: error instanceof Error ? error.message : String(error) };
     }
   }
-  const rows = await listedSessions(command.source, runtime.maxFileBytes, runtime.signal);
-  const selected = query === void 0 ? rows : rows.filter((row) => row.nativeId.includes(query) || row.path.includes(query) || row.title.includes(query));
+  const selected = await matchingSessions(command.source, runtime.maxFileBytes, query, runtime.signal);
   if (selected.length === 0) return { kind: "error", text: "No matching foreign sessions." };
   let imported = 0;
   let skipped = 0;
@@ -1223,34 +1280,54 @@ ${failures.slice(0, 8).join("\n")}`;
     text: `Imported ${String(imported)}, already present ${String(skipped)}, failed ${String(failures.length)}.${failed}`
   };
 }
-async function listedSessions(source, maxFileBytes, signal) {
+var discoverCache = /* @__PURE__ */ new Map();
+function rootsFor(source) {
   const roots = defaultScanRoots();
-  const discovered = await discoverSessions(source === void 0 ? roots : {
+  if (source === void 0) return roots;
+  return {
     claude: source === "claude" ? roots.claude : [],
     codex: source === "codex" ? roots.codex : [],
     cursor: source === "cursor" ? roots.cursor : []
-  }, signal);
-  const enriched = [];
-  for (const row of discovered) {
-    if (row.bytes > maxFileBytes) continue;
-    try {
-      const preview = await readFile3(row.path, "utf8");
-      enriched.push(enrichFromPreview(row, preview));
-    } catch {
-      enriched.push(row);
-    }
+  };
+}
+async function discoveredSessions(source, signal) {
+  const roots = rootsFor(source);
+  const key = [...roots.claude, ...roots.codex, ...roots.cursor].join("|");
+  const now = Date.now();
+  const cached = discoverCache.get(key);
+  if (cached !== void 0 && cached.expiresAt > now) return cached.rows;
+  const rows = discoverSessions(roots, signal);
+  discoverCache.set(key, { expiresAt: now + DISCOVER_CACHE_MS, rows });
+  try {
+    return await rows;
+  } catch (error) {
+    discoverCache.delete(key);
+    throw error;
   }
-  return enriched;
+}
+async function listedSessions(source, maxFileBytes, options = {}) {
+  return presentSessions(await discoveredSessions(source, options.signal), {
+    maxFileBytes,
+    query: options.query,
+    limit: options.limit,
+    signal: options.signal
+  });
+}
+async function matchingSessions(source, maxFileBytes, query, signal) {
+  return filterDiscovered(await discoveredSessions(source, signal), maxFileBytes, query);
 }
 async function listSessions(request, maxFileBytes) {
-  return { entries: await listedSessions(request.source, maxFileBytes) };
+  return listedSessions(request.source, maxFileBytes, {
+    query: request.query,
+    limit: request.limit ?? DEFAULT_LIST_LIMIT
+  });
 }
 async function importSessions(ctx, request, limits, maxFileBytes) {
   const persistence = requirePersistence(ctx);
   if (persistence === void 0) {
     throw new Error("session persistence is not configured");
   }
-  const rows = await listedSessions(request.source, maxFileBytes);
+  const rows = await matchingSessions(request.source, maxFileBytes);
   const selected = request.paths === void 0 || request.paths.length === 0 ? rows : rows.filter((row) => request.paths.includes(row.path));
   let imported = 0;
   let skipped = 0;

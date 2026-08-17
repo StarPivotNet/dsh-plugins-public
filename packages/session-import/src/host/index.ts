@@ -12,9 +12,15 @@ import { DEFAULT_CONVERT_LIMITS } from '../convert/types.ts'
 import type { DiscoveredSession, ImportSource } from '../convert/types.ts'
 import { convertFile, importDiscovered, persistConverted, withWorkspaceCwd } from './import.ts'
 import { parseImportArgs } from './parse-args.ts'
-import { defaultScanRoots, discoverSessions, enrichFromPreview } from './scan.ts'
+import {
+  DEFAULT_LIST_LIMIT,
+  DISCOVER_CACHE_MS,
+  defaultScanRoots,
+  discoverSessions,
+  filterDiscovered,
+  presentSessions,
+} from './scan.ts'
 import { copySkill, defaultSkillRoots, discoverSkills } from './skills.ts'
-import { readFile } from 'node:fs/promises'
 
 export const name = 'session-import'
 
@@ -66,7 +72,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       try {
         switch (endpoint) {
           case 'listSessions':
-            return { ok: true, value: await listSessions(payload as { source?: ImportSource }, maxFileBytes) }
+            return { ok: true, value: await listSessions(payload as { source?: ImportSource; query?: string; limit?: number }, maxFileBytes) }
           case 'importSessions':
             return { ok: true, value: await importSessions(connectionCtx, payload as { paths?: string[]; source?: ImportSource; keepCwd?: boolean }, limits, maxFileBytes) }
           case 'listSkills':
@@ -115,13 +121,18 @@ async function handleImportCommand(
     }
   }
   if (command.kind === 'list') {
-    const rows = await listedSessions(command.source, runtime.maxFileBytes, runtime.signal)
-    if (rows.length === 0) return { kind: 'success', text: 'No foreign sessions found.' }
-    const lines = rows.slice(0, 40).map(row => (
+    const listed = await listedSessions(command.source, runtime.maxFileBytes, {
+      signal: runtime.signal,
+      limit: 40,
+    })
+    if (listed.total === 0) return { kind: 'success', text: 'No foreign sessions found.' }
+    const lines = listed.entries.map(row => (
       `${row.source}\t${row.title}\t${row.nativeId}\t${row.path}`
     ))
-    const extra = rows.length > 40 ? `\n… ${String(rows.length - 40)} more` : ''
-    return { kind: 'success', text: `Found ${String(rows.length)} session(s).\n${lines.join('\n')}${extra}` }
+    const extra = listed.total > listed.entries.length
+      ? `\n… ${String(listed.total - listed.entries.length)} more`
+      : ''
+    return { kind: 'success', text: `Found ${String(listed.total)} session(s).\n${lines.join('\n')}${extra}` }
   }
   if (command.kind === 'skills') {
     const skills = await discoverSkills(defaultSkillRoots(), runtime.signal)
@@ -160,10 +171,7 @@ async function handleImportCommand(
       return { kind: 'error', text: error instanceof Error ? error.message : String(error) }
     }
   }
-  const rows = await listedSessions(command.source, runtime.maxFileBytes, runtime.signal)
-  const selected = query === undefined
-    ? rows
-    : rows.filter(row => row.nativeId.includes(query) || row.path.includes(query) || row.title.includes(query))
+  const selected = await matchingSessions(command.source, runtime.maxFileBytes, query, runtime.signal)
   if (selected.length === 0) return { kind: 'error', text: 'No matching foreign sessions.' }
   let imported = 0
   let skipped = 0
@@ -185,35 +193,67 @@ async function handleImportCommand(
   }
 }
 
-async function listedSessions(
-  source: ImportSource | undefined,
-  maxFileBytes: number,
-  signal?: AbortSignal,
-): Promise<DiscoveredSession[]> {
+const discoverCache = new Map<string, { expiresAt: number; rows: Promise<DiscoveredSession[]> }>()
+
+function rootsFor(source: ImportSource | undefined) {
   const roots = defaultScanRoots()
-  const discovered = await discoverSessions(source === undefined ? roots : {
+  if (source === undefined) return roots
+  return {
     claude: source === 'claude' ? roots.claude : [],
     codex: source === 'codex' ? roots.codex : [],
     cursor: source === 'cursor' ? roots.cursor : [],
-  }, signal)
-  const enriched: DiscoveredSession[] = []
-  for (const row of discovered) {
-    if (row.bytes > maxFileBytes) continue
-    try {
-      const preview = await readFile(row.path, 'utf8')
-      enriched.push(enrichFromPreview(row, preview))
-    } catch {
-      enriched.push(row)
-    }
   }
-  return enriched
+}
+
+async function discoveredSessions(
+  source: ImportSource | undefined,
+  signal?: AbortSignal,
+): Promise<DiscoveredSession[]> {
+  const roots = rootsFor(source)
+  const key = [...roots.claude, ...roots.codex, ...roots.cursor].join('|')
+  const now = Date.now()
+  const cached = discoverCache.get(key)
+  if (cached !== undefined && cached.expiresAt > now) return cached.rows
+  const rows = discoverSessions(roots, signal)
+  discoverCache.set(key, { expiresAt: now + DISCOVER_CACHE_MS, rows })
+  try {
+    return await rows
+  } catch (error) {
+    discoverCache.delete(key)
+    throw error
+  }
+}
+
+async function listedSessions(
+  source: ImportSource | undefined,
+  maxFileBytes: number,
+  options: { signal?: AbortSignal; query?: string; limit?: number } = {},
+): Promise<{ entries: DiscoveredSession[]; total: number }> {
+  return presentSessions(await discoveredSessions(source, options.signal), {
+    maxFileBytes,
+    query: options.query,
+    limit: options.limit,
+    signal: options.signal,
+  })
+}
+
+async function matchingSessions(
+  source: ImportSource | undefined,
+  maxFileBytes: number,
+  query: string | undefined,
+  signal?: AbortSignal,
+): Promise<DiscoveredSession[]> {
+  return filterDiscovered(await discoveredSessions(source, signal), maxFileBytes, query)
 }
 
 async function listSessions(
-  request: { source?: ImportSource },
+  request: { source?: ImportSource; query?: string; limit?: number },
   maxFileBytes: number,
-): Promise<{ entries: DiscoveredSession[] }> {
-  return { entries: await listedSessions(request.source, maxFileBytes) }
+): Promise<{ entries: DiscoveredSession[]; total: number }> {
+  return listedSessions(request.source, maxFileBytes, {
+    query: request.query,
+    limit: request.limit ?? DEFAULT_LIST_LIMIT,
+  })
 }
 
 async function importSessions(
@@ -226,7 +266,7 @@ async function importSessions(
   if (persistence === undefined) {
     throw new Error('session persistence is not configured')
   }
-  const rows = await listedSessions(request.source, maxFileBytes)
+  const rows = await matchingSessions(request.source, maxFileBytes)
   const selected = request.paths === undefined || request.paths.length === 0
     ? rows
     : rows.filter(row => request.paths!.includes(row.path))

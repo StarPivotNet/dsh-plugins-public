@@ -38,6 +38,8 @@ Slash commands:
 | Codex | `~/.codex/sessions/**/rollout-*.jsonl`, `~/.codex/archived_sessions` | `~/.codex/skills` |
 | Cursor | `~/.cursor/projects`, `~/.cursor/chats`, Cursor `workspaceStorage` composer / transcript JSON | `~/.cursor/skills`, `~/.cursor/commands` |
 
+The Settings page lists the newest 300 conversations and only reads the first 64 KiB of each file for title and cwd. `/import list` does the same walk and prints the newest 40. Filter by title or path to reach older conversations; `/import all` still imports every discovered file that fits `maxFileBytes`.
+
 A file path that is not under those homes can still be imported with `/import /absolute/path.jsonl` from the Host command, or from the Settings page when you pass that path through the RPC `importSessions` call.
 
 ## Conversion

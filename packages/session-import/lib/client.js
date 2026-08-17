@@ -41,7 +41,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var SessionImportSection_default = { "hint": "YmEt6W_hint", "section": "YmEt6W_section", "empty": "YmEt6W_empty", "tag": "YmEt6W_tag", "button": "YmEt6W_button", "list": "YmEt6W_list", "select": "YmEt6W_select", "title": "YmEt6W_title", "row": "YmEt6W_row", "status": "YmEt6W_status", "failure": "YmEt6W_failure", "heading": "YmEt6W_heading", "toolbar": "YmEt6W_toolbar", "search": "YmEt6W_search", "tabs": "YmEt6W_tabs", "tab": "YmEt6W_tab", "intro": "YmEt6W_intro", "meta": "YmEt6W_meta" };
+var SessionImportSection_default = { "search": "YmEt6W_search", "failure": "YmEt6W_failure", "status": "YmEt6W_status", "hint": "YmEt6W_hint", "tabs": "YmEt6W_tabs", "button": "YmEt6W_button", "list": "YmEt6W_list", "meta": "YmEt6W_meta", "section": "YmEt6W_section", "empty": "YmEt6W_empty", "heading": "YmEt6W_heading", "tab": "YmEt6W_tab", "intro": "YmEt6W_intro", "toolbar": "YmEt6W_toolbar", "row": "YmEt6W_row", "title": "YmEt6W_title", "tag": "YmEt6W_tag", "select": "YmEt6W_select" };
 
 // src/client/SessionImportSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -51,22 +51,25 @@ function SessionImportSection(props) {
   const [source, setSource] = (0, import_react.useState)("all");
   const [query, setQuery] = (0, import_react.useState)("");
   const [rows, setRows] = (0, import_react.useState)([]);
+  const [total, setTotal] = (0, import_react.useState)(0);
   const [skills, setSkills] = (0, import_react.useState)([]);
   const [selected, setSelected] = (0, import_react.useState)(/* @__PURE__ */ new Set());
-  const [status, setStatus] = (0, import_react.useState)("idle");
+  const [status, setStatus] = (0, import_react.useState)("loading");
   const [busy, setBusy] = (0, import_react.useState)(false);
   const [message, setMessage] = (0, import_react.useState)("");
   const [failure, setFailure] = (0, import_react.useState)("");
-  const load = async () => {
+  const load = async (nextQuery = query) => {
     setStatus("loading");
     setFailure("");
     try {
       if (tab === "sessions") {
-        const snapshot = await listSessions(source === "all" ? void 0 : source);
+        const snapshot = await listSessions(source === "all" ? void 0 : source, nextQuery.trim() || void 0);
         setRows(snapshot.entries);
+        setTotal(snapshot.total ?? snapshot.entries.length);
       } else {
         const snapshot = await listSkills();
         setSkills(snapshot.entries);
+        setTotal(snapshot.entries.length);
       }
       setStatus("idle");
     } catch {
@@ -142,9 +145,20 @@ function SessionImportSection(props) {
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "cursor", children: t("sourceCursor") })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: SessionImportSection_default.search, value: query, onChange: (event) => {
-        setQuery(event.target.value);
-      }, placeholder: t("search") }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        "input",
+        {
+          className: SessionImportSection_default.search,
+          value: query,
+          onChange: (event) => {
+            setQuery(event.target.value);
+          },
+          onKeyDown: (event) => {
+            if (event.key === "Enter") void load();
+          },
+          placeholder: t("search")
+        }
+      ),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: SessionImportSection_default.button, disabled: status === "loading", onClick: () => {
         void load();
       }, children: status === "loading" ? t("refreshing") : t("refresh") }),
@@ -157,7 +171,7 @@ function SessionImportSection(props) {
     ] }),
     message.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.status, children: message }) : null,
     failure.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.failure, role: "alert", children: failure }) : null,
-    status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.failure, role: "alert", children: t("error") }) : tab === "sessions" ? visibleRows.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.empty, children: t("empty") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.list, children: visibleRows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: SessionImportSection_default.row, children: [
+    status === "loading" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.empty, children: t("refreshing") }) : status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.failure, role: "alert", children: t("error") }) : tab === "sessions" ? visibleRows.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.empty, children: t("empty") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.list, children: visibleRows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: SessionImportSection_default.row, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "checkbox", checked: selected.has(row.path), onChange: () => {
         toggle(row.path);
       } }),
@@ -192,6 +206,7 @@ function SessionImportSection(props) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.meta, children: skill.path })
       ] })
     ] }, skill.path)) }),
+    status === "idle" && tab === "sessions" && total > visibleRows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.hint, children: t("truncated").replace("{shown}", String(visibleRows.length)).replace("{total}", String(total)) }) : null,
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.hint, children: t("commandHint") })
   ] });
 }
@@ -214,6 +229,7 @@ var zh = {
   importAll: "\u5168\u90E8\u5BFC\u5165",
   importing: "\u5BFC\u5165\u4E2D\u2026",
   empty: "\u6CA1\u6709\u53D1\u73B0\u53EF\u5BFC\u5165\u7684\u4F1A\u8BDD\u3002",
+  truncated: "\u5DF2\u663E\u793A\u6700\u8FD1 {shown} \u6761\uFF0C\u672C\u673A\u5171\u53D1\u73B0 {total} \u6761\u3002\u53EF\u7528\u6807\u9898\u6216\u8DEF\u5F84\u7EE7\u7EED\u7B5B\u9009\u3002",
   skillsEmpty: "\u6CA1\u6709\u53D1\u73B0\u53EF\u5BFC\u5165\u7684\u6280\u80FD\u3002",
   sourceFilter: "\u6765\u6E90",
   sourceAll: "\u5168\u90E8",
@@ -243,6 +259,7 @@ var en = {
   importAll: "Import all",
   importing: "Importing\u2026",
   empty: "No foreign sessions found.",
+  truncated: "Showing the newest {shown} of {total} conversations. Filter by title or path to narrow the list.",
   skillsEmpty: "No foreign skills found.",
   sourceFilter: "Source",
   sourceAll: "All",
@@ -279,7 +296,10 @@ function apply(ctx) {
   const t = ctx.locale.bind(NS);
   const call = sessionImportCaller(ctx);
   const injected = () => ({
-    listSessions: (source) => call("listSessions", source === void 0 ? {} : { source }),
+    listSessions: (source, query) => call("listSessions", {
+      ...source === void 0 ? {} : { source },
+      ...query === void 0 || query.length === 0 ? {} : { query }
+    }),
     importSessions: (paths) => call("importSessions", { paths }),
     listSkills: () => call("listSkills"),
     importSkills: (paths) => call("importSkills", { paths })

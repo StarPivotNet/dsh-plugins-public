@@ -63,3 +63,11 @@ test('converts a Claude Code tool loop', () => {
   const result = converted.events.find(event => event.type === 'tool/result')
   assert.match(JSON.stringify(result?.data), /Already up to date/)
 })
+
+test('recovers cwd from the Claude projects folder slug', () => {
+  const converted = convertClaudeSession(
+    JSON.stringify({ type: 'user', sessionId: 's2', timestamp: '2026-08-02T14:58:37.721Z', message: { role: 'user', content: 'hi' } }),
+    '/Users/me/.claude/projects/-Volumes-ExternalData-Projects-CodexInstall/s2.jsonl',
+  )
+  assert.equal(converted.header.cwd, '/Volumes/ExternalData/Projects/CodexInstall')
+})

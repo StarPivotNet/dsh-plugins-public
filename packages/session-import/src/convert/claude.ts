@@ -65,7 +65,7 @@ export function extractClaudeConversation(
     source: 'claude',
     nativeId,
     title,
-    cwd,
+    cwd: cwd ?? cwdFromClaudeProjectPath(path),
     createdAt: createdAt || updatedAt,
     updatedAt: updatedAt || createdAt,
     model,
@@ -178,4 +178,14 @@ function extractUser(
 function idFromPath(path: string): string {
   const base = path.split(/[\\/]/u).at(-1) ?? 'session'
   return base.replace(/\.jsonl$/u, '')
+}
+
+/** Recover the project cwd from Claude's `~/.claude/projects/<encoded>` folder. */
+export function cwdFromClaudeProjectPath(path: string): string | undefined {
+  const parts = path.replace(/\\/gu, '/').split('/')
+  const index = parts.lastIndexOf('projects')
+  const slug = index === -1 ? undefined : parts[index + 1]
+  if (slug === undefined || !slug.startsWith('-')) return undefined
+  const recovered = slug.replace(/-/gu, '/')
+  return recovered.length > 1 ? recovered : undefined
 }

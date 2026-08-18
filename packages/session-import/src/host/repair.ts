@@ -5,6 +5,7 @@ import { basename, dirname, join } from 'node:path'
 import { mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { constants, zstdCompress, zstdDecompress } from 'node:zlib'
 import { promisify } from 'node:util'
+import { cwdFromClaudeProjectPath } from '../convert/claude.ts'
 import { sessionName } from '../convert/events.ts'
 import { parseGrokSummary } from '../convert/grok.ts'
 import { asString, isInstructionDump, isRecord } from '../convert/text.ts'
@@ -181,7 +182,7 @@ async function collectClaudeOrigins(roots: readonly string[], found: Map<string,
       const preview = await readHead(path, 64_000)
       const record = firstJsonObject(preview)
       const nativeId = asString(record?.sessionId) ?? basename(path).replace(/\.jsonl$/u, '')
-      const cwd = asString(record?.cwd)
+      const cwd = asString(record?.cwd) ?? cwdFromClaudeProjectPath(path)
       if (cwd === undefined) continue
       found.set(importedSessionId('claude', nativeId), {
         id: importedSessionId('claude', nativeId),

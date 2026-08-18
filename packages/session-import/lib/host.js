@@ -322,7 +322,7 @@ function extractClaudeConversation(text, path, limits = DEFAULT_CONVERT_LIMITS) 
     source: "claude",
     nativeId,
     title,
-    cwd,
+    cwd: cwd ?? cwdFromClaudeProjectPath(path),
     createdAt: createdAt || updatedAt,
     updatedAt: updatedAt || createdAt,
     model,
@@ -421,6 +421,14 @@ function extractUser(record, time, limits) {
 function idFromPath(path) {
   const base = path.split(/[\\/]/u).at(-1) ?? "session";
   return base.replace(/\.jsonl$/u, "");
+}
+function cwdFromClaudeProjectPath(path) {
+  const parts = path.replace(/\\/gu, "/").split("/");
+  const index = parts.lastIndexOf("projects");
+  const slug = index === -1 ? void 0 : parts[index + 1];
+  if (slug === void 0 || !slug.startsWith("-")) return void 0;
+  const recovered = slug.replace(/-/gu, "/");
+  return recovered.length > 1 ? recovered : void 0;
 }
 
 // src/convert/codex.ts
@@ -1765,7 +1773,7 @@ async function collectClaudeOrigins(roots, found) {
       const preview = await readHead(path, 64e3);
       const record = firstJsonObject(preview);
       const nativeId = asString(record?.sessionId) ?? basename5(path).replace(/\.jsonl$/u, "");
-      const cwd = asString(record?.cwd);
+      const cwd = asString(record?.cwd) ?? cwdFromClaudeProjectPath(path);
       if (cwd === void 0) continue;
       found.set(importedSessionId("claude", nativeId), {
         id: importedSessionId("claude", nativeId),

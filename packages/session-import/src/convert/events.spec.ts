@@ -24,6 +24,10 @@ test('user then assistant becomes one balanced turn', () => {
   ])
   assert.equal(converted.header.id, 'import-claude-abc')
   assert.equal(converted.title, 'hi')
+  assert.equal(Number.isSafeInteger(converted.header.createdAt), true)
+  const title = converted.events.find(event => event.type === 'session/title')
+  assert.ok(title)
+  assert.deepEqual((title.data as { messageSeqs: number[] }).messageSeqs, [1])
 })
 
 test('tool calls stay inside one step until results arrive', () => {

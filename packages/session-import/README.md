@@ -20,7 +20,7 @@ After restart, Settings gains **导入 / Import**:
 - **会话** — scan the local Claude Code, Codex, and Cursor homes, then write selected conversations as cold DSH sessions
 - **技能** — copy Claude / Codex / Cursor `SKILL.md` bundles and Markdown commands into `~/.dsh/skills`
 
-Imported conversations keep user text, assistant text, reasoning, and tool-call / tool-result pairs. They are written under the current workspace cwd so they appear in this project's session list after a refresh. Open one to resume it with the current DSH agent. Pass `--keep-cwd` to keep the foreign working directory instead.
+Imported conversations keep user text, assistant text, reasoning, and tool-call / tool-result pairs. They are written under the current workspace cwd, stamped with the import time, and given a title event so they appear at the top of this project's session list. Open one to resume it with the current DSH agent. Pass `--keep-cwd` to keep the foreign working directory instead. Re-importing the same native id is counted as already present, not as a failure.
 
 Slash commands:
 

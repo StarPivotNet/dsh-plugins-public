@@ -160,8 +160,8 @@ async function visit(
       nativeId: nativeIdFromName(source, basename(full)),
       path: full,
       title: fallbackTitle(nativeIdFromName(source, basename(full))),
-      createdAt: info.birthtimeMs || info.mtimeMs,
-      updatedAt: info.mtimeMs,
+      createdAt: Math.round(info.birthtimeMs || info.mtimeMs),
+      updatedAt: Math.round(info.mtimeMs),
       bytes: info.size,
     })
   })

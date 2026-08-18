@@ -187,6 +187,7 @@ async function handleImportCommand(
     }
     if (outcome.alreadyImported) skipped += 1
     else imported += 1
+    await warmProjection(ctx, outcome.converted.header.id)
   }
   const failed = failures.length === 0 ? '' : `\nFailed:\n${failures.slice(0, 8).join('\n')}`
   return {
@@ -279,23 +280,27 @@ async function importSessions(
   let skipped = 0
   const failed: { path: string; message: string }[] = []
   for (const row of selected) {
-    const outcome = await importOne(persistence, row, limits, process.cwd(), request.keepCwd === true)
+    const outcome = await importOne(persistence, row, limits, workspaceCwdOf(ctx), request.keepCwd === true)
     if (!outcome.ok) {
       failed.push({ path: row.path, message: outcome.message })
       continue
     }
     if (outcome.alreadyImported) skipped += 1
     else imported += 1
+    await warmProjection(ctx, outcome.converted.header.id)
   }
   if (request.paths !== undefined) {
     for (const path of request.paths) {
       if (selected.some(row => row.path === path)) continue
       try {
-        const converted = relocate(await convertFile(path, request.source, limits), process.cwd(), request.keepCwd === true)
+        const converted = relocate(await convertFile(path, request.source, limits), workspaceCwdOf(ctx), request.keepCwd === true)
         const outcome = await persistConverted(persistence, converted)
         if (!outcome.ok) failed.push({ path, message: outcome.message })
-        else if (outcome.alreadyImported) skipped += 1
-        else imported += 1
+        else {
+          if (outcome.alreadyImported) skipped += 1
+          else imported += 1
+          await warmProjection(ctx, outcome.converted.header.id)
+        }
       } catch (error) {
         failed.push({ path, message: error instanceof Error ? error.message : String(error) })
       }
@@ -365,4 +370,22 @@ function requirePersistence(ctx: Context): {
     create(meta: unknown): Promise<void>
     append(id: string, events: unknown): Promise<void>
   } | undefined
+}
+
+function workspaceCwdOf(ctx: Context): string | undefined {
+  const live = ctx.get('sessions') as { list?: () => Iterable<{ header?: { cwd?: string } }> } | undefined
+  for (const session of live?.list?.() ?? []) {
+    if (typeof session.header?.cwd === 'string' && session.header.cwd.length > 0) return session.header.cwd
+  }
+  return process.cwd()
+}
+
+async function warmProjection(ctx: Context, id: string): Promise<void> {
+  const cache = ctx.get('sessionProjectionCache') as { coldSnapshot?: (sessionId: string) => Promise<unknown> } | undefined
+  if (cache?.coldSnapshot === undefined) return
+  try {
+    await cache.coldSnapshot(id)
+  } catch {
+    // Listing can still probe the log; a missing title row is recoverable.
+  }
 }

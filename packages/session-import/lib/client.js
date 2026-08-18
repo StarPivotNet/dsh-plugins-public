@@ -41,7 +41,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var SessionImportSection_default = { "row": "YmEt6W_row", "tag": "YmEt6W_tag", "heading": "YmEt6W_heading", "tab": "YmEt6W_tab", "failure": "YmEt6W_failure", "search": "YmEt6W_search", "section": "YmEt6W_section", "tabs": "YmEt6W_tabs", "list": "YmEt6W_list", "status": "YmEt6W_status", "title": "YmEt6W_title", "empty": "YmEt6W_empty", "meta": "YmEt6W_meta", "intro": "YmEt6W_intro", "button": "YmEt6W_button", "toolbar": "YmEt6W_toolbar", "hint": "YmEt6W_hint", "select": "YmEt6W_select" };
+var SessionImportSection_default = { "search": "YmEt6W_search", "hint": "YmEt6W_hint", "failure": "YmEt6W_failure", "tab": "YmEt6W_tab", "row": "YmEt6W_row", "select": "YmEt6W_select", "toolbar": "YmEt6W_toolbar", "section": "YmEt6W_section", "status": "YmEt6W_status", "meta": "YmEt6W_meta", "tabs": "YmEt6W_tabs", "tag": "YmEt6W_tag", "heading": "YmEt6W_heading", "list": "YmEt6W_list", "title": "YmEt6W_title", "empty": "YmEt6W_empty", "intro": "YmEt6W_intro", "button": "YmEt6W_button" };
 
 // src/client/SessionImportSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -117,11 +117,15 @@ function SessionImportSection(props) {
       if (tab === "sessions") {
         const result = await importSessions(paths);
         setMessage(`${t("imported")} ${String(result.imported)} / ${String(result.skipped)}`);
-        if (result.failed.length > 0) setFailure(`${t("failed")} ${String(result.failed.length)}`);
+        if (result.failed.length > 0) {
+          setFailure(`${t("failed")} ${String(result.failed.length)}\uFF1A${result.failed.slice(0, 3).map((item) => item.message).join("\uFF1B")}`);
+        }
       } else {
         const result = await importSkills(paths);
         setMessage(`${t("importedSkills")} ${String(result.copied)}`);
-        if (result.failed.length > 0) setFailure(`${t("failed")} ${String(result.failed.length)}`);
+        if (result.failed.length > 0) {
+          setFailure(`${t("failed")} ${String(result.failed.length)}\uFF1A${result.failed.slice(0, 3).map((item) => item.message).join("\uFF1B")}`);
+        }
       }
     } catch {
       setFailure(t("error"));
@@ -248,7 +252,7 @@ var zh = {
   sourceCodex: "Codex",
   sourceCursor: "Cursor",
   search: "\u6309\u6807\u9898\u6216\u8DEF\u5F84\u7B5B\u9009",
-  imported: "\u5BFC\u5165\u5B8C\u6210\u3002",
+  imported: "\u5BFC\u5165\u5B8C\u6210\uFF08\u65B0\u5BFC\u5165 / \u5DF2\u5B58\u5728\uFF09",
   importedSkills: "\u6280\u80FD\u5DF2\u590D\u5236\u5230 ~/.dsh/skills\u3002",
   failed: "\u90E8\u5206\u9879\u76EE\u5BFC\u5165\u5931\u8D25\u3002",
   error: "\u6682\u65F6\u65E0\u6CD5\u626B\u63CF\u672C\u673A\u4F1A\u8BDD\u3002",
@@ -278,7 +282,7 @@ var en = {
   sourceCodex: "Codex",
   sourceCursor: "Cursor",
   search: "Filter by title or path",
-  imported: "Import finished.",
+  imported: "Import finished (new / already present).",
   importedSkills: "Skills copied into ~/.dsh/skills.",
   failed: "Some items failed to import.",
   error: "Could not scan local sessions.",

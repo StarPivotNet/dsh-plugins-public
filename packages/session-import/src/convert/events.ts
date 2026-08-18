@@ -1,6 +1,6 @@
 /** Build a balanced DSH session seed from a foreign transcript. */
 
-import { flattenText, fallbackTitle, truncateChars } from './text.ts'
+import { epochMs, flattenText, fallbackTitle, truncateChars } from './text.ts'
 import type {
   ConvertedSession,
   ConvertLimits,
@@ -149,7 +149,7 @@ export function convertConversation(
     if (!remaining) closeStep(item.time)
   }
 
-  const lastTime = conversation.items.at(-1)?.time ?? conversation.updatedAt
+  const lastTime = epochMs(conversation.items.at(-1)?.time ?? conversation.updatedAt)
   closeTurn(lastTime)
 
   const firstUser = conversation.items.find((item): item is Extract<TranscriptItem, { kind: 'user' }> => (
@@ -160,18 +160,20 @@ export function convertConversation(
     && !item.text.trimStart().startsWith('# Files mentioned')
   ))
   const title = conversation.title?.trim() || (firstUser === undefined ? 'Imported session' : fallbackTitle(firstUser.text))
+  const firstUserEvent = events.find(event => event.type === 'user/message')
   if (title.length > 0) {
     push('session/title', {
       title,
-      messageSeqs: [],
-      source: { kind: 'user' },
-    }, conversation.updatedAt || lastTime)
+      messageSeqs: firstUserEvent === undefined ? [] : [firstUserEvent.seq],
+      source: firstUserEvent === undefined ? { kind: 'user' } : { kind: 'fallback' },
+    }, lastTime)
   }
 
+  const importedAt = Date.now()
   const header: ImportSessionHeader = {
     version: SESSION_FORMAT_VERSION,
     id,
-    createdAt: conversation.createdAt || lastTime || Date.now(),
+    createdAt: importedAt,
     ...isAbsolutePath(conversation.cwd) ? { cwd: conversation.cwd } : {},
     seedLength: events.length,
     delegationDepth: 0,

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { encodeArguments, fallbackTitle, flattenText, isInstructionDump, kebabName, parseTime, truncateChars } from './text.ts'
+import { encodeArguments, epochMs, fallbackTitle, flattenText, isInstructionDump, kebabName, parseTime, truncateChars } from './text.ts'
 
 test('truncateChars keeps a short string', () => {
   assert.equal(truncateChars('hello', 10), 'hello')
@@ -21,6 +21,11 @@ test('flattenText joins text blocks and skips tool_use', () => {
 test('parseTime accepts ISO and epoch milliseconds', () => {
   assert.equal(parseTime('2026-08-02T14:58:37.721Z'), Date.parse('2026-08-02T14:58:37.721Z'))
   assert.equal(parseTime(1_700_000_000_000), 1_700_000_000_000)
+})
+
+test('epochMs rejects fractional filesystem times', () => {
+  assert.equal(epochMs(1785912076190.5608), 1785912076191)
+  assert.equal(epochMs(Number.NaN, 10), 10)
 })
 
 test('encodeArguments keeps a JSON string', () => {

@@ -22,7 +22,13 @@ export function parseTime(value: unknown, fallback = 0): number {
     const parsed = Date.parse(value)
     if (Number.isFinite(parsed)) return parsed
   }
-  return fallback
+  return Math.round(fallback)
+}
+
+/** Persistable epoch milliseconds for a DSH session header or event. */
+export function epochMs(value: number, fallback = Date.now()): number {
+  const rounded = Math.round(value)
+  return Number.isSafeInteger(rounded) && rounded >= 0 ? rounded : Math.round(fallback)
 }
 
 /** Truncate text to a character budget without splitting a surrogate pair. */

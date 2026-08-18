@@ -122,11 +122,15 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
       if (tab === 'sessions') {
         const result = await importSessions(paths)
         setMessage(`${t('imported')} ${String(result.imported)} / ${String(result.skipped)}`)
-        if (result.failed.length > 0) setFailure(`${t('failed')} ${String(result.failed.length)}`)
+        if (result.failed.length > 0) {
+          setFailure(`${t('failed')} ${String(result.failed.length)}：${result.failed.slice(0, 3).map(item => item.message).join('；')}`)
+        }
       } else {
         const result = await importSkills(paths)
         setMessage(`${t('importedSkills')} ${String(result.copied)}`)
-        if (result.failed.length > 0) setFailure(`${t('failed')} ${String(result.failed.length)}`)
+        if (result.failed.length > 0) {
+          setFailure(`${t('failed')} ${String(result.failed.length)}：${result.failed.slice(0, 3).map(item => item.message).join('；')}`)
+        }
       }
     } catch {
       setFailure(t('error'))

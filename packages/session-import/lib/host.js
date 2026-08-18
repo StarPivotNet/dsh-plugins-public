@@ -32,7 +32,11 @@ function parseTime(value, fallback = 0) {
     const parsed = Date.parse(value);
     if (Number.isFinite(parsed)) return parsed;
   }
-  return fallback;
+  return Math.round(fallback);
+}
+function epochMs(value, fallback = Date.now()) {
+  const rounded = Math.round(value);
+  return Number.isSafeInteger(rounded) && rounded >= 0 ? rounded : Math.round(fallback);
 }
 function truncateChars(text, maxChars) {
   if (text.length <= maxChars) return text;
@@ -211,21 +215,23 @@ function convertConversation(conversation, path, limits = DEFAULT_CONVERT_LIMITS
     const remaining = [...pending.values()].some((entry) => entry.turn === open2.turn && entry.step === open2.step);
     if (!remaining) closeStep(item.time);
   }
-  const lastTime = conversation.items.at(-1)?.time ?? conversation.updatedAt;
+  const lastTime = epochMs(conversation.items.at(-1)?.time ?? conversation.updatedAt);
   closeTurn(lastTime);
   const firstUser = conversation.items.find((item) => item.kind === "user" && item.source === "user" && item.text.trim().length > 0 && !item.text.trimStart().startsWith("# AGENTS.md") && !item.text.trimStart().startsWith("# Files mentioned"));
   const title = conversation.title?.trim() || (firstUser === void 0 ? "Imported session" : fallbackTitle(firstUser.text));
+  const firstUserEvent = events.find((event) => event.type === "user/message");
   if (title.length > 0) {
     push("session/title", {
       title,
-      messageSeqs: [],
-      source: { kind: "user" }
-    }, conversation.updatedAt || lastTime);
+      messageSeqs: firstUserEvent === void 0 ? [] : [firstUserEvent.seq],
+      source: firstUserEvent === void 0 ? { kind: "user" } : { kind: "fallback" }
+    }, lastTime);
   }
+  const importedAt = Date.now();
   const header = {
     version: SESSION_FORMAT_VERSION,
     id,
-    createdAt: conversation.createdAt || lastTime || Date.now(),
+    createdAt: importedAt,
     ...isAbsolutePath(conversation.cwd) ? { cwd: conversation.cwd } : {},
     seedLength: events.length,
     delegationDepth: 0
@@ -943,8 +949,8 @@ async function visit(path, source, found, depth, signal) {
       nativeId: nativeIdFromName(source, basename(full)),
       path: full,
       title: fallbackTitle(nativeIdFromName(source, basename(full))),
-      createdAt: info.birthtimeMs || info.mtimeMs,
-      updatedAt: info.mtimeMs,
+      createdAt: Math.round(info.birthtimeMs || info.mtimeMs),
+      updatedAt: Math.round(info.mtimeMs),
       bytes: info.size
     });
   });
@@ -1273,6 +1279,7 @@ ${lines.join("\n")}${extra}` };
     }
     if (outcome.alreadyImported) skipped += 1;
     else imported += 1;
+    await warmProjection(ctx, outcome.converted.header.id);
   }
   const failed = failures.length === 0 ? "" : `
 Failed:
@@ -1336,23 +1343,27 @@ async function importSessions(ctx, request, limits, maxFileBytes) {
   let skipped = 0;
   const failed = [];
   for (const row of selected) {
-    const outcome = await importOne(persistence, row, limits, process.cwd(), request.keepCwd === true);
+    const outcome = await importOne(persistence, row, limits, workspaceCwdOf(ctx), request.keepCwd === true);
     if (!outcome.ok) {
       failed.push({ path: row.path, message: outcome.message });
       continue;
     }
     if (outcome.alreadyImported) skipped += 1;
     else imported += 1;
+    await warmProjection(ctx, outcome.converted.header.id);
   }
   if (request.paths !== void 0) {
     for (const path of request.paths) {
       if (selected.some((row) => row.path === path)) continue;
       try {
-        const converted = relocate(await convertFile(path, request.source, limits), process.cwd(), request.keepCwd === true);
+        const converted = relocate(await convertFile(path, request.source, limits), workspaceCwdOf(ctx), request.keepCwd === true);
         const outcome = await persistConverted(persistence, converted);
         if (!outcome.ok) failed.push({ path, message: outcome.message });
-        else if (outcome.alreadyImported) skipped += 1;
-        else imported += 1;
+        else {
+          if (outcome.alreadyImported) skipped += 1;
+          else imported += 1;
+          await warmProjection(ctx, outcome.converted.header.id);
+        }
       } catch (error) {
         failed.push({ path, message: error instanceof Error ? error.message : String(error) });
       }
@@ -1395,6 +1406,21 @@ function expandHome(value) {
 }
 function requirePersistence(ctx) {
   return ctx.get("sessionPersistence");
+}
+function workspaceCwdOf(ctx) {
+  const live = ctx.get("sessions");
+  for (const session of live?.list?.() ?? []) {
+    if (typeof session.header?.cwd === "string" && session.header.cwd.length > 0) return session.header.cwd;
+  }
+  return process.cwd();
+}
+async function warmProjection(ctx, id) {
+  const cache = ctx.get("sessionProjectionCache");
+  if (cache?.coldSnapshot === void 0) return;
+  try {
+    await cache.coldSnapshot(id);
+  } catch {
+  }
 }
 export {
   SESSION_IMPORT_SETTINGS_NAMESPACE,

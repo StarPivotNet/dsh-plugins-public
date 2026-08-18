@@ -454,7 +454,7 @@ function extractCodexConversation(text, path, limits = DEFAULT_CONVERT_LIMITS) {
       cwd = asString(payload.cwd) ?? cwd;
       model = asString(payload.model) ?? model;
       provider = asString(payload.model_provider) ?? provider;
-      title = asString(payload.thread_name) ?? asString(payload.agent_nickname) ?? title;
+      title = asString(payload.thread_name) ?? title;
       continue;
     }
     if (type === "turn_context") {
@@ -1026,9 +1026,9 @@ async function importDiscovered(persistence, row, limits = DEFAULT_CONVERT_LIMIT
 var SOURCES = /* @__PURE__ */ new Set(["claude", "codex", "cursor", "grok"]);
 function parseImportArgs(rawInput) {
   const rawTokens = rawInput.trim().split(/\s+/u).filter((token) => token.length > 0);
-  const keepCwd = rawTokens.some((token) => token === "--keep-cwd");
+  const keepCwd = !rawTokens.some((token) => token === "--here");
   const includeArchived = rawTokens.some((token) => token === "--archived");
-  const tokens = rawTokens.filter((token) => token !== "--keep-cwd" && token !== "--archived");
+  const tokens = rawTokens.filter((token) => token !== "--keep-cwd" && token !== "--archived" && token !== "--here");
   if (tokens.length === 0) return { kind: "help" };
   const first = tokens[0]?.toLowerCase();
   if (first === "help" || first === "--help") return { kind: "help" };
@@ -1708,7 +1708,8 @@ async function handleImportCommand(ctx, rawInput, runtime) {
         "/import memory \u2014 copy Claude/Codex instruction files into ~/.dsh/AGENTS.md",
         "/import automations \u2014 create DSH timers from ~/.codex/automations",
         "/import <path-or-id> \u2014 import one file or native id",
-        "Add --keep-cwd to keep the foreign working directory instead of this workspace.",
+        "Imports keep the foreign working directory and create a DSH workspace when it is missing.",
+        "Add --here to rewrite imported sessions into the current workspace instead.",
         "Add --archived to include ~/.codex/archived_sessions."
       ].join("\n")
     };
@@ -1854,7 +1855,7 @@ async function importSessions(ctx, request, limits, maxFileBytes) {
   let skipped = 0;
   const failed = [];
   for (const row of selected) {
-    const outcome = await importOne(persistence, row, limits, workspaceCwdOf(ctx), request.keepCwd === true);
+    const outcome = await importOne(persistence, row, limits, workspaceCwdOf(ctx), request.keepCwd !== false);
     if (!outcome.ok) {
       failed.push({ path: row.path, message: outcome.message });
       continue;
@@ -1867,7 +1868,7 @@ async function importSessions(ctx, request, limits, maxFileBytes) {
     for (const path of request.paths) {
       if (selected.some((row) => row.path === path)) continue;
       try {
-        const converted = relocate(await convertFile(path, request.source, limits), workspaceCwdOf(ctx), request.keepCwd === true);
+        const converted = relocate(await convertFile(path, request.source, limits), workspaceCwdOf(ctx), request.keepCwd !== false);
         const outcome = await persistConverted(persistence, converted);
         if (!outcome.ok) failed.push({ path, message: outcome.message });
         else {

@@ -53,7 +53,7 @@ export function extractCodexConversation(
       cwd = asString(payload.cwd) ?? cwd
       model = asString(payload.model) ?? model
       provider = asString(payload.model_provider) ?? provider
-      title = asString(payload.thread_name) ?? asString(payload.agent_nickname) ?? title
+      title = asString(payload.thread_name) ?? title
       continue
     }
     if (type === 'turn_context') {

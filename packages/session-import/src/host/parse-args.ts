@@ -16,9 +16,9 @@ const SOURCES = new Set<ImportSource>(['claude', 'codex', 'cursor', 'grok'])
 /** Parse the free-form text after `/import`. */
 export function parseImportArgs(rawInput: string): ImportCommand {
   const rawTokens = rawInput.trim().split(/\s+/u).filter(token => token.length > 0)
-  const keepCwd = rawTokens.some(token => token === '--keep-cwd')
+  const keepCwd = !rawTokens.some(token => token === '--here')
   const includeArchived = rawTokens.some(token => token === '--archived')
-  const tokens = rawTokens.filter(token => token !== '--keep-cwd' && token !== '--archived')
+  const tokens = rawTokens.filter(token => token !== '--keep-cwd' && token !== '--archived' && token !== '--here')
   if (tokens.length === 0) return { kind: 'help' }
   const first = tokens[0]?.toLowerCase()
   if (first === 'help' || first === '--help') return { kind: 'help' }

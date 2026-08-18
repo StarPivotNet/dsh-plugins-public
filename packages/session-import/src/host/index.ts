@@ -128,7 +128,8 @@ async function handleImportCommand(
         '/import memory — copy Claude/Codex instruction files into ~/.dsh/AGENTS.md',
         '/import automations — create DSH timers from ~/.codex/automations',
         '/import <path-or-id> — import one file or native id',
-        'Add --keep-cwd to keep the foreign working directory instead of this workspace.',
+        'Imports keep the foreign working directory and create a DSH workspace when it is missing.',
+        'Add --here to rewrite imported sessions into the current workspace instead.',
         'Add --archived to include ~/.codex/archived_sessions.',
       ].join('\n'),
     }
@@ -307,7 +308,7 @@ async function importSessions(
   let skipped = 0
   const failed: { path: string; message: string }[] = []
   for (const row of selected) {
-    const outcome = await importOne(persistence, row, limits, workspaceCwdOf(ctx), request.keepCwd === true)
+    const outcome = await importOne(persistence, row, limits, workspaceCwdOf(ctx), request.keepCwd !== false)
     if (!outcome.ok) {
       failed.push({ path: row.path, message: outcome.message })
       continue
@@ -320,7 +321,7 @@ async function importSessions(
     for (const path of request.paths) {
       if (selected.some(row => row.path === path)) continue
       try {
-        const converted = relocate(await convertFile(path, request.source, limits), workspaceCwdOf(ctx), request.keepCwd === true)
+        const converted = relocate(await convertFile(path, request.source, limits), workspaceCwdOf(ctx), request.keepCwd !== false)
         const outcome = await persistConverted(persistence, converted)
         if (!outcome.ok) failed.push({ path, message: outcome.message })
         else {

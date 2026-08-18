@@ -22,7 +22,7 @@ After restart, Settings gains **导入 / Import**:
 - **记忆** — copy `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, and Codex `MEMORY.md` into `~/.dsh/imported-memory`, and merge the instruction files into `~/.dsh/AGENTS.md`
 - **自动化** — map Codex `~/.codex/automations/*/automation.toml` RRULEs onto DSH timers. Daily/weekly local clocks and intervals of at least 5 minutes are created; faster heartbeats are listed as unsupported
 
-Imported conversations keep user text, assistant text, reasoning, and tool-call / tool-result pairs. They are stamped with the import time and a short sidebar title (Automation boilerplate is stripped). If the foreign cwd is not yet a DSH workspace, the importer creates that workspace and attaches the session there. Pass `--keep-cwd` to keep the foreign working directory instead of rewriting it to the current project. Re-importing the same native id is counted as already present, not as a failure.
+Imported conversations keep user text, assistant text, reasoning, and tool-call / tool-result pairs. They stay under the foreign working directory; if that directory is not a DSH workspace yet, one is created and the session is attached there. Pass `--here` to rewrite them into the current workspace instead. Titles come from the native thread name or the first human prompt, not from model nicknames. Re-importing the same native id is counted as already present, then re-attached to the correct workspace.
 
 Slash commands:
 

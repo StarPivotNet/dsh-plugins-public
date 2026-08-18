@@ -41,7 +41,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var SessionImportSection_default = { "title": "YmEt6W_title", "tab": "YmEt6W_tab", "section": "YmEt6W_section", "status": "YmEt6W_status", "empty": "YmEt6W_empty", "meta": "YmEt6W_meta", "heading": "YmEt6W_heading", "tag": "YmEt6W_tag", "intro": "YmEt6W_intro", "hint": "YmEt6W_hint", "button": "YmEt6W_button", "failure": "YmEt6W_failure", "row": "YmEt6W_row", "search": "YmEt6W_search", "select": "YmEt6W_select", "tabs": "YmEt6W_tabs", "list": "YmEt6W_list", "toolbar": "YmEt6W_toolbar" };
+var SessionImportSection_default = { "hint": "YmEt6W_hint", "heading": "YmEt6W_heading", "status": "YmEt6W_status", "meta": "YmEt6W_meta", "failure": "YmEt6W_failure", "section": "YmEt6W_section", "intro": "YmEt6W_intro", "title": "YmEt6W_title", "empty": "YmEt6W_empty", "tab": "YmEt6W_tab", "select": "YmEt6W_select", "search": "YmEt6W_search", "button": "YmEt6W_button", "row": "YmEt6W_row", "toolbar": "YmEt6W_toolbar", "tag": "YmEt6W_tag", "list": "YmEt6W_list", "tabs": "YmEt6W_tabs" };
 
 // src/client/SessionImportSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -315,7 +315,7 @@ function formatBytes(bytes) {
 var zh = {
   nav: "\u5BFC\u5165",
   title: "\u5BFC\u5165\u5176\u4ED6 AI \u4F1A\u8BDD",
-  intro: "\u626B\u63CF\u672C\u673A Cursor\u3001Codex \u548C Claude Code \u7684\u4F1A\u8BDD\u3001\u6280\u80FD\u3001\u9879\u76EE\u8BB0\u5FC6\u548C\u81EA\u52A8\u5316\u3002\u9ED8\u8BA4\u4E0D\u626B Codex \u5F52\u6863\u76EE\u5F55\u3002\u5BFC\u5165\u540E\u5237\u65B0\u4F1A\u8BDD\u5217\u8868\u6216\u81EA\u52A8\u5316\u9875\u5373\u53EF\u6253\u5F00\u3002",
+  intro: "\u626B\u63CF\u672C\u673A Cursor\u3001Codex\u3001Claude Code \u548C Grok Build \u7684\u4F1A\u8BDD\u3001\u6280\u80FD\u3001\u9879\u76EE\u8BB0\u5FC6\u548C\u81EA\u52A8\u5316\u3002\u5BFC\u5165\u9ED8\u8BA4\u7559\u5728\u539F\u6765\u7684\u9879\u76EE\u76EE\u5F55\uFF0C\u6CA1\u6709\u5BF9\u5E94\u5DE5\u4F5C\u533A\u5C31\u81EA\u52A8\u65B0\u5EFA\u3002",
   sessionsTab: "\u4F1A\u8BDD",
   skillsTab: "\u6280\u80FD",
   memoryTab: "\u8BB0\u5FC6",
@@ -352,7 +352,7 @@ var zh = {
 var en = {
   nav: "Import",
   title: "Import other AI sessions",
-  intro: "Scan local Cursor, Codex, and Claude Code conversations, skills, memory files, and automations. Codex archived_sessions is skipped unless you pass --archived.",
+  intro: "Scan local Cursor, Codex, Claude Code, and Grok Build conversations, skills, memory, and automations. Imports stay in the original project directory and create a workspace when it is missing.",
   sessionsTab: "Sessions",
   skillsTab: "Skills",
   memoryTab: "Memory",

@@ -3,7 +3,7 @@
 export const zh = {
   nav: '导入',
   title: '导入其他 AI 会话',
-  intro: '扫描本机 Cursor、Codex 和 Claude Code 的会话、技能、项目记忆和自动化。默认不扫 Codex 归档目录。导入后刷新会话列表或自动化页即可打开。',
+  intro: '扫描本机 Cursor、Codex、Claude Code 和 Grok Build 的会话、技能、项目记忆和自动化。导入默认留在原来的项目目录，没有对应工作区就自动新建。',
   sessionsTab: '会话',
   skillsTab: '技能',
   memoryTab: '记忆',
@@ -41,7 +41,7 @@ export const zh = {
 export const en = {
   nav: 'Import',
   title: 'Import other AI sessions',
-  intro: 'Scan local Cursor, Codex, and Claude Code conversations, skills, memory files, and automations. Codex archived_sessions is skipped unless you pass --archived.',
+  intro: 'Scan local Cursor, Codex, Claude Code, and Grok Build conversations, skills, memory, and automations. Imports stay in the original project directory and create a workspace when it is missing.',
   sessionsTab: 'Sessions',
   skillsTab: 'Skills',
   memoryTab: 'Memory',

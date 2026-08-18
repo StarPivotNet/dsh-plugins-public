@@ -92,8 +92,10 @@ export function EditorHost(props: {
   expanded: string[]
   onToggleDir: (path: string) => void
   onReferenceFile: (path: string) => void
+  /** Additional workspace folders shown as sibling explorer roots. */
+  folders?: readonly string[]
 }) {
-  const { ctx, store, scope, tab, expanded, onToggleDir, onReferenceFile } = props
+  const { ctx, store, scope, tab, expanded, onToggleDir, onReferenceFile, folders = [] } = props
   const path = tab.path ?? ''
   const title = tab.title
   const [load, setLoad] = useState<EditorLoad>({ status: 'loading' })
@@ -271,6 +273,7 @@ export function EditorHost(props: {
           full
           sessionId={scope.sessionId}
           cwd={scope.cwd}
+          folders={folders}
           expanded={expanded}
           onToggle={onToggleDir}
           onOpenFile={openFile}
@@ -365,6 +368,7 @@ export function EditorHost(props: {
             <TreePanel
               sessionId={scope.sessionId}
               cwd={scope.cwd}
+              folders={folders}
               expanded={expanded}
               onToggle={onToggleDir}
               onOpenFile={openFile}

@@ -29,7 +29,7 @@ import { createElement, useCallback, useEffect, useMemo, useRef, useState, type 
 import { useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import { IconCloseFill14, IconRefreshOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { Context, SidebarSessionList } from '../context-types.ts'
+import type { Context, SidebarSessionList, SidebarWorkspaceListState } from '../context-types.ts'
 import { appendToDraft } from './conversation-draft.ts'
 import {
   BOTTOM_MIN, PANEL_MIN, agentUuidOf, firstLeaf, isAgentTabId, leafWithTab, migrateBottomTabs, moveTab, moveTabToEdge, openDiffTab,
@@ -42,7 +42,7 @@ import { Workbench, type WorkbenchActions } from './split-pane.tsx'
 import { useNarrowViewport } from './breakpoints.ts'
 import type { NewTabOption } from './TabBar.tsx'
 import type { TabDragPayload } from './TabBar.tsx'
-import { relativeTo } from './paths.ts'
+import { relativeToWorkspace } from './paths.ts'
 import { OrphanedTab } from './OrphanedTab.tsx'
 import { RenderBoundary } from './RenderBoundary.tsx'
 import { detectNewDirectSubagent } from './subagent-detect.ts'
@@ -55,11 +55,15 @@ import css from './sidebar.module.css'
  * (mirror of the terminal view's own cap; the loop restarts on session switch). */
 const FAILURE_LIMIT = 3
 
+/** Stable empty workspace list for runtimes that do not publish `list`. */
+const EMPTY_WORKSPACE_LIST: SidebarWorkspaceListState = { items: [] }
+
 /** Render the content of one tab (dispatched by type). */
 function TabContent(props: {
   tab: SidebarTab
   sessionId: string
   cwd: string | undefined
+  folders: readonly string[]
   expanded: string[]
   onToggleDir: (path: string) => void
   onReferenceFile: (path: string) => void
@@ -72,7 +76,7 @@ function TabContent(props: {
   /** Open a diff tab from the git panel (placement handled by the store). */
   onOpenDiff: (tab: SidebarTab) => void
 }) {
-  const { tab, sessionId, cwd, expanded, onToggleDir, onReferenceFile, ctx, store, visible, onSubagentJump, onOpenDiff } = props
+  const { tab, sessionId, cwd, folders, expanded, onToggleDir, onReferenceFile, ctx, store, visible, onSubagentJump, onOpenDiff } = props
   const scope = { sessionId, cwd }
   const descriptor = ctx.betterSidebar?.getTab(tab.type)
   if (descriptor === undefined) {
@@ -90,7 +94,7 @@ function TabContent(props: {
     RenderBoundary,
     { className: css.tabBoundaryError },
     createElement(descriptor.component, {
-      ctx, store, scope, tab, visible, expanded,
+      ctx, store, scope, tab, visible, expanded, folders,
       onToggleDir, onReferenceFile, onOpenDiff, onSubagentJump,
     }),
   )
@@ -231,16 +235,41 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   // the process cwd) so the explorer root and terminal cwd are real from
   // first paint instead of showing "no session".
   const [fetchedCwd, setFetchedCwd] = useState<string | undefined>(undefined)
+  const [fetchedFolders, setFetchedFolders] = useState<string[]>([])
   useEffect(() => {
     setFetchedCwd(undefined)
-    if (sessionId === undefined || summaryCwd !== undefined) return
+    setFetchedFolders([])
+    if (sessionId === undefined) return
     let cancelled = false
-    api.sessionCwd({ sessionId })
-      .then(result => { if (!cancelled) setFetchedCwd(result.cwd) })
+    api.sessionCwd({ sessionId, cwd: summaryCwd })
+      .then(result => {
+        if (cancelled) return
+        if (summaryCwd === undefined) setFetchedCwd(result.cwd)
+        setFetchedFolders(result.folders ?? [])
+      })
       .catch(() => { /* the explorer/git rows surface their own errors */ })
     return () => { cancelled = true }
   }, [sessionId, summaryCwd])
   const cwd = summaryCwd ?? fetchedCwd
+
+  const workspaceList = useSyncExternalStore(
+    useMemo(() => {
+      const list = ctx.workspaces?.list
+      if (list === undefined) return (_callback: () => void) => () => {}
+      return (callback: () => void) => list.subscribe(callback)
+    }, [ctx]),
+    useCallback((): SidebarWorkspaceListState => (
+      ctx.workspaces?.list?.getSnapshot() ?? EMPTY_WORKSPACE_LIST
+    ), [ctx]),
+  )
+  const folders = useMemo(() => {
+    if (sessionId === undefined) return [] as string[]
+    const owned = workspaceList.items.find(item => item.sessionIds.includes(sessionId))
+    if (owned !== undefined) return [...owned.folders]
+    if (cwd === undefined) return fetchedFolders
+    const byPath = workspaceList.items.find(item => item.path === cwd)
+    return byPath === undefined ? fetchedFolders : [...byPath.folders]
+  }, [workspaceList, sessionId, cwd, fetchedFolders])
 
   /**
    * Agent terminals push: subscribe to the host's live list of agent-owned
@@ -655,8 +684,8 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
    */
   const referenceInChat = useCallback((path: string): void => {
     if (sessionId === undefined) return
-    appendToDraft(ctx, sessionId, `@${relativeTo(cwd ?? '', path)}`)
-  }, [ctx, sessionId, cwd])
+    appendToDraft(ctx, sessionId, `@${relativeToWorkspace(cwd, folders, path)}`)
+  }, [ctx, sessionId, cwd, folders])
 
   if (state === undefined || sessionId === undefined) {
     if (overlayOpen) return null
@@ -733,6 +762,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       tab={tab}
       sessionId={sessionId}
       cwd={cwd}
+      folders={folders}
       expanded={state.expanded}
       onToggleDir={(path) => { store.reduce(s => toggleExpanded(s, path)) }}
       onReferenceFile={referenceInChat}

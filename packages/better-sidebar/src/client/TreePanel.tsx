@@ -14,12 +14,15 @@ import clsx from 'clsx'
 import { api } from './api.ts'
 import { FileTree } from './FileTree.tsx'
 import { t } from './locales.ts'
+import { isAbsolutePath } from './paths.ts'
 import { resolveSidebarPath } from './produced-files.ts'
 import css from './sidebar.module.css'
 
 export function TreePanel(props: {
   sessionId: string
   cwd: string | undefined
+  /** Additional workspace folders shown as sibling explorer roots. */
+  folders?: readonly string[]
   expanded: string[]
   onToggle: (path: string) => void
   onOpenFile: (path: string) => void
@@ -34,7 +37,7 @@ export function TreePanel(props: {
    *  at a fixed width. */
   full?: boolean
 }) {
-  const { sessionId, cwd, expanded, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, onReferenceFile, refreshTick = 0, full } = props
+  const { sessionId, cwd, folders = [], expanded, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, onReferenceFile, refreshTick = 0, full } = props
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<{ matches: string[]; truncated: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -78,6 +81,7 @@ export function TreePanel(props: {
         <FileTree
           sessionId={sessionId}
           cwd={cwd}
+          folders={folders}
           expanded={expanded}
           onToggle={onToggle}
           onOpenFile={onOpenFile}
@@ -99,7 +103,7 @@ export function TreePanel(props: {
               type="button"
               className={css.editorSearchResult}
               title={rel}
-              onClick={() => { onOpenFile(resolveSidebarPath(cwd, rel)) }}
+              onClick={() => { onOpenFile(isAbsolutePath(rel) ? rel : resolveSidebarPath(cwd, rel)) }}
             >
               {rel}
             </button>

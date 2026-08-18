@@ -1,11 +1,11 @@
 /**
  * The controlled file tree behind the files window's tree panel (TreePanel
  * wraps it with the search box): a lazy VSCode-style tree rooted at the
- * session's working directory. Levels load on expansion (one API call per
- * directory), directories sort first, hidden entries render dimmed. The
- * expansion set lives in the per-session state (owned by the caller); the
- * caller also owns the refresh affordance — a `refreshTick` bump wipes the
- * level cache so the visible set reloads.
+ * session's working directory plus any additional workspace folders. Levels
+ * load on expansion (one API call per directory), directories sort first,
+ * hidden entries render dimmed. The expansion set lives in the per-session
+ * state (owned by the caller); the caller also owns the refresh affordance
+ * — a `refreshTick` bump wipes the level cache so the visible set reloads.
  *
  * Row actions: hovering a row reveals an @-reference button on the far
  * right (appends `@<relative path>` to the composer draft), and right-click
@@ -22,7 +22,7 @@ import {
   IconLinkOutline16, Menu, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { api, downloadUrl, type FsEntry } from './api.ts'
-import { relativeTo } from './paths.ts'
+import { relativeToWorkspace, workspaceRoots } from './paths.ts'
 import { t } from './locales.ts'
 import css from './sidebar.module.css'
 
@@ -44,6 +44,8 @@ const COPIED_MS = 1200
 export function FileTree(props: {
   sessionId: string
   cwd: string | undefined
+  /** Additional workspace folders (cwd is always the first root). */
+  folders?: readonly string[]
   expanded: string[]
   onToggle: (path: string) => void
   onOpenFile: (path: string) => void
@@ -56,7 +58,9 @@ export function FileTree(props: {
   /** Bump to wipe the level cache and reload the visible set. */
   refreshTick: number
 }) {
-  const { sessionId, cwd, expanded, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, onReferenceFile, refreshTick } = props
+  const { sessionId, cwd, folders = [], expanded, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, onReferenceFile, refreshTick } = props
+  const roots = workspaceRoots(cwd, folders)
+  const rootsKey = roots.join('\0')
   const [data, setData] = useState<Record<string, LevelData>>({})
   const dataRef = useRef(data)
   /** The row whose path was just copied ("copied" label replaces its button). */
@@ -92,11 +96,10 @@ export function FileTree(props: {
   useEffect(() => {
     // Load the visible set; already-loaded levels (kept in the cache) are
     // not refetched. Only the refresh tick wipes the cache.
-    const root = cwd
-    if (root === undefined) return
-    loadDir(root)
+    if (roots.length === 0) return
+    for (const root of workspaceRoots(cwd, folders)) loadDir(root)
     for (const dir of expanded) loadDir(dir)
-  }, [cwd, expanded, refreshTick, loadDir])
+  }, [rootsKey, cwd, folders, expanded, refreshTick, loadDir])
 
   /** Copy `text`; on success flip the row's copied label for a moment. */
   const copyPath = useCallback((text: string, path: string): void => {
@@ -147,7 +150,35 @@ export function FileTree(props: {
     anchor.remove()
   }
 
-  const root = cwd
+  const renderRoot = (root: string): ReactNode => (
+    <div key={root}>
+      <div
+        className={css.explorerRow}
+        style={{ paddingLeft: 6 }}
+        onContextMenu={(event) => { openRowMenu(event, root, true) }}
+      >
+        <IconFolderOpen16 size={14} />
+        <span className={css.explorerName}>{baseName(root)}</span>
+        {copiedPath === root
+          ? <span className={css.explorerCopied}>{t('copied')}</span>
+          : (
+            <button
+              type="button"
+              className={css.explorerRef}
+              aria-label={t('referenceFile')}
+              title={t('referenceFile')}
+              onClick={(event) => {
+                event.stopPropagation()
+                onReferenceFile(root)
+              }}
+            >
+              {t('referenceFile')}
+            </button>
+          )}
+      </div>
+      {data[root] !== undefined && renderLevel(root, 1)}
+    </div>
+  )
 
   const renderLevel = (dir: string, depth: number): ReactNode => {
     const level = data[dir]
@@ -218,37 +249,9 @@ export function FileTree(props: {
 
   return (
     <div className={css.explorerBody}>
-      {root === undefined ? (
+      {roots.length === 0 ? (
         <div className={css.explorerEmpty}>{t('noSession')}</div>
-      ) : (
-        <>
-          <div
-            className={css.explorerRow}
-            style={{ paddingLeft: 6 }}
-            onContextMenu={(event) => { openRowMenu(event, root, true) }}
-          >
-            <IconFolderOpen16 size={14} />
-            <span className={css.explorerName}>{baseName(root)}</span>
-            {copiedPath === root
-              ? <span className={css.explorerCopied}>{t('copied')}</span>
-              : (
-                <button
-                  type="button"
-                  className={css.explorerRef}
-                  aria-label={t('referenceFile')}
-                  title={t('referenceFile')}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onReferenceFile(root)
-                  }}
-                >
-                  {t('referenceFile')}
-                </button>
-              )}
-          </div>
-          {data[root] !== undefined && renderLevel(root, 1)}
-        </>
-      )}
+      ) : roots.map(root => renderRoot(root))}
       {/*
         The one shared context menu, positioned at the right-click cursor
         (portal so the tree's overflow clip cannot crop it).
@@ -288,7 +291,7 @@ export function FileTree(props: {
             return
           }
           copyPath(
-            id === 'relative' ? relativeTo(cwd ?? '', target.path) : target.path,
+            id === 'relative' ? relativeToWorkspace(cwd, folders, target.path) : target.path,
             target.path,
           )
         }}

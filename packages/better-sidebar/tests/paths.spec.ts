@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isAbsolutePath, relativeTo } from '../src/client/paths.ts'
+import { containingRoot, isAbsolutePath, relativeTo, relativeToWorkspace, workspaceRoots } from '../src/client/paths.ts'
 import { resolveSidebarPath } from '../src/client/produced-files.ts'
 import { htmlUrl } from '../src/client/api.ts'
 
@@ -54,6 +54,22 @@ describe('path helpers', () => {
     expect(isAbsolutePath('//server/share/x.ts')).toBe(true)
     expect(isAbsolutePath('C:relative.ts')).toBe(false)
     expect(isAbsolutePath('rel/x.ts')).toBe(false)
+  })
+
+  it('workspaceRoots keeps cwd first and drops duplicate folders', () => {
+    expect(workspaceRoots(undefined, ['/extra'])).toEqual(['/extra'])
+    expect(workspaceRoots('/work/proj')).toEqual(['/work/proj'])
+    expect(workspaceRoots('/work/proj', ['/libs/shared', '/work/proj/', '/libs/shared/'])).toEqual([
+      '/work/proj',
+      '/libs/shared',
+    ])
+  })
+
+  it('relativeToWorkspace uses the closest folder that contains the path', () => {
+    expect(relativeToWorkspace('/work/proj', ['/libs/shared'], '/libs/shared/src/a.ts')).toBe('src/a.ts')
+    expect(relativeToWorkspace('/work/proj', ['/libs/shared'], '/work/proj/src/a.ts')).toBe('src/a.ts')
+    expect(relativeToWorkspace('/work/proj', ['/libs/shared'], '/elsewhere/a.ts')).toBe('/elsewhere/a.ts')
+    expect(containingRoot(['/work/proj', '/libs/shared'], '/libs/shared/src/a.ts')).toBe('/libs/shared')
   })
 
   it('htmlUrl always marks UNC paths (platform-neutral marker)', () => {

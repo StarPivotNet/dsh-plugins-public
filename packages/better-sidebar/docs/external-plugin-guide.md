@@ -245,6 +245,7 @@ interface TabComponentProps {
   onOpenFile?: (path: string) => void
   onOpenDiff?: (tab: SidebarTab) => void
   onSubagentJump?: (childSessionId: string) => void
+  folders?: readonly string[]  // additional workspace folders (cwd is always the first root)
 }
 ```
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolve } from 'node:path'
-import { compareEntries, isWithin, parentOf, requireAbsolute, rootLabel } from '../src/fs-tree.ts'
+import { compareEntries, isWithin, isWithinAny, parentOf, requireAbsolute, rootLabel, uniqueRoots } from '../src/fs-tree.ts'
 import { isWin32 } from './platform.ts'
 
 describe('fs-tree', () => {
@@ -94,5 +94,19 @@ describe('fs-tree', () => {
     expect(isWithin('\\\\server\\share\\proj', '\\\\server\\share\\proj\\src\\a.ts', 'win32')).toBe(true)
     expect(isWithin('\\\\server\\share\\proj', '\\\\server\\share\\proj2\\a.ts', 'win32')).toBe(false)
     expect(isWithin('\\\\server\\share\\proj', '\\\\other\\share\\a.ts', 'win32')).toBe(false)
+  })
+
+  it('isWithinAny accepts a path under any listed root', () => {
+    expect(isWithinAny(['/work/proj', '/libs/shared'], '/libs/shared/src/a.ts')).toBe(true)
+    expect(isWithinAny(['/work/proj', '/libs/shared'], '/elsewhere/a.ts')).toBe(false)
+    expect(isWithinAny([], '/work/proj/a.ts')).toBe(false)
+  })
+
+  it('uniqueRoots keeps cwd first and skips invalid extras', () => {
+    expect(uniqueRoots(resolve('/work/proj'), [resolve('/libs/shared'), resolve('/work/proj')])).toEqual([
+      resolve('/work/proj'),
+      resolve('/libs/shared'),
+    ])
+    expect(uniqueRoots(resolve('/work/proj'), ['relative/nope', ''])).toEqual([resolve('/work/proj')])
   })
 })

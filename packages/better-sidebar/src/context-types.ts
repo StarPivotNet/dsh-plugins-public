@@ -333,14 +333,32 @@ export interface SidebarConversation {
 }
 
 /**
- * The client workspaces service face (mirror of the runtime IWorkspaces). Only
- * the chat's file-open funnel is touched: `openPath` hands an absolute path
- * to the Host OS's default application, and every chat-side file open
- * (tool rows, produced-files, prose mentions) funnels through it.
+ * The client workspaces service face (mirror of the runtime IWorkspaces).
+ * `openPath` hands an absolute path to the Host OS's default application
+ * (every chat-side file open funnels through it). The optional `list`
+ * feed supplies additional workspace folders for the explorer.
  */
+export interface SidebarWorkspaceView {
+  path: string
+  folders: readonly string[]
+  sessionIds: readonly string[]
+}
+
+export interface SidebarWorkspaceListState {
+  items: readonly SidebarWorkspaceView[]
+}
+
 export interface SidebarWorkspacesService {
   /** Open a filesystem path with the Host operating system's default application. */
   openPath(path: string): Promise<void>
+  /**
+   * Workspace list feed (optional on older runtimes). The explorer reads
+   * additional folders from the workspace that accounts the current session.
+   */
+  list?: {
+    getSnapshot(): SidebarWorkspaceListState
+    subscribe(fn: () => void): () => void
+  }
 }
 
 /**

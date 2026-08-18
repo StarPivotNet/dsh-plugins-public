@@ -28,8 +28,8 @@ import {
   type SidebarConfig,
   type SidebarPrefs,
 } from './config.ts'
-import { isWithin, parentOf, requireAbsolute, listDirectory, rootLabel } from './fs-tree.ts'
-import { searchFiles } from './fs-search.ts'
+import { isWithinAny, parentOf, requireAbsolute, listDirectory, rootLabel, uniqueRoots } from './fs-tree.ts'
+import { searchFilesInRoots } from './fs-search.ts'
 import { decodeHtmlUrl } from './html-route.ts'
 import { extractFrameAncestors } from './browser-probe.ts'
 import { isTrustedApiRequest, isLoopbackHostname } from './trust-fence.ts'
@@ -113,6 +113,31 @@ function sessionCwdOf(ctx: Context, sessionId: string, clientCwd?: string): stri
     }
   }
   return process.cwd()
+}
+
+/**
+ * Additional folders of the workspace that accounts `sessionId`.
+ * Missing registry (older hosts) or an unaccounted session yield [].
+ */
+function workspaceFoldersOf(ctx: Context, sessionId: string, cwd: string): string[] {
+  const lookup = (ctx as Context & { get?: (name: string) => unknown }).get
+  const registry = typeof lookup === 'function'
+    ? lookup.call(ctx, 'workspaceRegistry') as {
+      list(): ReadonlyArray<{ path: string; folders: readonly string[]; sessionIds: readonly string[] }>
+    } | undefined
+    : undefined
+  if (registry === undefined || typeof registry.list !== 'function') return []
+  let workspaces: ReadonlyArray<{ path: string; folders: readonly string[]; sessionIds: readonly string[] }>
+  try {
+    workspaces = registry.list()
+  } catch {
+    // A registry that is still bootstrapping must not fail explorer/search.
+    return []
+  }
+  const owned = workspaces.find(workspace => workspace.sessionIds.includes(sessionId))
+  if (owned !== undefined) return [...owned.folders]
+  const byPath = workspaces.find(workspace => workspace.path === cwd)
+  return byPath === undefined ? [] : [...byPath.folders]
 }
 
 /**
@@ -206,7 +231,14 @@ function buildApi(
   return {
     'session.cwd': (payload) => {
       const { sessionId, cwd } = cwdOf(payload)
-      return { sessionId, cwd, root: rootLabel(cwd), parent: parentOf(cwd) ?? null }
+      const roots = uniqueRoots(cwd, workspaceFoldersOf(ctx, sessionId, cwd))
+      return {
+        sessionId,
+        cwd,
+        root: rootLabel(cwd),
+        parent: parentOf(cwd) ?? null,
+        folders: roots.slice(1),
+      }
     },
     'fs.tree': async (payload) => {
       const { cwd } = cwdOf(payload)
@@ -215,12 +247,12 @@ function buildApi(
       return listDirectory(target, resolved.listLimit)
     },
     'fs.search': async (payload) => {
-      // The editor side panel's global name search: rooted at the session
-      // cwd (not caller-targetable — the walk is unbounded by design and
-      // must never escape the workspace), budgeted inside searchFiles.
-      const { cwd } = cwdOf(payload)
+      // The editor side panel's global name search: rooted at every
+      // workspace folder (cwd plus additional folders). The walk is not
+      // caller-targetable — extra roots come from the host registry.
+      const { sessionId, cwd } = cwdOf(payload)
       const query = requireString(payload, 'query')
-      return searchFiles(cwd, query)
+      return searchFilesInRoots(uniqueRoots(cwd, workspaceFoldersOf(ctx, sessionId, cwd)), query)
     },
     'fs.read': async (payload) => {
       const { cwd } = cwdOf(payload)
@@ -598,12 +630,13 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         if (sessionId === null || raw === null) throw new SidebarError('bad-request', 'sessionId and path are required')
         const cwd = sessionCwdOf(ctx, sessionId, url.searchParams.get('cwd') ?? undefined)
         const path = requireAbsolute(raw)
-        if (!isWithin(cwd, path)) {
-          // Only files under the session cwd are served as media (the editor
-          // opens images from the explorer; produced files go through read).
-          // isWithin (not a raw startsWith) so case-mismatched Windows paths
-          // and mixed separators cannot be misclassified.
-          throw new SidebarError('fs-error', 'media path outside the session working directory', 403)
+        const roots = uniqueRoots(cwd, workspaceFoldersOf(ctx, sessionId, cwd))
+        if (!isWithinAny(roots, path)) {
+          // Only files under a workspace folder are served as media (the
+          // editor opens images from the explorer; produced files go through
+          // read). isWithinAny (not a raw startsWith) so case-mismatched
+          // Windows paths and mixed separators cannot be misclassified.
+          throw new SidebarError('fs-error', 'media path outside the workspace folders', 403)
         }
         const info = await stat(path)
         if (!info.isFile() || info.size > resolved.mediaLimit) {
@@ -663,8 +696,9 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         // semantics as the media route's fallback).
         const cwd = sessionCwdOf(ctx, sessionId)
         const absolute = requireAbsolute(path)
-        if (!isWithin(cwd, absolute)) {
-          throw new SidebarError('fs-error', 'html path outside the session working directory', 403)
+        const roots = uniqueRoots(cwd, workspaceFoldersOf(ctx, sessionId, cwd))
+        if (!isWithinAny(roots, absolute)) {
+          throw new SidebarError('fs-error', 'html path outside the workspace folders', 403)
         }
         const info = await stat(absolute)
         if (!info.isFile() || info.size > resolved.mediaLimit) {

@@ -152,6 +152,50 @@ export function isWithin(base: string, target: string, platform: NodeJS.Platform
   return t === b || t.startsWith(`${b}/`)
 }
 
+/**
+ * Whether `target` lies under any of `bases` (or equals one of them).
+ * Empty `bases` never contains a path.
+ */
+export function isWithinAny(
+  bases: readonly string[],
+  target: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  return bases.some(base => isWithin(base, target, platform))
+}
+
+/**
+ * Deduplicate workspace roots, cwd first. Invalid extra folders are skipped
+ * so a stale client hint cannot fail the whole request.
+ * @param cwd - already-resolved session working directory.
+ * @param folders - additional workspace folders (any spelling).
+ */
+export function uniqueRoots(cwd: string, folders: readonly string[] = []): string[] {
+  const roots: string[] = [cwd]
+  const seen = new Set<string>()
+  const keyOf = (value: string): string => {
+    const normalized = value.replace(/[\\/]+/g, '/').replace(/\/$/, '')
+    return process.platform === 'win32' ? normalized.toLowerCase() : normalized
+  }
+  seen.add(keyOf(cwd))
+  for (const folder of folders) {
+    if (folder === '') continue
+    let absolute: string
+    try {
+      absolute = requireAbsolute(folder)
+    } catch {
+      // A non-absolute extra folder is a stale hint; skip it so the
+      // remaining roots still list.
+      continue
+    }
+    const key = keyOf(absolute)
+    if (seen.has(key)) continue
+    seen.add(key)
+    roots.push(absolute)
+  }
+  return roots
+}
+
 /** Message text of an unknown thrown value. */
 export function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)

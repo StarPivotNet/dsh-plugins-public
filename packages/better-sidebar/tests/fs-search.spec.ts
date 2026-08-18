@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { searchFiles } from '../src/fs-search.ts'
+import { searchFiles, searchFilesInRoots } from '../src/fs-search.ts'
 
 /**
  * Symlink creation needs extra privileges on Windows; the symlink case skips
@@ -136,6 +136,27 @@ describe('fs-search', () => {
       expect(result.matches).toEqual([])
     } finally {
       rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('searchFilesInRoots keeps one-root matches relative and multi-root matches absolute', async () => {
+    const primary = makeFixture()
+    const extra = mkdtempSync(join(tmpdir(), 'dsh-sidebar-search-extra-'))
+    try {
+      writeFileSync(join(extra, 'util.md'), 'doc')
+      expect(await searchFilesInRoots([primary], 'util')).toEqual({
+        matches: ['src/util.ts'],
+        truncated: false,
+      })
+      const multi = await searchFilesInRoots([primary, extra], 'util')
+      expect(multi.truncated).toBe(false)
+      expect(multi.matches).toEqual([
+        join(extra, 'util.md').split(/[\\/]/).join('/'),
+        join(primary, 'src', 'util.ts').split(/[\\/]/).join('/'),
+      ].sort())
+    } finally {
+      rmSync(primary, { recursive: true, force: true })
+      rmSync(extra, { recursive: true, force: true })
     }
   })
 

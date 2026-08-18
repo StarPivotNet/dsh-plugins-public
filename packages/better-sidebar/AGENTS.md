@@ -281,6 +281,7 @@ interface TabComponentProps {
   onOpenFile?: (path: string) => void
   onOpenDiff?: (tab: SidebarTab) => void
   onSubagentJump?: (childSessionId: string) => void
+  folders?: readonly string[]  // 工作区附加文件夹（cwd 始终是第一棵树）
 }
 ```
 

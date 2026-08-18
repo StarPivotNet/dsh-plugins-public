@@ -358,6 +358,7 @@ describe('git destructive operations (scratch repository)', () => {
 describe('session cwd resolution over the API route', () => {
   interface CtxOverrides {
     sessions?: { get: (id: string) => { header: { cwd?: string } } | undefined }
+    get?: (name: string) => unknown
   }
 
   const mount = (overrides: CtxOverrides = {}): SidebarWebRoute => {
@@ -374,8 +375,8 @@ describe('session cwd resolution over the API route', () => {
       effect: (fn: () => void | (() => void)) => { fn() },
       // No settings service: the namespace registration never runs.
       inject: () => () => {},
-      // No jobs/agents services in the smoke context: the routes degrade.
-      get: () => undefined,
+      // Optional services (jobs/agents/workspaceRegistry) degrade when absent.
+      get: overrides.get ?? (() => undefined),
     }
     apply(ctx as never)
     return routes.find(route => route.path === '/sidebar/api')!
@@ -436,6 +437,59 @@ describe('session cwd resolution over the API route', () => {
     expect(result.error?.message).toMatch(/invalid working directory/)
   })
 
+  it('session.cwd lists additional workspace folders for the owning workspace', async () => {
+    const extra = resolvePath('/tmp/extra-folder')
+    const route = mount({
+      sessions: {
+        get: (id) => id === 's-owned' ? { header: { cwd: '/attached-cwd' } } : undefined,
+      },
+      get: (name) => name === 'workspaceRegistry'
+        ? {
+          list: () => [{
+            path: '/attached-cwd',
+            folders: [extra],
+            sessionIds: ['s-owned'],
+          }],
+        }
+        : undefined,
+    })
+    const result = await invoke(route, 'session.cwd', { sessionId: 's-owned' }) as {
+      ok: boolean
+      value?: { cwd: string; folders?: string[] }
+    }
+    expect(result.ok).toBe(true)
+    expect(result.value?.cwd).toBe('/attached-cwd')
+    expect(result.value?.folders).toEqual([extra])
+  })
+
+  it('fs.search walks every workspace folder', async () => {
+    const primary = mkdtempSync(join(tmpdir(), 'dsh-sidebar-search-primary-'))
+    const extra = mkdtempSync(join(tmpdir(), 'dsh-sidebar-search-extra-'))
+    try {
+      writeFileSync(join(primary, 'alpha.ts'), 'a')
+      writeFileSync(join(extra, 'alpha.md'), 'b')
+      const route = mount({
+        sessions: { get: () => ({ header: { cwd: primary } }) },
+        get: (name) => name === 'workspaceRegistry'
+          ? { list: () => [{ path: primary, folders: [extra], sessionIds: ['s-search'] }] }
+          : undefined,
+      })
+      const result = await invoke(route, 'fs.search', { sessionId: 's-search', query: 'alpha' }) as {
+        ok: boolean
+        value?: { matches: string[]; truncated: boolean }
+      }
+      expect(result.ok).toBe(true)
+      expect(result.value?.truncated).toBe(false)
+      expect(result.value?.matches).toEqual([
+        join(extra, 'alpha.md').split(/[\\/]/).join('/'),
+        join(primary, 'alpha.ts').split(/[\\/]/).join('/'),
+      ].sort())
+    } finally {
+      rmSync(primary, { recursive: true, force: true })
+      rmSync(extra, { recursive: true, force: true })
+    }
+  })
+
   it('pty.close releases a terminal key (and rejects a missing tab)', async () => {
     const route = mount()
     const result = await invoke(route, 'pty.close', { sessionId: 's-pty', tab: 't1' })
@@ -466,7 +520,7 @@ describe('session cwd resolution over the API route', () => {
         get: () => ({ header: { cwd: join(process.cwd(), 'src') } }),
       },
     })
-    const result = await invoke(route, 'fs.read', { sessionId: 's-sub', path: 'src/git.ts' })
+    const result = await invoke(route, 'fs.read', { sessionId: 's-sub', path: 'packages/better-sidebar/src/git.ts' })
     expect(result.ok).toBe(true)
     const value = result as unknown as { ok: boolean; value?: { kind: string; content: string } }
     expect(value.value?.kind).toBe('text')

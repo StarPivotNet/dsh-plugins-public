@@ -84,3 +84,43 @@ export async function searchFiles(root: string, query: string, opts: FsSearchOpt
   // '/' separators on every platform: the client joins onto the cwd itself.
   return { matches: matches.sort().map(path => path.split(sep).join('/')), truncated }
 }
+
+/**
+ * Search every workspace root. A single root keeps cwd-relative matches
+ * (the historical client contract). Several roots return absolute paths so
+ * the client can tell which folder a hit came from. Match and visit
+ * budgets are shared across roots.
+ */
+export async function searchFilesInRoots(
+  roots: readonly string[],
+  query: string,
+  opts: FsSearchOptions = {},
+): Promise<FsSearchResult> {
+  if (roots.length === 0) return { matches: [], truncated: false }
+  if (roots.length === 1) return searchFiles(roots[0]!, query, opts)
+
+  const maxMatches = opts.maxMatches ?? DEFAULT_MAX_MATCHES
+  const remaining: string[] = [...roots]
+  const matches: string[] = []
+  let truncated = false
+  while (remaining.length > 0) {
+    const root = remaining.shift()!
+    const result = await searchFiles(root, query, {
+      maxMatches: maxMatches - matches.length,
+      maxVisited: opts.maxVisited,
+    })
+    for (const rel of result.matches) matches.push(absoluteSearchMatch(root, rel))
+    if (!result.truncated) continue
+    truncated = true
+    if (matches.length >= maxMatches) break
+    // A visit-budget stop in one root still lets later roots contribute
+    // until the shared match cap is hit.
+  }
+  return { matches: matches.sort(), truncated }
+}
+
+/** Join a search-relative path back onto its root as a '/'-separated absolute. */
+function absoluteSearchMatch(root: string, rel: string): string {
+  if (rel === '' || rel === '.') return root.split(sep).join('/')
+  return join(root, ...rel.split('/')).split(sep).join('/')
+}

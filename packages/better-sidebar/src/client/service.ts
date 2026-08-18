@@ -153,6 +153,8 @@ export interface TabComponentProps {
   onOpenFile?: (path: string) => void
   onOpenDiff?: (tab: SidebarTab) => void
   onSubagentJump?: (childSessionId: string) => void
+  /** Additional workspace folders (cwd is always the first explorer root). */
+  folders?: readonly string[]
 }
 
 /** Describes one kind of sidebar tab (builtins register themselves too). */
@@ -470,7 +472,7 @@ export function matchUrlTarget(tabs: readonly TabDescriptor[], url: URL): TabDes
  * The plugin version this service instance reports. Keep in lockstep with
  * `package.json`'s version — `tests/service.spec.ts` asserts the pair.
  */
-export const SIDEBAR_SERVICE_VERSION = '0.12.3'
+export const SIDEBAR_SERVICE_VERSION = '0.13.3'
 
 /**
  * Monotonic capability list consumers use to gate new API usage (features

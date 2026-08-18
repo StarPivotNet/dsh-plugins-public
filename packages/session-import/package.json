@@ -1,6 +1,6 @@
 {
   "name": "@starpivot/dsh-session-import",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Import Cursor, Codex, and Claude Code sessions and skills into DeepSeek Harness",
   "homepage": "https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/session-import",
   "keywords": [

@@ -1600,6 +1600,32 @@ function unescapeTomlString(value) {
   return value.replace(/\\n/gu, "\n").replace(/\\t/gu, "	").replace(/\\"/gu, '"').replace(/\\\\/gu, "\\");
 }
 
+// src/host/workspace.ts
+import { basename as basename4 } from "node:path";
+import { mkdir as mkdir3 } from "node:fs/promises";
+async function ensureWorkspace(registry, cwd) {
+  if (registry === void 0 || cwd === void 0 || cwd.length === 0) return registry?.list?.()[0];
+  try {
+    const existing = await registry.resolveByPath?.(cwd);
+    if (existing !== void 0) return existing;
+  } catch {
+  }
+  try {
+    await mkdir3(cwd, { recursive: true });
+  } catch {
+    return registry.list?.()[0];
+  }
+  try {
+    return await registry.create?.(cwd, basename4(cwd)) ?? registry.list?.()[0];
+  } catch {
+    try {
+      return await registry.resolveByPath?.(cwd);
+    } catch {
+      return registry.list?.()[0];
+    }
+  }
+}
+
 // src/host/index.ts
 var name = "session-import";
 var SESSION_IMPORT_SETTINGS_NAMESPACE = "session-import";
@@ -1950,19 +1976,8 @@ async function importAutomations(ctx, request) {
   return { imported, skipped, unsupported, failed };
 }
 async function resolveWorkspaceId(registry, cwd, fallbackCwd) {
-  const target = cwd ?? fallbackCwd;
-  if (registry === void 0) return void 0;
-  if (target !== void 0 && registry.resolveByPath !== void 0) {
-    const existing = await registry.resolveByPath(target);
-    if (existing !== void 0) return existing.id;
-    if (registry.create !== void 0) {
-      try {
-        return (await registry.create(target)).id;
-      } catch {
-      }
-    }
-  }
-  return registry.list?.()[0]?.id;
+  const workspace = await ensureWorkspace(registry, cwd ?? fallbackCwd);
+  return workspace?.id ?? registry?.list?.()[0]?.id;
 }
 async function settleImported(ctx, id, cwd) {
   await warmProjection(ctx, id);
@@ -1979,9 +1994,8 @@ async function warmProjection(ctx, id) {
 async function attachImported(ctx, id, cwd) {
   const registry = ctx.get("workspaceRegistry");
   if (registry === void 0) return;
-  const target = cwd ?? workspaceCwdOf(ctx);
   try {
-    const workspace = target !== void 0 && registry.resolveByPath !== void 0 ? await registry.resolveByPath(target) ?? (registry.create === void 0 ? void 0 : await registry.create(target)) : registry.list?.()[0];
+    const workspace = await ensureWorkspace(registry, cwd ?? workspaceCwdOf(ctx));
     await workspace?.attachSession?.(id);
   } catch {
   }

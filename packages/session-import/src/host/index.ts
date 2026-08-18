@@ -22,6 +22,7 @@ import {
 } from './scan.ts'
 import { copySkill, defaultSkillRoots, discoverSkills } from './skills.ts'
 import { discoverAutomations, discoverMemories, importMemories } from './compat.ts'
+import { ensureWorkspace, type WorkspaceRegistryHandle } from './workspace.ts'
 
 export const name = 'session-import'
 
@@ -483,25 +484,12 @@ async function importAutomations(
 }
 
 async function resolveWorkspaceId(
-  registry: {
-    list?: () => readonly { id: string; path?: string }[]
-    resolveByPath?: (path: string) => Promise<{ id: string } | undefined>
-    create?: (path: string, title?: string) => Promise<{ id: string }>
-  } | undefined,
+  registry: WorkspaceRegistryHandle | undefined,
   cwd: string | undefined,
   fallbackCwd: string | undefined,
 ): Promise<string | undefined> {
-  const target = cwd ?? fallbackCwd
-  if (registry === undefined) return undefined
-  if (target !== undefined && registry.resolveByPath !== undefined) {
-    const existing = await registry.resolveByPath(target)
-    if (existing !== undefined) return existing.id
-    if (registry.create !== undefined) {
-      try { return (await registry.create(target)).id }
-      catch { /* fall through to an already registered workspace */ }
-    }
-  }
-  return registry.list?.()[0]?.id
+  const workspace = await ensureWorkspace(registry, cwd ?? fallbackCwd)
+  return workspace?.id ?? registry?.list?.()[0]?.id
 }
 
 async function settleImported(ctx: Context, id: string, cwd: string | undefined): Promise<void> {
@@ -520,19 +508,14 @@ async function warmProjection(ctx: Context, id: string): Promise<void> {
 }
 
 async function attachImported(ctx: Context, id: string, cwd: string | undefined): Promise<void> {
-  const registry = ctx.get('workspaceRegistry') as {
-    resolveByPath?: (path: string) => Promise<{ attachSession?: (sessionId: string) => Promise<void> } | undefined>
-    create?: (path: string) => Promise<{ attachSession?: (sessionId: string) => Promise<void> }>
-    list?: () => readonly { path?: string; attachSession?: (sessionId: string) => Promise<void> }[]
-  } | undefined
+  const registry = ctx.get('workspaceRegistry') as WorkspaceRegistryHandle | undefined
   if (registry === undefined) return
-  const target = cwd ?? workspaceCwdOf(ctx)
   try {
-    const workspace = target !== undefined && registry.resolveByPath !== undefined
-      ? await registry.resolveByPath(target) ?? (registry.create === undefined ? undefined : await registry.create(target))
-      : registry.list?.()[0]
+    const workspace = await ensureWorkspace(registry, cwd ?? workspaceCwdOf(ctx))
     await workspace?.attachSession?.(id)
   } catch {
     // The session remains openable from Ungrouped if workspace membership fails.
   }
 }
+
+

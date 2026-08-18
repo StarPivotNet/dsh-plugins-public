@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { persistConverted, withWorkspaceCwd } from './import.ts'
+import { ensureWorkspace } from './workspace.ts'
 import { convertClaudeSession } from '../convert/claude.ts'
 
 test('persistConverted writes header then events once', async () => {
@@ -37,6 +38,20 @@ test('persistConverted treats an existing id as already imported', async () => {
   const result = await persistConverted(persistence, converted)
   assert.equal(result.ok, true)
   assert.equal(result.ok && result.alreadyImported, true)
+})
+
+test('ensureWorkspace creates a missing registry row', async () => {
+  const created: string[] = []
+  const workspace = await ensureWorkspace({
+    async resolveByPath() { return undefined },
+    async create(path) {
+      created.push(path)
+      return { id: 'ws-1', attachSession: async () => {} }
+    },
+    list: () => [],
+  }, '/tmp/dsh-import-missing-workspace')
+  assert.equal(workspace?.id, 'ws-1')
+  assert.deepEqual(created, ['/tmp/dsh-import-missing-workspace'])
 })
 
 test('withWorkspaceCwd rewrites the header cwd', () => {

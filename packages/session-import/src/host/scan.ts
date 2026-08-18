@@ -2,6 +2,7 @@
 
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
+import { readFileSync } from 'node:fs'
 import { open, readdir, stat } from 'node:fs/promises'
 import { fallbackTitle, isRecord } from '../convert/text.ts'
 import { loadCodexThreadNames, lookupCodexThreadName } from './codex-index.ts'
@@ -28,6 +29,7 @@ export interface ScanRoots {
   readonly codex: readonly string[]
   readonly cursor: readonly string[]
   readonly grok: readonly string[]
+  readonly zcode?: readonly string[]
 }
 
 /** Options for turning a discovered walk into a Settings or `/import list` page. */
@@ -58,6 +60,11 @@ export function defaultScanRoots(home = homedir(), includeArchived = false): Sca
     grok: [
       join(home, '.grok', 'sessions'),
     ],
+    zcode: [
+      join(home, '.zcode', 'cli', 'db', 'db.sqlite'),
+      join(home, '.zcode', 'v2', 'sessions'),
+      ...zcodeDataSessionRoots(home),
+    ],
   }
 }
 
@@ -68,8 +75,26 @@ export async function discoverSessions(roots: ScanRoots, signal?: AbortSignal): 
   await walk(roots.codex, 'codex', found, signal)
   await walk(roots.cursor, 'cursor', found, signal)
   await walk(roots.grok, 'grok', found, signal)
+  if (roots.zcode !== undefined) {
+    const { discoverZcodeSessions } = await import('./zcode-scan.ts')
+    found.push(...await discoverZcodeSessions(roots.zcode, signal))
+  }
   found.sort((left, right) => right.updatedAt - left.updatedAt || left.path.localeCompare(right.path))
   return found
+}
+
+function zcodeDataSessionRoots(home: string): string[] {
+  try {
+    const text = readFileSync(join(home, '.zcode', 'v2', 'setting.json'), 'utf8')
+    const parsed: unknown = JSON.parse(text)
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const dir = (parsed as { dataBaseDir?: unknown }).dataBaseDir
+      if (typeof dir === 'string' && dir.length > 0) return [join(dir, '.zcode', 'v2', 'sessions')]
+    }
+  } catch {
+    // A missing or unreadable ZCode setting file just skips the extra data volume.
+  }
+  return []
 }
 
 /** Keep conversations that fit the size budget and optional title/path filter. */
@@ -213,6 +238,7 @@ export function isSessionFile(source: ImportSource, name: string): boolean {
   if (source === 'claude') return lower.endsWith('.jsonl')
   if (source === 'codex') return lower.endsWith('.jsonl') && (lower.startsWith('rollout-') || lower.includes('session'))
   if (source === 'grok') return lower === 'updates.jsonl'
+  if (source === 'zcode') return lower.endsWith('.json')
   return lower.endsWith('.jsonl') || (lower.endsWith('.json') && /composer|transcript|chat|conversation/u.test(lower))
 }
 

@@ -20,3 +20,11 @@ test('detects Grok Build by path and ACP updates', () => {
   assert.equal(detectSource('/Users/a/.grok/sessions/%2Ftmp/01abc/updates.jsonl', '{}'), 'grok')
   assert.equal(detectSource('/tmp/updates.jsonl', '{"method":"session/update","params":{}}'), 'grok')
 })
+
+test('detects ZCode by sqlite locator and v2 JSON', () => {
+  assert.equal(detectSource('zcode-sqlite:///tmp/db.sqlite#sess_1', ''), 'zcode')
+  assert.equal(
+    detectSource('/Users/a/.zcode/v2/sessions/abc/claude-import-1.json', '{"meta":{"taskId":"t1"},"messages":[]}'),
+    'zcode',
+  )
+})

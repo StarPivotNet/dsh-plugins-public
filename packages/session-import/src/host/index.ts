@@ -127,9 +127,9 @@ async function handleImportCommand(
       kind: 'success',
       text: [
         'Import foreign agent conversations into this Harness.',
-        '/import list [claude|codex|cursor|grok] — discover local sessions',
+        '/import list [claude|codex|cursor|grok|zcode] — discover local sessions',
         '/import all — import every discovered session into this workspace',
-        '/import claude|codex|cursor|grok — import one store',
+        '/import claude|codex|cursor|grok|zcode — import one store',
         '/import skills — copy Claude/Codex/Cursor skills into ~/.dsh/skills',
         '/import memory — copy Claude/Codex instruction files into ~/.dsh/AGENTS.md',
         '/import automations — create DSH timers from ~/.codex/automations',
@@ -362,9 +362,11 @@ async function importOneSession(
   const persistence = requirePersistence(ctx)
   if (persistence === undefined) throw new Error('session persistence is not configured')
   try {
-    const info = await stat(path)
-    if (info.size > maxFileBytes) {
-      return { imported: 0, skipped: 0, failed: [{ path, message: `file exceeds maxFileBytes (${String(info.size)})` }] }
+    if (!path.startsWith('zcode-sqlite://')) {
+      const info = await stat(path)
+      if (info.size > maxFileBytes) {
+        return { imported: 0, skipped: 0, failed: [{ path, message: `file exceeds maxFileBytes (${String(info.size)})` }] }
+      }
     }
     const converted = relocate(await convertFile(path, request.source), workspaceCwdOf(ctx), request.keepCwd !== false)
     const outcome = await persistConverted(persistence, converted)

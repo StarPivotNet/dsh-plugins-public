@@ -3,7 +3,7 @@
 export const zh = {
   nav: '导入',
   title: '导入其他 AI 会话',
-  intro: '扫描本机 Cursor、Codex、Claude Code 和 Grok Build 的会话、技能、项目记忆和自动化。导入默认留在原来的项目目录，没有对应工作区就自动新建。',
+  intro: '扫描本机 Cursor、Codex、Claude Code、Grok Build 和 ZCode 的会话、技能、项目记忆和自动化。导入默认留在原来的项目目录，没有对应工作区就自动新建。',
   sessionsTab: '会话',
   skillsTab: '技能',
   memoryTab: '记忆',
@@ -26,6 +26,7 @@ export const zh = {
   sourceCodex: 'Codex',
   sourceCursor: 'Cursor',
   sourceGrok: 'Grok Build',
+  sourceZcode: 'ZCode',
   search: '按标题或路径筛选',
   imported: '导入完成（新导入 / 已存在）',
   repaired: '已按原项目重新分组（已修复 / 无需改动）',
@@ -44,7 +45,7 @@ export const zh = {
 export const en = {
   nav: 'Import',
   title: 'Import other AI sessions',
-  intro: 'Scan local Cursor, Codex, Claude Code, and Grok Build conversations, skills, memory, and automations. Imports stay in the original project directory and create a workspace when it is missing.',
+  intro: 'Scan local Cursor, Codex, Claude Code, Grok Build, and ZCode conversations, skills, memory, and automations. Imports stay in the original project directory and create a workspace when it is missing.',
   sessionsTab: 'Sessions',
   skillsTab: 'Skills',
   memoryTab: 'Memory',
@@ -67,6 +68,7 @@ export const en = {
   sourceCodex: 'Codex',
   sourceCursor: 'Cursor',
   sourceGrok: 'Grok Build',
+  sourceZcode: 'ZCode',
   search: 'Filter by title or path',
   imported: 'Import finished (new / already present).',
   repaired: 'Moved leftover imports back to their original projects (repaired / unchanged).',

@@ -1,23 +1,28 @@
-// src/host/index.ts
-import { homedir as homedir6 } from "node:os";
-import { join as join7 } from "node:path";
-import { stat as stat4 } from "node:fs/promises";
-import { settingsNamespace } from "@deepseek-ai/dsh-settings";
-import z from "@deepseek-ai/schemastery";
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __export = (target, all) => {
+  for (var name2 in all)
+    __defProp(target, name2, { get: all[name2], enumerable: true });
+};
 
 // src/convert/types.ts
-var DEFAULT_CONVERT_LIMITS = {
-  maxToolResultChars: 32e3,
-  maxTextChars: 2e5
-};
 function importedSessionId(source, nativeId) {
   const safe = nativeId.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
   return `import-${source}-${safe || "session"}`;
 }
-
-// src/host/import.ts
-import { readFile as readFile2 } from "node:fs/promises";
-import { dirname, join as join2 } from "node:path";
+var DEFAULT_CONVERT_LIMITS;
+var init_types = __esm({
+  "src/convert/types.ts"() {
+    "use strict";
+    DEFAULT_CONVERT_LIMITS = {
+      maxToolResultChars: 32e3,
+      maxTextChars: 2e5
+    };
+  }
+});
 
 // src/convert/text.ts
 function isRecord(value) {
@@ -95,9 +100,14 @@ function kebabName(raw) {
   const normalized = raw.trim().toLowerCase().replace(/\.[a-z0-9]+$/u, "").replace(/[^a-z0-9]+/gu, "-").replace(/^-+|-+$/gu, "");
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalized) ? normalized : void 0;
 }
+var init_text = __esm({
+  "src/convert/text.ts"() {
+    "use strict";
+    init_types();
+  }
+});
 
 // src/convert/events.ts
-var SESSION_FORMAT_VERSION = 0;
 function convertConversation(conversation, path, limits = DEFAULT_CONVERT_LIMITS) {
   const id = importedSessionId(conversation.source, conversation.nativeId);
   const events = [];
@@ -276,8 +286,346 @@ function sessionName(raw, maxChars = 48) {
 function messageId(source, nativeId, seq) {
   return `import-${source}-${nativeId}-${String(seq)}`;
 }
+var SESSION_FORMAT_VERSION;
+var init_events = __esm({
+  "src/convert/events.ts"() {
+    "use strict";
+    init_text();
+    init_types();
+    SESSION_FORMAT_VERSION = 0;
+  }
+});
+
+// src/convert/zcode.ts
+import { DatabaseSync } from "node:sqlite";
+function convertZcodeSession(text, path, limits = DEFAULT_CONVERT_LIMITS) {
+  const locator = parseZcodeSqlitePath(path);
+  const conversation = locator === void 0 ? extractZcodeJson(text, path, limits) : extractZcodeSqlite(locator.db, locator.id, limits);
+  return convertConversation(conversation, path, limits);
+}
+function zcodeSqlitePath(db, id) {
+  return SQLITE_PREFIX + db + "#" + id;
+}
+function parseZcodeSqlitePath(path) {
+  if (!path.startsWith(SQLITE_PREFIX)) return void 0;
+  const hash = path.lastIndexOf("#");
+  if (hash <= SQLITE_PREFIX.length) return void 0;
+  const db = path.slice(SQLITE_PREFIX.length, hash);
+  const id = path.slice(hash + 1);
+  if (db.length === 0 || id.length === 0) return void 0;
+  return { db, id };
+}
+function extractZcodeJson(text, path, limits = DEFAULT_CONVERT_LIMITS) {
+  let record;
+  try {
+    record = JSON.parse(text);
+  } catch {
+    record = void 0;
+  }
+  const root = isRecord(record) ? record : {};
+  const meta = isRecord(root.meta) ? root.meta : {};
+  const messages = Array.isArray(root.messages) ? root.messages : [];
+  const items = [];
+  let createdAt = parseTime(meta.createdAt);
+  let updatedAt = parseTime(meta.updatedAt, createdAt);
+  for (const raw of messages) {
+    if (!isRecord(raw)) continue;
+    const time = parseTime(raw.timestamp, updatedAt);
+    if (createdAt === 0 && time > 0) createdAt = time;
+    if (time > updatedAt) updatedAt = time;
+    const role = asString(raw.role);
+    const textValue = flattenText(raw.content, limits);
+    if (role === "user" && textValue.length > 0) {
+      items.push({ kind: "user", time, text: textValue, source: "user" });
+    } else if (role === "assistant" && textValue.length > 0) {
+      items.push({ kind: "assistant", time, text: textValue, reasoning: "", toolCalls: [] });
+    }
+  }
+  const nativeId = asString(meta.taskId) ?? fileStem(path);
+  return {
+    source: "zcode",
+    nativeId,
+    title: asString(meta.title),
+    cwd: asString(meta.workspacePath),
+    createdAt: createdAt || updatedAt,
+    updatedAt: updatedAt || createdAt,
+    items
+  };
+}
+function extractZcodeSqlite(dbPath, sessionId, limits = DEFAULT_CONVERT_LIMITS) {
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const session = db.prepare(
+      "SELECT id, directory, path, title, time_created, time_updated FROM session WHERE id = ?"
+    ).get(sessionId);
+    if (session === void 0) throw new Error("zcode session not found: " + sessionId);
+    const messages = db.prepare(
+      "SELECT id, data, sequence FROM message WHERE session_id = ? ORDER BY sequence, time_created"
+    ).all(sessionId);
+    const parts = db.prepare(
+      "SELECT message_id, data, sequence FROM part WHERE session_id = ? ORDER BY sequence, time_created"
+    ).all(sessionId);
+    const partsByMessage = /* @__PURE__ */ new Map();
+    for (const part of parts) {
+      const list = partsByMessage.get(part.message_id) ?? [];
+      list.push(part);
+      partsByMessage.set(part.message_id, list);
+    }
+    const items = [];
+    for (const message of messages) {
+      let data;
+      try {
+        data = JSON.parse(message.data);
+      } catch {
+        continue;
+      }
+      if (!isRecord(data)) continue;
+      const role = asString(data.role);
+      const time = messageTime(data, Number(session.time_created));
+      const attached = partsByMessage.get(message.id) ?? [];
+      if (role === "user") {
+        const text2 = partsText(attached, limits) || flattenText(data.content, limits);
+        if (text2.length > 0) items.push({ kind: "user", id: message.id, time, text: text2, source: "user" });
+        continue;
+      }
+      if (role !== "assistant") continue;
+      const reasoning = partsOfType(attached, "reasoning", limits);
+      const text = partsOfType(attached, "text", limits);
+      const toolCalls = toolCallsFromParts(attached, limits);
+      if (text.length === 0 && reasoning.length === 0 && toolCalls.length === 0) continue;
+      items.push({
+        kind: "assistant",
+        id: message.id,
+        time,
+        text,
+        reasoning,
+        toolCalls
+      });
+      for (const call of toolCalls) {
+        if (call.result === void 0) continue;
+        items.push({
+          kind: "tool-result",
+          time: call.time,
+          callId: call.callId,
+          text: call.result,
+          isError: call.isError === true
+        });
+      }
+    }
+    return {
+      source: "zcode",
+      nativeId: session.id,
+      title: session.title || void 0,
+      cwd: session.directory || session.path || void 0,
+      createdAt: Number(session.time_created) || 0,
+      updatedAt: Number(session.time_updated) || Number(session.time_created) || 0,
+      items
+    };
+  } finally {
+    db.close();
+  }
+}
+function partsText(parts, limits) {
+  return partsOfType(parts, "text", limits);
+}
+function partsOfType(parts, type, limits) {
+  const chunks = [];
+  for (const part of parts) {
+    const record = parsePart(part.data);
+    if (record?.type !== type) continue;
+    const text = flattenText(record.text ?? record.content, limits);
+    if (text.length > 0) chunks.push(text);
+  }
+  return chunks.join("\n");
+}
+function toolCallsFromParts(parts, limits) {
+  const calls = [];
+  for (const part of parts) {
+    const record = parsePart(part.data);
+    if (record?.type !== "tool") continue;
+    const callId = asString(record.callID) ?? asString(record.id);
+    const name2 = asString(record.tool) ?? "tool";
+    if (callId === void 0) continue;
+    const state = isRecord(record.state) ? record.state : {};
+    const status = asString(state.status);
+    const output = state.output;
+    const result = output === void 0 ? void 0 : flattenText(output, limits);
+    calls.push({
+      callId,
+      name: name2,
+      arguments: encodeArguments(state.input),
+      time: partTime(record, 0),
+      result,
+      isError: status === "error" || status === "failed"
+    });
+  }
+  return calls;
+}
+function parsePart(raw) {
+  try {
+    const parsed = JSON.parse(raw);
+    return isRecord(parsed) ? parsed : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function messageTime(data, fallback) {
+  const time = isRecord(data.time) ? data.time : {};
+  return parseTime(time.created ?? time.start ?? data.timestamp, fallback);
+}
+function partTime(data, fallback) {
+  const time = isRecord(data.time) ? data.time : {};
+  return parseTime(time.end ?? time.start ?? time.created, fallback);
+}
+function fileStem(path) {
+  const base = path.replace(/\\/gu, "/").split("/").at(-1) ?? "session";
+  return base.replace(/\.(json|jsonl)$/u, "");
+}
+var SQLITE_PREFIX;
+var init_zcode = __esm({
+  "src/convert/zcode.ts"() {
+    "use strict";
+    init_events();
+    init_text();
+    init_types();
+    SQLITE_PREFIX = "zcode-sqlite://";
+  }
+});
+
+// src/host/zcode-scan.ts
+var zcode_scan_exports = {};
+__export(zcode_scan_exports, {
+  defaultZcodeRoots: () => defaultZcodeRoots,
+  discoverZcodeSessions: () => discoverZcodeSessions,
+  isZcodeSessionPath: () => isZcodeSessionPath
+});
+import { homedir as homedir2 } from "node:os";
+import { basename, join as join3 } from "node:path";
+import { readdir, stat } from "node:fs/promises";
+import { DatabaseSync as DatabaseSync2 } from "node:sqlite";
+function defaultZcodeRoots(home = homedir2()) {
+  return [
+    join3(home, ".zcode", "cli", "db", "db.sqlite"),
+    join3(home, ".zcode", "v2", "sessions"),
+    join3("/Volumes/ExternalData/zcode/.zcode/v2/sessions")
+  ];
+}
+async function discoverZcodeSessions(extraRoots, signal) {
+  const roots = extraRoots ?? defaultZcodeRoots();
+  const found = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const root of roots) {
+    signal?.throwIfAborted();
+    if (root.endsWith(".sqlite") || root.endsWith(".db")) {
+      for (const row of listSqliteSessions(root)) {
+        if (seen.has(row.path)) continue;
+        seen.add(row.path);
+        found.push(row);
+      }
+      continue;
+    }
+    for (const row of await listJsonSessions(root, 4, signal)) {
+      if (seen.has(row.path)) continue;
+      seen.add(row.path);
+      found.push(row);
+    }
+  }
+  found.sort((left, right) => right.updatedAt - left.updatedAt || left.path.localeCompare(right.path));
+  return found;
+}
+function listSqliteSessions(dbPath) {
+  let db;
+  try {
+    db = new DatabaseSync2(dbPath, { readOnly: true });
+  } catch {
+    return [];
+  }
+  try {
+    const rows = db.prepare(
+      "SELECT id, directory, path, title, time_created, time_updated, parent_id FROM session WHERE parent_id IS NULL"
+    ).all();
+    return rows.map((row) => {
+      const createdAt = Number(row.time_created) || 0;
+      const updatedAt = Number(row.time_updated) || createdAt;
+      return {
+        source: "zcode",
+        nativeId: row.id,
+        path: zcodeSqlitePath(dbPath, row.id),
+        title: row.title?.trim() || fallbackTitle(row.id),
+        cwd: row.directory || row.path || void 0,
+        createdAt,
+        updatedAt,
+        bytes: 1
+      };
+    });
+  } catch {
+    return [];
+  } finally {
+    db.close();
+  }
+}
+async function listJsonSessions(root, depth, signal) {
+  if (depth < 0) return [];
+  let entries;
+  try {
+    entries = await readdir(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const found = [];
+  for (const entry of entries) {
+    signal?.throwIfAborted();
+    const full = join3(root, entry.name);
+    if (entry.isDirectory()) {
+      found.push(...await listJsonSessions(full, depth - 1, signal));
+      continue;
+    }
+    if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".json")) continue;
+    let info;
+    try {
+      info = await stat(full);
+    } catch {
+      continue;
+    }
+    found.push({
+      source: "zcode",
+      nativeId: basename(entry.name).replace(/\.json$/u, ""),
+      path: full,
+      title: fallbackTitle(basename(entry.name).replace(/\.json$/u, "")),
+      createdAt: Math.round(info.birthtimeMs || info.mtimeMs),
+      updatedAt: Math.round(info.mtimeMs),
+      bytes: info.size
+    });
+  }
+  return found;
+}
+function isZcodeSessionPath(path) {
+  return parseZcodeSqlitePath(path) !== void 0 || path.includes("/.zcode/v2/sessions/") || path.includes("/zcode/.zcode/v2/sessions/");
+}
+var init_zcode_scan = __esm({
+  "src/host/zcode-scan.ts"() {
+    "use strict";
+    init_text();
+    init_zcode();
+  }
+});
+
+// src/host/index.ts
+init_types();
+import { homedir as homedir7 } from "node:os";
+import { join as join8 } from "node:path";
+import { stat as stat5 } from "node:fs/promises";
+import { settingsNamespace } from "@deepseek-ai/dsh-settings";
+import z from "@deepseek-ai/schemastery";
+
+// src/host/import.ts
+import { readFile as readFile2 } from "node:fs/promises";
+import { dirname, join as join2 } from "node:path";
 
 // src/convert/claude.ts
+init_events();
+init_text();
+init_types();
 function convertClaudeSession(text, path, limits = DEFAULT_CONVERT_LIMITS) {
   const conversation = extractClaudeConversation(text, path, limits);
   return convertConversation(conversation, path, limits);
@@ -432,6 +780,9 @@ function cwdFromClaudeProjectPath(path) {
 }
 
 // src/convert/codex.ts
+init_events();
+init_text();
+init_types();
 function convertCodexSession(text, path, limits = DEFAULT_CONVERT_LIMITS, threadName) {
   return convertConversation(extractCodexConversation(text, path, limits, threadName), path, limits);
 }
@@ -571,6 +922,7 @@ function idFromPath2(path) {
 }
 
 // src/host/codex-index.ts
+init_text();
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
@@ -607,6 +959,9 @@ function lookupCodexThreadName(names, ...ids) {
 }
 
 // src/convert/cursor.ts
+init_events();
+init_text();
+init_types();
 function convertCursorSession(text, path, limits = DEFAULT_CONVERT_LIMITS) {
   return convertConversation(extractCursorConversation(text, path, limits), path, limits);
 }
@@ -776,6 +1131,9 @@ function idFromPath3(path) {
 }
 
 // src/convert/grok.ts
+init_events();
+init_text();
+init_types();
 function convertGrokSession(text, path, limits = DEFAULT_CONVERT_LIMITS, summary) {
   return convertConversation(extractGrokConversation(text, path, limits, summary), path, limits);
 }
@@ -967,7 +1325,11 @@ function idFromPath4(path) {
   return file.replace(/\.(jsonl|json)$/u, "");
 }
 
+// src/host/import.ts
+init_zcode();
+
 // src/convert/detect.ts
+init_text();
 function detectSource(path, text) {
   const normalized = path.replace(/\\/gu, "/");
   if (normalized.includes("/.claude/projects/") || normalized.includes("/.claude/sessions/")) return "claude";
@@ -976,6 +1338,9 @@ function detectSource(path, text) {
     return "cursor";
   }
   if (normalized.includes("/.grok/sessions/") || normalized.endsWith("/updates.jsonl")) return "grok";
+  if (normalized.startsWith("zcode-sqlite://") || normalized.includes("/.zcode/v2/sessions/") || normalized.includes("/zcode/.zcode/v2/sessions/")) {
+    return "zcode";
+  }
   const first = firstRecord(text);
   if (first === void 0) return void 0;
   if (asString(first.sessionId) !== void 0 && (first.type === "user" || first.type === "assistant" || first.type === "mode")) {
@@ -985,6 +1350,7 @@ function detectSource(path, text) {
   if (first.method === "session/update") return "grok";
   if (asString(first.composerId) !== void 0 || asString(first.bubbleId) !== void 0) return "cursor";
   if (Array.isArray(first.fullConversationHeadersOnly) || Array.isArray(first.bubbles)) return "cursor";
+  if (isRecord(first.meta) && Array.isArray(first.messages) && asString(first.meta.taskId) !== void 0) return "zcode";
   return void 0;
 }
 function firstRecord(text) {
@@ -1010,7 +1376,12 @@ function firstRecord(text) {
 }
 
 // src/host/import.ts
+init_types();
 async function convertFile(path, source, limits = DEFAULT_CONVERT_LIMITS) {
+  const detectedHint = source ?? detectSource(path, "");
+  if (detectedHint === "zcode" && path.startsWith("zcode-sqlite://")) {
+    return convertZcodeSession("", path, limits);
+  }
   const text = await readFile2(path, "utf8");
   const detected = source ?? detectSource(path, text);
   if (detected === void 0) {
@@ -1036,6 +1407,7 @@ async function convertFile(path, source, limits = DEFAULT_CONVERT_LIMITS) {
     }
     return convertGrokSession(text, path, limits, summary);
   }
+  if (detected === "zcode") return convertZcodeSession(text, path, limits);
   return convertCursorSession(text, path, limits);
 }
 function firstCodexMeta(text) {
@@ -1098,7 +1470,7 @@ async function importDiscovered(persistence, row, limits = DEFAULT_CONVERT_LIMIT
 }
 
 // src/host/parse-args.ts
-var SOURCES = /* @__PURE__ */ new Set(["claude", "codex", "cursor", "grok"]);
+var SOURCES = /* @__PURE__ */ new Set(["claude", "codex", "cursor", "grok", "zcode"]);
 function parseImportArgs(rawInput) {
   const rawTokens = rawInput.trim().split(/\s+/u).filter((token) => token.length > 0);
   const keepCwd = !rawTokens.some((token) => token === "--here");
@@ -1139,31 +1511,38 @@ function parseSource(value) {
 }
 
 // src/host/scan.ts
-import { homedir as homedir2 } from "node:os";
-import { basename, dirname as dirname2, join as join3 } from "node:path";
-import { open, readdir, stat } from "node:fs/promises";
+init_text();
+import { homedir as homedir3 } from "node:os";
+import { basename as basename2, dirname as dirname2, join as join4 } from "node:path";
+import { readFileSync } from "node:fs";
+import { open, readdir as readdir2, stat as stat2 } from "node:fs/promises";
 var DEFAULT_LIST_LIMIT = 300;
 var PREVIEW_BYTES = 64e3;
 var STAT_CONCURRENCY = 32;
 var PREVIEW_CONCURRENCY = 16;
 var DISCOVER_CACHE_MS = 3e4;
-function defaultScanRoots(home = homedir2(), includeArchived = false) {
-  const codex = [join3(home, ".codex", "sessions")];
-  if (includeArchived) codex.push(join3(home, ".codex", "archived_sessions"));
+function defaultScanRoots(home = homedir3(), includeArchived = false) {
+  const codex = [join4(home, ".codex", "sessions")];
+  if (includeArchived) codex.push(join4(home, ".codex", "archived_sessions"));
   return {
     claude: [
-      join3(home, ".claude", "projects"),
-      join3(home, ".claude", "sessions")
+      join4(home, ".claude", "projects"),
+      join4(home, ".claude", "sessions")
     ],
     codex,
     cursor: [
-      join3(home, ".cursor", "projects"),
-      join3(home, ".cursor", "chats"),
-      join3(home, "Library", "Application Support", "Cursor", "User", "workspaceStorage"),
-      join3(home, "AppData", "Roaming", "Cursor", "User", "workspaceStorage")
+      join4(home, ".cursor", "projects"),
+      join4(home, ".cursor", "chats"),
+      join4(home, "Library", "Application Support", "Cursor", "User", "workspaceStorage"),
+      join4(home, "AppData", "Roaming", "Cursor", "User", "workspaceStorage")
     ],
     grok: [
-      join3(home, ".grok", "sessions")
+      join4(home, ".grok", "sessions")
+    ],
+    zcode: [
+      join4(home, ".zcode", "cli", "db", "db.sqlite"),
+      join4(home, ".zcode", "v2", "sessions"),
+      ...zcodeDataSessionRoots(home)
     ]
   };
 }
@@ -1173,8 +1552,24 @@ async function discoverSessions(roots, signal) {
   await walk(roots.codex, "codex", found, signal);
   await walk(roots.cursor, "cursor", found, signal);
   await walk(roots.grok, "grok", found, signal);
+  if (roots.zcode !== void 0) {
+    const { discoverZcodeSessions: discoverZcodeSessions2 } = await Promise.resolve().then(() => (init_zcode_scan(), zcode_scan_exports));
+    found.push(...await discoverZcodeSessions2(roots.zcode, signal));
+  }
   found.sort((left, right) => right.updatedAt - left.updatedAt || left.path.localeCompare(right.path));
   return found;
+}
+function zcodeDataSessionRoots(home) {
+  try {
+    const text = readFileSync(join4(home, ".zcode", "v2", "setting.json"), "utf8");
+    const parsed = JSON.parse(text);
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const dir = parsed.dataBaseDir;
+      if (typeof dir === "string" && dir.length > 0) return [join4(dir, ".zcode", "v2", "sessions")];
+    }
+  } catch {
+  }
+  return [];
 }
 function filterDiscovered(rows, maxFileBytes, query) {
   const needle = query?.trim().toLowerCase() ?? "";
@@ -1204,7 +1599,7 @@ async function presentSessions(rows, options) {
 }
 async function readGrokPreview(path, read) {
   try {
-    return await read(join3(dirname2(path), "summary.json"));
+    return await read(join4(dirname2(path), "summary.json"));
   } catch {
     return read(path);
   }
@@ -1230,14 +1625,14 @@ async function visit(path, source, found, depth, signal) {
   signal?.throwIfAborted();
   let entries;
   try {
-    entries = await readdir(path, { withFileTypes: true });
+    entries = await readdir2(path, { withFileTypes: true });
   } catch {
     return;
   }
   const files = [];
   const directories = [];
   for (const entry of entries) {
-    const full = join3(path, entry.name);
+    const full = join4(path, entry.name);
     if (entry.isDirectory()) directories.push(full);
     else if (entry.isFile() && isSessionFile(source, entry.name)) files.push(full);
   }
@@ -1245,11 +1640,11 @@ async function visit(path, source, found, depth, signal) {
     signal?.throwIfAborted();
     let info;
     try {
-      info = await stat(full);
+      info = await stat2(full);
     } catch {
       return;
     }
-    const nativeId = source === "grok" ? grokNativeIdFromPath(full) : nativeIdFromName(source, basename(full));
+    const nativeId = source === "grok" ? grokNativeIdFromPath(full) : nativeIdFromName(source, basename2(full));
     found.push({
       source,
       nativeId,
@@ -1281,6 +1676,7 @@ function isSessionFile(source, name2) {
   if (source === "claude") return lower.endsWith(".jsonl");
   if (source === "codex") return lower.endsWith(".jsonl") && (lower.startsWith("rollout-") || lower.includes("session"));
   if (source === "grok") return lower === "updates.jsonl";
+  if (source === "zcode") return lower.endsWith(".json");
   return lower.endsWith(".jsonl") || lower.endsWith(".json") && /composer|transcript|chat|conversation/u.test(lower);
 }
 function nativeIdFromName(source, name2) {
@@ -1366,21 +1762,22 @@ function parsePreviewObject(text) {
 }
 
 // src/host/skills.ts
+init_text();
 import { mkdir, readFile as readFile3, writeFile } from "node:fs/promises";
-import { basename as basename2, dirname as dirname3, join as join4 } from "node:path";
-import { homedir as homedir3 } from "node:os";
-function defaultSkillRoots(home = homedir3()) {
+import { basename as basename3, dirname as dirname3, join as join5 } from "node:path";
+import { homedir as homedir4 } from "node:os";
+function defaultSkillRoots(home = homedir4()) {
   return {
     claude: [
-      join4(home, ".claude", "skills"),
-      join4(home, ".claude", "commands")
+      join5(home, ".claude", "skills"),
+      join5(home, ".claude", "commands")
     ],
     codex: [
-      join4(home, ".codex", "skills")
+      join5(home, ".codex", "skills")
     ],
     cursor: [
-      join4(home, ".cursor", "skills"),
-      join4(home, ".cursor", "commands")
+      join5(home, ".cursor", "skills"),
+      join5(home, ".cursor", "commands")
     ]
   };
 }
@@ -1396,8 +1793,8 @@ async function discoverSkills(roots, signal) {
   return found;
 }
 async function copySkill(skill, targetRoot) {
-  const directory = join4(targetRoot, skill.name);
-  const target = join4(directory, "SKILL.md");
+  const directory = join5(targetRoot, skill.name);
+  const target = join5(directory, "SKILL.md");
   await mkdir(directory, { recursive: true });
   let overwritten = false;
   try {
@@ -1411,19 +1808,19 @@ async function copySkill(skill, targetRoot) {
   return { path: target, overwritten };
 }
 async function visitSkillRoot(root, source, found) {
-  const { readdir: readdir4, readFile: readFile6, stat: stat5 } = await import("node:fs/promises");
+  const { readdir: readdir5, readFile: readFile6, stat: stat6 } = await import("node:fs/promises");
   let entries;
   try {
-    entries = await readdir4(root, { withFileTypes: true });
+    entries = await readdir5(root, { withFileTypes: true });
   } catch {
     return;
   }
   for (const entry of entries) {
-    const full = join4(root, entry.name);
+    const full = join5(root, entry.name);
     if (entry.isDirectory()) {
-      const skillFile = join4(full, "SKILL.md");
+      const skillFile = join5(full, "SKILL.md");
       try {
-        const info = await stat5(skillFile);
+        const info = await stat6(skillFile);
         if (!info.isFile()) continue;
         const parsed = parseSkillFile(await readFile6(skillFile, "utf8"), source, skillFile);
         if (parsed !== void 0) found.push(parsed);
@@ -1447,7 +1844,7 @@ function parseSkillFile(text, source, path) {
   const front = match?.[1] ?? "";
   const body = (match?.[2] ?? text).trim();
   const fields = parseFrontmatter(front);
-  const fromFile = kebabName(path.endsWith("SKILL.md") ? basename2(dirname3(path)) : basename2(path));
+  const fromFile = kebabName(path.endsWith("SKILL.md") ? basename3(dirname3(path)) : basename3(path));
   const name2 = kebabName(String(fields.name ?? "")) ?? fromFile;
   if (name2 === void 0) return void 0;
   const description = String(fields.description ?? firstHeading(body) ?? name2);
@@ -1494,9 +1891,9 @@ function firstHeading(body) {
 }
 
 // src/host/compat.ts
-import { homedir as homedir4 } from "node:os";
-import { basename as basename3, dirname as dirname4, join as join5 } from "node:path";
-import { mkdir as mkdir2, readFile as readFile4, readdir as readdir2, stat as stat2, writeFile as writeFile2 } from "node:fs/promises";
+import { homedir as homedir5 } from "node:os";
+import { basename as basename4, dirname as dirname4, join as join6 } from "node:path";
+import { mkdir as mkdir2, readFile as readFile4, readdir as readdir3, stat as stat3, writeFile as writeFile2 } from "node:fs/promises";
 var WEEKDAY_TO_ISO = {
   MO: 1,
   TU: 2,
@@ -1506,20 +1903,20 @@ var WEEKDAY_TO_ISO = {
   SA: 6,
   SU: 7
 };
-function defaultMemoryRoots(home = homedir4()) {
+function defaultMemoryRoots(home = homedir5()) {
   return [
-    { source: "claude", kind: "agents", path: join5(home, ".claude", "CLAUDE.md"), name: "claude-claude-md" },
-    { source: "codex", kind: "agents", path: join5(home, ".codex", "AGENTS.md"), name: "codex-agents-md" },
-    { source: "codex", kind: "memory", path: join5(home, ".codex", "memories", "MEMORY.md"), name: "codex-memory" },
-    { source: "codex", kind: "memory", path: join5(home, ".codex", "memories", "memory_summary.md"), name: "codex-memory-summary" }
+    { source: "claude", kind: "agents", path: join6(home, ".claude", "CLAUDE.md"), name: "claude-claude-md" },
+    { source: "codex", kind: "agents", path: join6(home, ".codex", "AGENTS.md"), name: "codex-agents-md" },
+    { source: "codex", kind: "memory", path: join6(home, ".codex", "memories", "MEMORY.md"), name: "codex-memory" },
+    { source: "codex", kind: "memory", path: join6(home, ".codex", "memories", "memory_summary.md"), name: "codex-memory-summary" }
   ];
 }
-async function discoverMemories(home = homedir4()) {
+async function discoverMemories(home = homedir5()) {
   const found = [];
   for (const root of defaultMemoryRoots(home)) {
     let info;
     try {
-      info = await stat2(root.path);
+      info = await stat3(root.path);
     } catch {
       continue;
     }
@@ -1541,8 +1938,8 @@ async function discoverMemories(home = homedir4()) {
   }
   return found;
 }
-async function importMemories(paths, home = homedir4()) {
-  const targetRoot = join5(home, ".dsh", "imported-memory");
+async function importMemories(paths, home = homedir5()) {
+  const targetRoot = join6(home, ".dsh", "imported-memory");
   await mkdir2(targetRoot, { recursive: true });
   let copied = 0;
   let merged = 0;
@@ -1552,11 +1949,11 @@ async function importMemories(paths, home = homedir4()) {
   for (const row of selected) {
     try {
       const text = await readFile4(row.path, "utf8");
-      const dest = join5(targetRoot, `${row.name}.md`);
+      const dest = join6(targetRoot, `${row.name}.md`);
       await writeFile2(dest, ensureTrailingNewline(text), "utf8");
       copied += 1;
       if (row.kind === "agents") {
-        await mergeAgentsFile(join5(home, ".dsh", "AGENTS.md"), row.path, text);
+        await mergeAgentsFile(join6(home, ".dsh", "AGENTS.md"), row.path, text);
         merged += 1;
       }
     } catch (error) {
@@ -1565,18 +1962,18 @@ async function importMemories(paths, home = homedir4()) {
   }
   return { copied, merged, failed };
 }
-async function discoverAutomations(home = homedir4()) {
-  const root = join5(home, ".codex", "automations");
+async function discoverAutomations(home = homedir5()) {
+  const root = join6(home, ".codex", "automations");
   let entries;
   try {
-    entries = await readdir2(root, { withFileTypes: true });
+    entries = await readdir3(root, { withFileTypes: true });
   } catch {
     return [];
   }
   const found = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const path = join5(root, entry.name, "automation.toml");
+    const path = join6(root, entry.name, "automation.toml");
     try {
       const text = await readFile4(path, "utf8");
       const parsed = parseAutomationToml(text, path);
@@ -1590,7 +1987,7 @@ async function discoverAutomations(home = homedir4()) {
 }
 function parseAutomationToml(text, path) {
   const fields = parseSimpleToml(text);
-  const nativeId = String(fields.id ?? basename3(dirname4(path)));
+  const nativeId = String(fields.id ?? basename4(dirname4(path)));
   const name2 = String(fields.name ?? nativeId);
   const prompt = String(fields.prompt ?? "");
   if (prompt.trim().length === 0) return void 0;
@@ -1718,7 +2115,7 @@ function unescapeTomlString(value) {
 }
 
 // src/host/workspace.ts
-import { basename as basename4 } from "node:path";
+import { basename as basename5 } from "node:path";
 import { mkdir as mkdir3 } from "node:fs/promises";
 async function ensureWorkspace(registry, cwd) {
   if (registry === void 0 || cwd === void 0 || cwd.length === 0) return registry?.list?.()[0];
@@ -1733,7 +2130,7 @@ async function ensureWorkspace(registry, cwd) {
     return registry.list?.()[0];
   }
   try {
-    return await registry.create?.(cwd, basename4(cwd)) ?? registry.list?.()[0];
+    return await registry.create?.(cwd, basename5(cwd)) ?? registry.list?.()[0];
   } catch {
     try {
       return await registry.resolveByPath?.(cwd);
@@ -1744,11 +2141,14 @@ async function ensureWorkspace(registry, cwd) {
 }
 
 // src/host/repair.ts
-import { homedir as homedir5 } from "node:os";
-import { basename as basename5, dirname as dirname5, join as join6 } from "node:path";
-import { mkdir as mkdir4, open as open2, readdir as readdir3, readFile as readFile5, rename, stat as stat3, writeFile as writeFile3 } from "node:fs/promises";
+import { homedir as homedir6 } from "node:os";
+import { basename as basename6, dirname as dirname5, join as join7 } from "node:path";
+import { mkdir as mkdir4, open as open2, readdir as readdir4, readFile as readFile5, rename, stat as stat4, writeFile as writeFile3 } from "node:fs/promises";
 import { constants, zstdCompress, zstdDecompress } from "node:zlib";
 import { promisify } from "node:util";
+init_events();
+init_text();
+init_types();
 var zstdCompressAsync = promisify(zstdCompress);
 var zstdDecompressAsync = promisify(zstdDecompress);
 var ZSTD_MAGIC = Buffer.from([40, 181, 47, 253]);
@@ -1759,7 +2159,8 @@ async function discoverForeignOrigins() {
   await Promise.all([
     collectCodexOrigins(roots.codex, found),
     collectGrokOrigins(roots.grok, found),
-    collectClaudeOrigins(roots.claude, found)
+    collectClaudeOrigins(roots.claude, found),
+    collectZcodeOrigins(found)
   ]);
   return found;
 }
@@ -1789,12 +2190,12 @@ async function repairImportedSessions(ctx) {
   return { repaired, skipped, failed };
 }
 async function repairOneOnDisk(id, origin) {
-  const sessionRoot = join6(homedir5(), ".dsh", "sessions");
+  const sessionRoot = join7(homedir6(), ".dsh", "sessions");
   const dir = (await listImportSessionDirs(sessionRoot)).find((item) => item.id === id)?.dir;
   if (dir === void 0) throw new Error("no stored log for " + id);
-  const header = await readStoredHeader(join6(dir, "session.jsonl.zstd"));
+  const header = await readStoredHeader(join7(dir, "session.jsonl.zstd"));
   if (header.cwd === origin.cwd) return false;
-  await rewriteHeaderCwd(join6(dir, "session.jsonl.zstd"), origin.cwd);
+  await rewriteHeaderCwd(join7(dir, "session.jsonl.zstd"), origin.cwd);
   await moveSessionDir(sessionRoot, dir, origin.cwd, id);
   return true;
 }
@@ -1814,7 +2215,7 @@ async function collectCodexOrigins(roots, found) {
   for (const root of roots) {
     for (const path of await walkFiles(root, 8, (name2) => isSessionFile("codex", name2))) {
       const preview = await readHead(path, 64e3);
-      const nativeId = basename5(path).replace(/\.jsonl$/u, "").replace(/^rollout-\d{4}-\d{2}-\d{2}T[0-9-]+-/u, "");
+      const nativeId = basename6(path).replace(/\.jsonl$/u, "").replace(/^rollout-\d{4}-\d{2}-\d{2}T[0-9-]+-/u, "");
       const payload = firstJsonObject(preview);
       const body = isRecord(payload?.payload) ? payload.payload : payload;
       const cwd = asString(body?.cwd);
@@ -1838,11 +2239,11 @@ async function collectGrokOrigins(roots, found) {
     for (const path of await walkFiles(root, 8, (name2) => isSessionFile("grok", name2))) {
       let summary;
       try {
-        summary = parseGrokSummary(await readFile5(join6(dirname5(path), "summary.json"), "utf8"));
+        summary = parseGrokSummary(await readFile5(join7(dirname5(path), "summary.json"), "utf8"));
       } catch {
         summary = {};
       }
-      const nativeId = summary.id ?? basename5(dirname5(path));
+      const nativeId = summary.id ?? basename6(dirname5(path));
       if (summary.cwd === void 0) continue;
       found.set(importedSessionId("grok", nativeId), {
         id: importedSessionId("grok", nativeId),
@@ -1857,7 +2258,7 @@ async function collectClaudeOrigins(roots, found) {
     for (const path of await walkFiles(root, 8, (name2) => isSessionFile("claude", name2))) {
       const preview = await readHead(path, 64e3);
       const record = firstJsonObject(preview);
-      const nativeId = asString(record?.sessionId) ?? basename5(path).replace(/\.jsonl$/u, "");
+      const nativeId = asString(record?.sessionId) ?? basename6(path).replace(/\.jsonl$/u, "");
       const cwd = asString(record?.cwd) ?? cwdFromClaudeProjectPath(path);
       if (cwd === void 0) continue;
       found.set(importedSessionId("claude", nativeId), {
@@ -1868,18 +2269,29 @@ async function collectClaudeOrigins(roots, found) {
     }
   }
 }
+async function collectZcodeOrigins(found) {
+  const { discoverZcodeSessions: discoverZcodeSessions2 } = await Promise.resolve().then(() => (init_zcode_scan(), zcode_scan_exports));
+  for (const row of await discoverZcodeSessions2()) {
+    if (row.cwd === void 0) continue;
+    found.set(importedSessionId("zcode", row.nativeId), {
+      id: importedSessionId("zcode", row.nativeId),
+      cwd: row.cwd,
+      title: sessionName(row.title)
+    });
+  }
+}
 async function walkFiles(root, depth, accept) {
   if (depth < 0) return [];
   let entries;
   try {
-    entries = await readdir3(root, { withFileTypes: true });
+    entries = await readdir4(root, { withFileTypes: true });
   } catch {
     return [];
   }
   const files = [];
   const dirs = [];
   for (const entry of entries) {
-    const full = join6(root, entry.name);
+    const full = join7(root, entry.name);
     if (entry.isDirectory()) dirs.push(full);
     else if (entry.isFile() && accept(entry.name)) files.push(full);
   }
@@ -1890,7 +2302,7 @@ async function listImportSessionDirs(root) {
   const found = [];
   let projects;
   try {
-    projects = await readdir3(root, { withFileTypes: true });
+    projects = await readdir4(root, { withFileTypes: true });
   } catch {
     return found;
   }
@@ -1898,13 +2310,13 @@ async function listImportSessionDirs(root) {
     if (!project.isDirectory()) continue;
     let sessions;
     try {
-      sessions = await readdir3(join6(root, project.name), { withFileTypes: true });
+      sessions = await readdir4(join7(root, project.name), { withFileTypes: true });
     } catch {
       continue;
     }
     for (const session of sessions) {
       if (session.isDirectory() && session.name.startsWith("import-")) {
-        found.push({ id: session.name, dir: join6(root, project.name, session.name) });
+        found.push({ id: session.name, dir: join7(root, project.name, session.name) });
       }
     }
   }
@@ -1925,9 +2337,9 @@ async function readStoredHeader(path) {
   return JSON.parse((await zstdDecompressAsync(buffer.subarray(0, firstEnd))).toString("utf8"));
 }
 async function moveSessionDir(root, from, cwd, id) {
-  const dest = join6(root, projectKey(cwd), id);
+  const dest = join7(root, projectKey(cwd), id);
   if (from === dest) return;
-  await mkdir4(join6(root, projectKey(cwd)), { recursive: true });
+  await mkdir4(join7(root, projectKey(cwd)), { recursive: true });
   try {
     await rename(from, dest);
   } catch (error) {
@@ -2006,7 +2418,7 @@ function firstClaudeUserText(text) {
 async function readHead(path, bytes) {
   const handle = await open2(path, "r");
   try {
-    const info = await stat3(path);
+    const info = await stat4(path);
     const size = Math.min(bytes, Number(info.size));
     const buffer = Buffer.alloc(size);
     await handle.read(buffer, 0, size, 0);
@@ -2027,7 +2439,7 @@ function apply(ctx, config = {}) {
     maxTextChars: config.maxTextChars ?? DEFAULT_CONVERT_LIMITS.maxTextChars
   };
   const maxFileBytes = config.maxFileBytes ?? 32 * 1024 * 1024;
-  const skillTarget = config.skillTarget ?? join7(homedir6(), ".dsh", "skills");
+  const skillTarget = config.skillTarget ?? join8(homedir7(), ".dsh", "skills");
   ctx.inject(["settings"], (settingsCtx) => {
     const settings = settingsCtx.get("settings");
     settings.register(SETTINGS_NS, z.object({
@@ -2091,9 +2503,9 @@ async function handleImportCommand(ctx, rawInput, runtime) {
       kind: "success",
       text: [
         "Import foreign agent conversations into this Harness.",
-        "/import list [claude|codex|cursor|grok] \u2014 discover local sessions",
+        "/import list [claude|codex|cursor|grok|zcode] \u2014 discover local sessions",
         "/import all \u2014 import every discovered session into this workspace",
-        "/import claude|codex|cursor|grok \u2014 import one store",
+        "/import claude|codex|cursor|grok|zcode \u2014 import one store",
         "/import skills \u2014 copy Claude/Codex/Cursor skills into ~/.dsh/skills",
         "/import memory \u2014 copy Claude/Codex instruction files into ~/.dsh/AGENTS.md",
         "/import automations \u2014 create DSH timers from ~/.codex/automations",
@@ -2287,9 +2699,11 @@ async function importOneSession(ctx, request, limits, maxFileBytes) {
   const persistence = requirePersistence(ctx);
   if (persistence === void 0) throw new Error("session persistence is not configured");
   try {
-    const info = await stat4(path);
-    if (info.size > maxFileBytes) {
-      return { imported: 0, skipped: 0, failed: [{ path, message: `file exceeds maxFileBytes (${String(info.size)})` }] };
+    if (!path.startsWith("zcode-sqlite://")) {
+      const info = await stat5(path);
+      if (info.size > maxFileBytes) {
+        return { imported: 0, skipped: 0, failed: [{ path, message: `file exceeds maxFileBytes (${String(info.size)})` }] };
+      }
     }
     const converted = relocate(await convertFile(path, request.source), workspaceCwdOf(ctx), request.keepCwd !== false);
     const outcome = await persistConverted(persistence, converted);
@@ -2329,8 +2743,8 @@ function looksLikePath(value) {
   return value.startsWith("/") || value.startsWith("~") || /^[A-Za-z]:[\\/]/u.test(value);
 }
 function expandHome(value) {
-  if (value === "~") return homedir6();
-  if (value.startsWith("~/")) return join7(homedir6(), value.slice(2));
+  if (value === "~") return homedir7();
+  if (value.startsWith("~/")) return join8(homedir7(), value.slice(2));
   return value;
 }
 function requirePersistence(ctx) {

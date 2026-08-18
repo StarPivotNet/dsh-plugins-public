@@ -7,6 +7,7 @@ import { convertCodexSession } from '../convert/codex.ts'
 import { loadCodexThreadNames, lookupCodexThreadName } from './codex-index.ts'
 import { convertCursorSession } from '../convert/cursor.ts'
 import { convertGrokSession, parseGrokSummary } from '../convert/grok.ts'
+import { convertZcodeSession } from '../convert/zcode.ts'
 import { detectSource } from '../convert/detect.ts'
 import type {
   ConvertedSession,
@@ -33,6 +34,10 @@ export async function convertFile(
   source: ImportSource | undefined,
   limits: ConvertLimits = DEFAULT_CONVERT_LIMITS,
 ): Promise<ConvertedSession> {
+  const detectedHint = source ?? detectSource(path, '')
+  if (detectedHint === 'zcode' && path.startsWith('zcode-sqlite://')) {
+    return convertZcodeSession('', path, limits)
+  }
   const text = await readFile(path, 'utf8')
   const detected = source ?? detectSource(path, text)
   if (detected === undefined) {
@@ -55,6 +60,7 @@ export async function convertFile(
     catch { summary = undefined }
     return convertGrokSession(text, path, limits, summary)
   }
+  if (detected === 'zcode') return convertZcodeSession(text, path, limits)
   return convertCursorSession(text, path, limits)
 }
 

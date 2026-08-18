@@ -17,7 +17,7 @@ dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:package
 
 After restart, Settings gains **导入 / Import**:
 
-- **会话** — scan the local Claude Code, Codex, and Cursor homes, then write selected conversations as cold DSH sessions
+- **会话** — scan the local Claude Code, Codex, Cursor, Grok Build, and ZCode homes, then write selected conversations as cold DSH sessions
 - **技能** — copy Claude / Codex / Cursor `SKILL.md` bundles and Markdown commands into `~/.dsh/skills`
 - **记忆** — copy `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, and Codex `MEMORY.md` into `~/.dsh/imported-memory`, and merge the instruction files into `~/.dsh/AGENTS.md`
 - **自动化** — map Codex `~/.codex/automations/*/automation.toml` RRULEs onto DSH timers. Daily/weekly local clocks and intervals of at least 5 minutes are created; faster heartbeats are listed as unsupported
@@ -27,9 +27,9 @@ Imported conversations keep user text, assistant text, reasoning, and tool-call 
 Slash commands:
 
 - `/import` — usage
-- `/import list [claude|codex|cursor]` — discover local conversations
+- `/import list [claude|codex|cursor|grok|zcode]` — discover local conversations
 - `/import all` — import every discovered conversation
-- `/import claude|codex|cursor [id-or-path]` — import one store, or one match
+- `/import claude|codex|cursor|grok|zcode [id-or-path]` — import one store, or one match
 - `/import skills [claude|codex|cursor]` — copy skills into `~/.dsh/skills`
 - `/import memory` — copy Claude/Codex instruction and memory files
 - `/import automations` — create DSH timers from Codex automations
@@ -43,6 +43,7 @@ Slash commands:
 | Codex | `~/.codex/sessions/**/rollout-*.jsonl`, `~/.codex/archived_sessions` | `~/.codex/skills` |
 | Cursor | `~/.cursor/projects`, `~/.cursor/chats`, Cursor `workspaceStorage` composer / transcript JSON | `~/.cursor/skills`, `~/.cursor/commands` |
 | Grok Build | `~/.grok/sessions/<cwd>/<id>/updates.jsonl` | bundled skills stay in Grok |
+| ZCode | `~/.zcode/cli/db/db.sqlite` sessions, `~/.zcode/v2/sessions/**/*.json` | ZCode skills stay in ZCode |
 
 The Settings page lists the newest 300 conversations and only reads the first 64 KiB of each file for title and cwd. It scans Claude, Codex, and Cursor one store at a time so the first matches appear before the slower stores finish. `/import list` does the same walk and prints the newest 40. Codex `archived_sessions` is skipped unless you pass `--archived`. Filter by title or path to reach older conversations; `/import all` still imports every discovered active-store file that fits `maxFileBytes`.
 

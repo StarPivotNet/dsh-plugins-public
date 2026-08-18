@@ -57,7 +57,7 @@ export interface SessionImportSectionInjected {
   repairImported: () => Promise<{ repaired: number; skipped: number; failed: readonly { id: string; message: string }[] }>
 }
 
-const SESSION_SOURCES: readonly SessionImportRow['source'][] = ['claude', 'codex', 'cursor', 'grok']
+const SESSION_SOURCES: readonly SessionImportRow['source'][] = ['claude', 'codex', 'cursor', 'grok', 'zcode']
 type ImportTab = 'sessions' | 'skills' | 'memory' | 'automations'
 
 export type SessionImportSectionProps =
@@ -221,6 +221,7 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
               <option value="codex">{t('sourceCodex')}</option>
               <option value="cursor">{t('sourceCursor')}</option>
               <option value="grok">{t('sourceGrok')}</option>
+              <option value="zcode">{t('sourceZcode')}</option>
             </select>
           </label>
         ) : null}

@@ -41,6 +41,7 @@ export async function discoverForeignOrigins(): Promise<Map<string, ForeignOrigi
     collectCodexOrigins(roots.codex, found),
     collectGrokOrigins(roots.grok, found),
     collectClaudeOrigins(roots.claude, found),
+    collectZcodeOrigins(found),
   ])
   return found
 }
@@ -207,6 +208,18 @@ async function collectClaudeOrigins(roots: readonly string[], found: Map<string,
         title: sessionName(firstClaudeUserText(preview) ?? nativeId),
       })
     }
+  }
+}
+
+async function collectZcodeOrigins(found: Map<string, ForeignOrigin>): Promise<void> {
+  const { discoverZcodeSessions } = await import('./zcode-scan.ts')
+  for (const row of await discoverZcodeSessions()) {
+    if (row.cwd === undefined) continue
+    found.set(importedSessionId('zcode', row.nativeId), {
+      id: importedSessionId('zcode', row.nativeId),
+      cwd: row.cwd,
+      title: sessionName(row.title),
+    })
   }
 }
 

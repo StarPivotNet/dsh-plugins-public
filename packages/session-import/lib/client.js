@@ -41,11 +41,11 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var SessionImportSection_default = { "search": "YmEt6W_search", "button": "YmEt6W_button", "empty": "YmEt6W_empty", "list": "YmEt6W_list", "hint": "YmEt6W_hint", "title": "YmEt6W_title", "progressBar": "YmEt6W_progressBar", "tab": "YmEt6W_tab", "status": "YmEt6W_status", "progress": "YmEt6W_progress", "heading": "YmEt6W_heading", "intro": "YmEt6W_intro", "row": "YmEt6W_row", "failure": "YmEt6W_failure", "toolbar": "YmEt6W_toolbar", "meta": "YmEt6W_meta", "select": "YmEt6W_select", "tag": "YmEt6W_tag", "section": "YmEt6W_section", "tabs": "YmEt6W_tabs" };
+var SessionImportSection_default = { "tabs": "YmEt6W_tabs", "failure": "YmEt6W_failure", "search": "YmEt6W_search", "toolbar": "YmEt6W_toolbar", "status": "YmEt6W_status", "row": "YmEt6W_row", "meta": "YmEt6W_meta", "progress": "YmEt6W_progress", "intro": "YmEt6W_intro", "progressBar": "YmEt6W_progressBar", "button": "YmEt6W_button", "select": "YmEt6W_select", "section": "YmEt6W_section", "heading": "YmEt6W_heading", "empty": "YmEt6W_empty", "list": "YmEt6W_list", "tag": "YmEt6W_tag", "hint": "YmEt6W_hint", "title": "YmEt6W_title", "tab": "YmEt6W_tab" };
 
 // src/client/SessionImportSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
-var SESSION_SOURCES = ["claude", "codex", "cursor", "grok"];
+var SESSION_SOURCES = ["claude", "codex", "cursor", "grok", "zcode"];
 function SessionImportSection(props) {
   const { t, listSessions, importSessions, importOneSession, listSkills, importSkills, listMemories, importMemories, listAutomations, importAutomations, repairImported } = props;
   const [tab, setTab] = (0, import_react.useState)("sessions");
@@ -184,7 +184,8 @@ function SessionImportSection(props) {
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "claude", children: t("sourceClaude") }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "codex", children: t("sourceCodex") }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "cursor", children: t("sourceCursor") }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "grok", children: t("sourceGrok") })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "grok", children: t("sourceGrok") }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "zcode", children: t("sourceZcode") })
         ] })
       ] }) : null,
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -376,7 +377,7 @@ function formatBytes(bytes) {
 var zh = {
   nav: "\u5BFC\u5165",
   title: "\u5BFC\u5165\u5176\u4ED6 AI \u4F1A\u8BDD",
-  intro: "\u626B\u63CF\u672C\u673A Cursor\u3001Codex\u3001Claude Code \u548C Grok Build \u7684\u4F1A\u8BDD\u3001\u6280\u80FD\u3001\u9879\u76EE\u8BB0\u5FC6\u548C\u81EA\u52A8\u5316\u3002\u5BFC\u5165\u9ED8\u8BA4\u7559\u5728\u539F\u6765\u7684\u9879\u76EE\u76EE\u5F55\uFF0C\u6CA1\u6709\u5BF9\u5E94\u5DE5\u4F5C\u533A\u5C31\u81EA\u52A8\u65B0\u5EFA\u3002",
+  intro: "\u626B\u63CF\u672C\u673A Cursor\u3001Codex\u3001Claude Code\u3001Grok Build \u548C ZCode \u7684\u4F1A\u8BDD\u3001\u6280\u80FD\u3001\u9879\u76EE\u8BB0\u5FC6\u548C\u81EA\u52A8\u5316\u3002\u5BFC\u5165\u9ED8\u8BA4\u7559\u5728\u539F\u6765\u7684\u9879\u76EE\u76EE\u5F55\uFF0C\u6CA1\u6709\u5BF9\u5E94\u5DE5\u4F5C\u533A\u5C31\u81EA\u52A8\u65B0\u5EFA\u3002",
   sessionsTab: "\u4F1A\u8BDD",
   skillsTab: "\u6280\u80FD",
   memoryTab: "\u8BB0\u5FC6",
@@ -399,6 +400,7 @@ var zh = {
   sourceCodex: "Codex",
   sourceCursor: "Cursor",
   sourceGrok: "Grok Build",
+  sourceZcode: "ZCode",
   search: "\u6309\u6807\u9898\u6216\u8DEF\u5F84\u7B5B\u9009",
   imported: "\u5BFC\u5165\u5B8C\u6210\uFF08\u65B0\u5BFC\u5165 / \u5DF2\u5B58\u5728\uFF09",
   repaired: "\u5DF2\u6309\u539F\u9879\u76EE\u91CD\u65B0\u5206\u7EC4\uFF08\u5DF2\u4FEE\u590D / \u65E0\u9700\u6539\u52A8\uFF09",
@@ -416,7 +418,7 @@ var zh = {
 var en = {
   nav: "Import",
   title: "Import other AI sessions",
-  intro: "Scan local Cursor, Codex, Claude Code, and Grok Build conversations, skills, memory, and automations. Imports stay in the original project directory and create a workspace when it is missing.",
+  intro: "Scan local Cursor, Codex, Claude Code, Grok Build, and ZCode conversations, skills, memory, and automations. Imports stay in the original project directory and create a workspace when it is missing.",
   sessionsTab: "Sessions",
   skillsTab: "Skills",
   memoryTab: "Memory",
@@ -439,6 +441,7 @@ var en = {
   sourceCodex: "Codex",
   sourceCursor: "Cursor",
   sourceGrok: "Grok Build",
+  sourceZcode: "ZCode",
   search: "Filter by title or path",
   imported: "Import finished (new / already present).",
   repaired: "Moved leftover imports back to their original projects (repaired / unchanged).",

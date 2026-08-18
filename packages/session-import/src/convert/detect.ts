@@ -12,6 +12,9 @@ export function detectSource(path: string, text: string): ImportSource | undefin
     return 'cursor'
   }
   if (normalized.includes('/.grok/sessions/') || normalized.endsWith('/updates.jsonl')) return 'grok'
+  if (normalized.startsWith('zcode-sqlite://') || normalized.includes('/.zcode/v2/sessions/') || normalized.includes('/zcode/.zcode/v2/sessions/')) {
+    return 'zcode'
+  }
   const first = firstRecord(text)
   if (first === undefined) return undefined
   if (asString(first.sessionId) !== undefined && (first.type === 'user' || first.type === 'assistant' || first.type === 'mode')) {
@@ -21,6 +24,7 @@ export function detectSource(path: string, text: string): ImportSource | undefin
   if (first.method === 'session/update') return 'grok'
   if (asString(first.composerId) !== undefined || asString(first.bubbleId) !== undefined) return 'cursor'
   if (Array.isArray(first.fullConversationHeadersOnly) || Array.isArray(first.bubbles)) return 'cursor'
+  if (isRecord(first.meta) && Array.isArray(first.messages) && asString(first.meta.taskId) !== undefined) return 'zcode'
   return undefined
 }
 

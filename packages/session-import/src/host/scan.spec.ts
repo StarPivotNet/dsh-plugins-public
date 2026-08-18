@@ -37,7 +37,7 @@ test('discoverSessions finds nested conversation files', async () => {
   await mkdir(nested, { recursive: true })
   const path = join(nested, 'rollout-2026-08-04T22-14-45-abc.jsonl')
   await writeFile(path, '{"type":"session_meta","payload":{"id":"abc","thread_name":"Hello"}}\n')
-  const found = await discoverSessions({ claude: [], codex: [root], cursor: [], grok: [] })
+  const found = await discoverSessions({ claude: [], codex: [root], cursor: [], grok: [], zcode: [] })
   assert.equal(found.length, 1)
   assert.equal(found[0]?.source, 'codex')
   assert.equal(found[0]?.path, path)
@@ -125,6 +125,7 @@ test('defaultScanRoots skips Codex archives unless asked', () => {
   const archived = defaultScanRoots('/tmp/home', true)
   assert.ok(archived.codex.some(path => path.endsWith('archived_sessions')))
   assert.deepEqual(active.grok, ['/tmp/home/.grok/sessions'])
+  assert.ok(active.zcode?.includes('/tmp/home/.zcode/cli/db/db.sqlite'))
 })
 
 function session(id: string, updatedAt: number, bytes: number, title = id): DiscoveredSession {

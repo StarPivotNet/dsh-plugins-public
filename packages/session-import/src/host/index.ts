@@ -213,7 +213,7 @@ async function handleImportCommand(
     }
     if (outcome.alreadyImported) skipped += 1
     else imported += 1
-    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd)
+    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd, outcome.converted.title)
   }
   const failed = failures.length === 0 ? '' : `\nFailed:\n${failures.slice(0, 8).join('\n')}`
   return {
@@ -314,7 +314,7 @@ async function importSessions(
     }
     if (outcome.alreadyImported) skipped += 1
     else imported += 1
-    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd)
+    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd, outcome.converted.title)
   }
   if (request.paths !== undefined) {
     for (const path of request.paths) {
@@ -326,7 +326,7 @@ async function importSessions(
         else {
           if (outcome.alreadyImported) skipped += 1
           else imported += 1
-          await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd)
+          await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd, outcome.converted.title)
         }
       } catch (error) {
         failed.push({ path, message: error instanceof Error ? error.message : String(error) })
@@ -492,9 +492,10 @@ async function resolveWorkspaceId(
   return workspace?.id ?? registry?.list?.()[0]?.id
 }
 
-async function settleImported(ctx: Context, id: string, cwd: string | undefined): Promise<void> {
+async function settleImported(ctx: Context, id: string, cwd: string | undefined, title?: string): Promise<void> {
   await warmProjection(ctx, id)
   await attachImported(ctx, id, cwd)
+  await publishTitle(ctx, id, title)
 }
 
 async function warmProjection(ctx: Context, id: string): Promise<void> {
@@ -515,6 +516,25 @@ async function attachImported(ctx: Context, id: string, cwd: string | undefined)
     await workspace?.attachSession?.(id)
   } catch {
     // The session remains openable from Ungrouped if workspace membership fails.
+  }
+}
+
+async function publishTitle(ctx: Context, id: string, title: string | undefined): Promise<void> {
+  const name = title?.trim()
+  if (name === undefined || name.length === 0) return
+  const persistence = ctx.get('sessionPersistence') as {
+    prepare?: (sessionId: string) => Promise<{ publish?: () => Promise<{ session?: unknown }> }>
+  } | undefined
+  const titles = ctx.get('sessionTitle') as { rename?: (session: unknown, next: string) => unknown } | undefined
+  if (persistence?.prepare === undefined || titles?.rename === undefined) return
+  try {
+    const prepared = await persistence.prepare(id)
+    const published = await prepared.publish?.()
+    const session = published?.session
+      ?? (ctx.get('sessions') as { get?: (sessionId: string) => unknown } | undefined)?.get?.(id)
+    if (session !== undefined) titles.rename(session, name)
+  } catch {
+    // Title stays in the seed log; listing can pick it up after the next Host reload.
   }
 }
 

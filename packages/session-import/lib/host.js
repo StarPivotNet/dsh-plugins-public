@@ -219,7 +219,7 @@ function convertConversation(conversation, path, limits = DEFAULT_CONVERT_LIMITS
   const lastTime = epochMs(conversation.items.at(-1)?.time ?? conversation.updatedAt);
   closeTurn(lastTime);
   const firstUser = conversation.items.find((item) => item.kind === "user" && item.source === "user" && item.text.trim().length > 0 && !item.text.trimStart().startsWith("# AGENTS.md") && !item.text.trimStart().startsWith("# Files mentioned"));
-  const title = conversation.title?.trim() || (firstUser === void 0 ? "Imported session" : fallbackTitle(firstUser.text));
+  const title = sessionName(conversation.title?.trim() || (firstUser === void 0 ? "Imported session" : firstUser.text));
   const firstUserEvent = events.find((event) => event.type === "user/message");
   if (title.length > 0) {
     push("session/title", {
@@ -267,6 +267,10 @@ function toolResultEvent(turn, step, callId, text, isError, limits) {
 }
 function isAbsolutePath(value) {
   return value !== void 0 && (value.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(value));
+}
+function sessionName(raw, maxChars = 48) {
+  const cleaned = raw.replace(/^Automation:\s*/u, "").replace(/\s+Automation ID:.*$/u, "").replace(/\s+/gu, " ").trim();
+  return fallbackTitle(cleaned, maxChars);
 }
 function messageId(source, nativeId, seq) {
   return `import-${source}-${nativeId}-${String(seq)}`;
@@ -1785,7 +1789,7 @@ ${lines.join("\n")}${extra}` };
     }
     if (outcome.alreadyImported) skipped += 1;
     else imported += 1;
-    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd);
+    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd, outcome.converted.title);
   }
   const failed = failures.length === 0 ? "" : `
 Failed:
@@ -1857,7 +1861,7 @@ async function importSessions(ctx, request, limits, maxFileBytes) {
     }
     if (outcome.alreadyImported) skipped += 1;
     else imported += 1;
-    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd);
+    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd, outcome.converted.title);
   }
   if (request.paths !== void 0) {
     for (const path of request.paths) {
@@ -1869,7 +1873,7 @@ async function importSessions(ctx, request, limits, maxFileBytes) {
         else {
           if (outcome.alreadyImported) skipped += 1;
           else imported += 1;
-          await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd);
+          await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd, outcome.converted.title);
         }
       } catch (error) {
         failed.push({ path, message: error instanceof Error ? error.message : String(error) });
@@ -1979,9 +1983,10 @@ async function resolveWorkspaceId(registry, cwd, fallbackCwd) {
   const workspace = await ensureWorkspace(registry, cwd ?? fallbackCwd);
   return workspace?.id ?? registry?.list?.()[0]?.id;
 }
-async function settleImported(ctx, id, cwd) {
+async function settleImported(ctx, id, cwd, title) {
   await warmProjection(ctx, id);
   await attachImported(ctx, id, cwd);
+  await publishTitle(ctx, id, title);
 }
 async function warmProjection(ctx, id) {
   const cache = ctx.get("sessionProjectionCache");
@@ -1997,6 +2002,20 @@ async function attachImported(ctx, id, cwd) {
   try {
     const workspace = await ensureWorkspace(registry, cwd ?? workspaceCwdOf(ctx));
     await workspace?.attachSession?.(id);
+  } catch {
+  }
+}
+async function publishTitle(ctx, id, title) {
+  const name2 = title?.trim();
+  if (name2 === void 0 || name2.length === 0) return;
+  const persistence = ctx.get("sessionPersistence");
+  const titles = ctx.get("sessionTitle");
+  if (persistence?.prepare === void 0 || titles?.rename === void 0) return;
+  try {
+    const prepared = await persistence.prepare(id);
+    const published = await prepared.publish?.();
+    const session = published?.session ?? ctx.get("sessions")?.get?.(id);
+    if (session !== void 0) titles.rename(session, name2);
   } catch {
   }
 }

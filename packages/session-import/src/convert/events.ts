@@ -159,7 +159,7 @@ export function convertConversation(
     && !item.text.trimStart().startsWith('# AGENTS.md')
     && !item.text.trimStart().startsWith('# Files mentioned')
   ))
-  const title = conversation.title?.trim() || (firstUser === undefined ? 'Imported session' : fallbackTitle(firstUser.text))
+  const title = sessionName(conversation.title?.trim() || (firstUser === undefined ? 'Imported session' : firstUser.text))
   const firstUserEvent = events.find(event => event.type === 'user/message')
   if (title.length > 0) {
     push('session/title', {
@@ -219,6 +219,16 @@ function toolResultEvent(
 /** Whether a foreign cwd is safe to stamp onto a DSH session header. */
 function isAbsolutePath(value: string | undefined): value is string {
   return value !== undefined && (value.startsWith('/') || /^[A-Za-z]:[\\/]/u.test(value))
+}
+
+/** Short sidebar label: first sentence, no Automation boilerplate. */
+export function sessionName(raw: string, maxChars = 48): string {
+  const cleaned = raw
+    .replace(/^Automation:\s*/u, '')
+    .replace(/\s+Automation ID:.*$/u, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
+  return fallbackTitle(cleaned, maxChars)
 }
 
 /** Deterministic message id for one imported event. */

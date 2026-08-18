@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { convertConversation } from './events.ts'
+import { convertConversation, sessionName } from './events.ts'
 import type { TranscriptConversation } from './types.ts'
 
 function conversation(items: TranscriptConversation['items']): TranscriptConversation {
@@ -49,6 +49,13 @@ test('tool calls stay inside one step until results arrive', () => {
   ])
   const missing = converted.events.filter(event => event.type === 'tool/result' && JSON.stringify(event.data).includes('no recorded result'))
   assert.equal(missing.length, 0)
+})
+
+test('sessionName strips automation boilerplate', () => {
+  assert.equal(
+    sessionName('Automation: FAC CLIProxyAPI 每日上游合并与部署 Automation ID: fac-cliproxyapi Automation…'),
+    'FAC CLIProxyAPI 每日上游合并与部署',
+  )
 })
 
 test('unfinished tool calls receive a synthetic result before turn/end', () => {

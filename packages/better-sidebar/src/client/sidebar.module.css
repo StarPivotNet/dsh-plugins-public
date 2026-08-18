@@ -1123,21 +1123,71 @@
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 
+.browserAddress {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  height: 28px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  overflow: hidden;
+}
+
+.browserAddress:focus-within {
+  border-color: var(--dsw-alias-border-l2);
+}
+
 .browserInput {
   flex: 1;
   min-width: 0;
-  height: 28px;
+  height: 100%;
   padding: 0 10px;
-  border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 6px;
-  background: var(--dsw-alias-bg-layer-1);
+  border: none;
+  border-radius: 0;
+  background: transparent;
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xxs-12);
 }
 
 .browserInput:focus {
   outline: none;
-  border-color: var(--dsw-alias-border-l2);
+}
+
+.browserActions {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+  border-left: 1px solid var(--dsw-alias-border-l1);
+}
+
+.browserAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.browserAction + .browserAction {
+  border-left: 1px solid var(--dsw-alias-border-l1);
+}
+
+.browserAction:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.browserAction:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .browserMessage {
@@ -2003,6 +2053,7 @@
 .toggleButton:focus-visible,
 .bottomClose:focus-visible,
 .iconButton:focus-visible,
+.browserAction:focus-visible,
 .tab:focus-visible,
 .tabClose:focus-visible,
 .tabBarPlus:focus-visible,

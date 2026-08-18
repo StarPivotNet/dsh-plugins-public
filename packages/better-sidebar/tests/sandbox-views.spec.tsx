@@ -151,10 +151,12 @@ describe('browser tab iframe sandbox', () => {
     const store = createSidebarStore()
     // No URL yet: the external-open action is disabled.
     const start = renderToString(createElement(BrowserView, tabProps(store)))
+    expect(start).toContain('aria-label="地址栏操作"')
     expect(start).toContain('aria-label="在浏览器中打开"')
     expect(start).toContain('title="在浏览器中打开" disabled=""')
     // With a URL: enabled.
     const loaded = renderToString(createElement(BrowserView, tabProps(store, 'https://example.com/')))
+    expect(loaded).toContain('aria-label="地址栏操作"')
     expect(loaded).toContain('aria-label="在浏览器中打开"')
     expect(loaded).not.toContain('title="在浏览器中打开" disabled=""')
   })

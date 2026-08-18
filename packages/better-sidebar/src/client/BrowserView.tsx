@@ -14,7 +14,9 @@
  * The URL is persisted onto the tab (path/title via the patchTab reducer)
  * so a reload restores the visited page; the back/forward stack only tracks
  * address-bar navigations (in-frame link clicks are cross-origin and
- * invisible — a documented limitation).
+ * invisible — a documented limitation). Go / open-external sit inside the
+ * address field as a segmented action group, not as free-floating icon
+ * buttons after the input.
  */
 import { useEffect, useState } from 'react'
 import {
@@ -157,37 +159,41 @@ export function BrowserView(props: TabComponentProps) {
         >
           <IconRefreshOutline14 />
         </button>
-        <input
-          className={css.browserInput}
-          value={input}
-          placeholder={t('browserPlaceholder')}
-          spellCheck={false}
-          onChange={event => { setInput(event.target.value) }}
-          onKeyDown={event => {
-            if (event.key === 'Enter') navigateTo(input)
-          }}
-        />
-        <button
-          type="button"
-          className={css.iconButton}
-          aria-label={t('browserGo')}
-          title={t('browserGo')}
-          onClick={() => { navigateTo(input) }}
-        >
-          <IconLinkOutline14 />
-        </button>
-        <button
-          type="button"
-          className={css.iconButton}
-          aria-label={t('browserOpenExternal')}
-          title={t('browserOpenExternal')}
-          disabled={url === undefined}
-          onClick={() => {
-            if (url !== undefined) window.open(url, '_blank', 'noopener')
-          }}
-        >
-          <IconRightUpOutline16 size={15} />
-        </button>
+        <div className={css.browserAddress}>
+          <input
+            className={css.browserInput}
+            value={input}
+            placeholder={t('browserPlaceholder')}
+            spellCheck={false}
+            onChange={event => { setInput(event.target.value) }}
+            onKeyDown={event => {
+              if (event.key === 'Enter') navigateTo(input)
+            }}
+          />
+          <div className={css.browserActions} role="group" aria-label={t('browserActions')}>
+            <button
+              type="button"
+              className={css.browserAction}
+              aria-label={t('browserGo')}
+              title={t('browserGo')}
+              onClick={() => { navigateTo(input) }}
+            >
+              <IconLinkOutline14 />
+            </button>
+            <button
+              type="button"
+              className={css.browserAction}
+              aria-label={t('browserOpenExternal')}
+              title={t('browserOpenExternal')}
+              disabled={url === undefined}
+              onClick={() => {
+                if (url !== undefined) window.open(url, '_blank', 'noopener')
+              }}
+            >
+              <IconRightUpOutline16 size={14} />
+            </button>
+          </div>
+        </div>
       </div>
       {message !== null && <div className={css.browserMessage}>{message}</div>}
       <SandboxStatusBar

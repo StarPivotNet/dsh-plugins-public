@@ -38,16 +38,15 @@ export interface PresentSessionsOptions {
 }
 
 /** Default homes for Claude Code, Codex, and Cursor. */
-export function defaultScanRoots(home = homedir()): ScanRoots {
+export function defaultScanRoots(home = homedir(), includeArchived = false): ScanRoots {
+  const codex = [join(home, '.codex', 'sessions')]
+  if (includeArchived) codex.push(join(home, '.codex', 'archived_sessions'))
   return {
     claude: [
       join(home, '.claude', 'projects'),
       join(home, '.claude', 'sessions'),
     ],
-    codex: [
-      join(home, '.codex', 'sessions'),
-      join(home, '.codex', 'archived_sessions'),
-    ],
+    codex,
     cursor: [
       join(home, '.cursor', 'projects'),
       join(home, '.cursor', 'chats'),

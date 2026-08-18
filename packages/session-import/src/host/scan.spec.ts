@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   DEFAULT_LIST_LIMIT,
+  defaultScanRoots,
   discoverSessions,
   enrichFromPreview,
   filterDiscovered,
@@ -97,6 +98,13 @@ test('enrichFromPreview reads Claude user text and Codex session_meta', () => {
 
 test('default list limit stays small enough for the Settings page', () => {
   assert.equal(DEFAULT_LIST_LIMIT, 300)
+})
+
+test('defaultScanRoots skips Codex archives unless asked', () => {
+  const active = defaultScanRoots('/tmp/home')
+  assert.deepEqual(active.codex, ['/tmp/home/.codex/sessions'])
+  const archived = defaultScanRoots('/tmp/home', true)
+  assert.ok(archived.codex.some(path => path.endsWith('archived_sessions')))
 })
 
 function session(id: string, updatedAt: number, bytes: number, title = id): DiscoveredSession {

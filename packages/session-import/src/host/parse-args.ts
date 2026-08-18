@@ -5,8 +5,8 @@ import type { ImportSource } from '../convert/types.ts'
 /** One parsed `/import` invocation. */
 export type ImportCommand =
   | { readonly kind: 'help' }
-  | { readonly kind: 'list'; readonly source?: ImportSource }
-  | { readonly kind: 'sessions'; readonly source?: ImportSource; readonly query?: string; readonly keepCwd: boolean }
+  | { readonly kind: 'list'; readonly source?: ImportSource; readonly includeArchived: boolean }
+  | { readonly kind: 'sessions'; readonly source?: ImportSource; readonly query?: string; readonly keepCwd: boolean; readonly includeArchived: boolean }
   | { readonly kind: 'skills'; readonly source?: ImportSource }
 
 const SOURCES = new Set<ImportSource>(['claude', 'codex', 'cursor'])
@@ -15,26 +15,29 @@ const SOURCES = new Set<ImportSource>(['claude', 'codex', 'cursor'])
 export function parseImportArgs(rawInput: string): ImportCommand {
   const rawTokens = rawInput.trim().split(/\s+/u).filter(token => token.length > 0)
   const keepCwd = rawTokens.some(token => token === '--keep-cwd')
-  const tokens = rawTokens.filter(token => token !== '--keep-cwd')
+  const includeArchived = rawTokens.some(token => token === '--archived')
+  const tokens = rawTokens.filter(token => token !== '--keep-cwd' && token !== '--archived')
   if (tokens.length === 0) return { kind: 'help' }
   const first = tokens[0]?.toLowerCase()
   if (first === 'help' || first === '--help') return { kind: 'help' }
   if (first === 'list') {
     const source = parseSource(tokens[1])
     return source === undefined && tokens[1] !== undefined
-      ? { kind: 'sessions', query: tokens.slice(1).join(' '), keepCwd }
-      : { kind: 'list', source }
+      ? { kind: 'sessions', query: tokens.slice(1).join(' '), keepCwd, includeArchived }
+      : { kind: 'list', source, includeArchived }
   }
   if (first === 'skills' || first === 'skill') {
     return { kind: 'skills', source: parseSource(tokens[1]) }
   }
-  if (first === 'all') return { kind: 'sessions', keepCwd }
+  if (first === 'all') return { kind: 'sessions', keepCwd, includeArchived }
   const source = parseSource(first)
   if (source !== undefined) {
     const query = tokens.slice(1).join(' ').trim()
-    return query.length === 0 ? { kind: 'sessions', source, keepCwd } : { kind: 'sessions', source, query, keepCwd }
+    return query.length === 0
+      ? { kind: 'sessions', source, keepCwd, includeArchived }
+      : { kind: 'sessions', source, query, keepCwd, includeArchived }
   }
-  return { kind: 'sessions', query: tokens.join(' '), keepCwd }
+  return { kind: 'sessions', query: tokens.join(' '), keepCwd, includeArchived }
 }
 
 /** Parse one source token. */

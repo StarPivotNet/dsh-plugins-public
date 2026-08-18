@@ -30,6 +30,8 @@ export interface SessionImportSectionInjected {
   importSkills: (paths: readonly string[]) => Promise<{ copied: number; overwritten: number; failed: readonly { path: string; message: string }[] }>
 }
 
+const SESSION_SOURCES: readonly SessionImportRow['source'][] = ['claude', 'codex', 'cursor']
+
 export type SessionImportSectionProps =
   PropsRuntime<'settings.section'>
   & PropsLocale<'settings.sessionImport'>
@@ -54,9 +56,19 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
     setFailure('')
     try {
       if (tab === 'sessions') {
-        const snapshot = await listSessions(source === 'all' ? undefined : source, nextQuery.trim() || undefined)
-        setRows(snapshot.entries)
-        setTotal(snapshot.total ?? snapshot.entries.length)
+        const sources = source === 'all' ? SESSION_SOURCES : [source]
+        const collected: SessionImportRow[] = []
+        let discovered = 0
+        setRows([])
+        setTotal(0)
+        for (const nextSource of sources) {
+          const snapshot = await listSessions(nextSource, nextQuery.trim() || undefined)
+          collected.push(...snapshot.entries)
+          discovered += snapshot.total ?? snapshot.entries.length
+          collected.sort((left, right) => right.updatedAt - left.updatedAt || left.path.localeCompare(right.path))
+          setRows([...collected])
+          setTotal(discovered)
+        }
       } else {
         const snapshot = await listSkills()
         setSkills(snapshot.entries)
@@ -167,27 +179,25 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
       </div>
       {message.length > 0 ? <p className={css.status}>{message}</p> : null}
       {failure.length > 0 ? <p className={css.failure} role="alert">{failure}</p> : null}
-      {status === 'loading' ? (
-        <p className={css.empty}>{t('refreshing')}</p>
-      ) : status === 'error' ? (
+      {status === 'error' ? (
         <p className={css.failure} role="alert">{t('error')}</p>
+      ) : tab === 'sessions' && visibleRows.length === 0 ? (
+        <p className={css.empty}>{status === 'loading' ? t('refreshing') : t('empty')}</p>
       ) : tab === 'sessions' ? (
-        visibleRows.length === 0 ? <p className={css.empty}>{t('empty')}</p> : (
-          <div className={css.list}>
-            {visibleRows.map(row => (
-              <label key={row.path} className={css.row}>
-                <input type="checkbox" checked={selected.has(row.path)} onChange={() => { toggle(row.path) }} />
-                <span>
-                  <p className={css.title}>{row.title}</p>
-                  <p className={css.meta}><span className={css.tag}>{row.source}</span> {t('nativeId')}: {row.nativeId}</p>
-                  {row.cwd === undefined ? null : <p className={css.meta}>{t('cwd')}: {row.cwd}</p>}
-                  <p className={css.meta}>{row.path}</p>
-                </span>
-                <span className={css.meta}>{formatBytes(row.bytes)}</span>
-              </label>
-            ))}
-          </div>
-        )
+        <div className={css.list}>
+          {visibleRows.map(row => (
+            <label key={row.path} className={css.row}>
+              <input type="checkbox" checked={selected.has(row.path)} onChange={() => { toggle(row.path) }} />
+              <span>
+                <p className={css.title}>{row.title}</p>
+                <p className={css.meta}><span className={css.tag}>{row.source}</span> {t('nativeId')}: {row.nativeId}</p>
+                {row.cwd === undefined ? null : <p className={css.meta}>{t('cwd')}: {row.cwd}</p>}
+                <p className={css.meta}>{row.path}</p>
+              </span>
+              <span className={css.meta}>{formatBytes(row.bytes)}</span>
+            </label>
+          ))}
+        </div>
       ) : (
         visibleSkills.length === 0 ? <p className={css.empty}>{t('skillsEmpty')}</p> : (
           <div className={css.list}>

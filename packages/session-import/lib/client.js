@@ -41,10 +41,11 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var SessionImportSection_default = { "search": "YmEt6W_search", "failure": "YmEt6W_failure", "status": "YmEt6W_status", "hint": "YmEt6W_hint", "tabs": "YmEt6W_tabs", "button": "YmEt6W_button", "list": "YmEt6W_list", "meta": "YmEt6W_meta", "section": "YmEt6W_section", "empty": "YmEt6W_empty", "heading": "YmEt6W_heading", "tab": "YmEt6W_tab", "intro": "YmEt6W_intro", "toolbar": "YmEt6W_toolbar", "row": "YmEt6W_row", "title": "YmEt6W_title", "tag": "YmEt6W_tag", "select": "YmEt6W_select" };
+var SessionImportSection_default = { "row": "YmEt6W_row", "tag": "YmEt6W_tag", "heading": "YmEt6W_heading", "tab": "YmEt6W_tab", "failure": "YmEt6W_failure", "search": "YmEt6W_search", "section": "YmEt6W_section", "tabs": "YmEt6W_tabs", "list": "YmEt6W_list", "status": "YmEt6W_status", "title": "YmEt6W_title", "empty": "YmEt6W_empty", "meta": "YmEt6W_meta", "intro": "YmEt6W_intro", "button": "YmEt6W_button", "toolbar": "YmEt6W_toolbar", "hint": "YmEt6W_hint", "select": "YmEt6W_select" };
 
 // src/client/SessionImportSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
+var SESSION_SOURCES = ["claude", "codex", "cursor"];
 function SessionImportSection(props) {
   const { t, listSessions, importSessions, listSkills, importSkills } = props;
   const [tab, setTab] = (0, import_react.useState)("sessions");
@@ -63,9 +64,19 @@ function SessionImportSection(props) {
     setFailure("");
     try {
       if (tab === "sessions") {
-        const snapshot = await listSessions(source === "all" ? void 0 : source, nextQuery.trim() || void 0);
-        setRows(snapshot.entries);
-        setTotal(snapshot.total ?? snapshot.entries.length);
+        const sources = source === "all" ? SESSION_SOURCES : [source];
+        const collected = [];
+        let discovered = 0;
+        setRows([]);
+        setTotal(0);
+        for (const nextSource of sources) {
+          const snapshot = await listSessions(nextSource, nextQuery.trim() || void 0);
+          collected.push(...snapshot.entries);
+          discovered += snapshot.total ?? snapshot.entries.length;
+          collected.sort((left, right) => right.updatedAt - left.updatedAt || left.path.localeCompare(right.path));
+          setRows([...collected]);
+          setTotal(discovered);
+        }
       } else {
         const snapshot = await listSkills();
         setSkills(snapshot.entries);
@@ -171,7 +182,7 @@ function SessionImportSection(props) {
     ] }),
     message.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.status, children: message }) : null,
     failure.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.failure, role: "alert", children: failure }) : null,
-    status === "loading" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.empty, children: t("refreshing") }) : status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.failure, role: "alert", children: t("error") }) : tab === "sessions" ? visibleRows.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.empty, children: t("empty") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.list, children: visibleRows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: SessionImportSection_default.row, children: [
+    status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.failure, role: "alert", children: t("error") }) : tab === "sessions" && visibleRows.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.empty, children: status === "loading" ? t("refreshing") : t("empty") }) : tab === "sessions" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.list, children: visibleRows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: SessionImportSection_default.row, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "checkbox", checked: selected.has(row.path), onChange: () => {
         toggle(row.path);
       } }),
@@ -220,7 +231,7 @@ function formatBytes(bytes) {
 var zh = {
   nav: "\u5BFC\u5165",
   title: "\u5BFC\u5165\u5176\u4ED6 AI \u4F1A\u8BDD",
-  intro: "\u626B\u63CF\u672C\u673A Cursor\u3001Codex \u548C Claude Code \u7684\u4F1A\u8BDD\u4E0E\u6280\u80FD\uFF0C\u8F6C\u6210 DeepSeek Harness \u4F1A\u8BDD\u3002\u5BFC\u5165\u540E\u5237\u65B0\u4F1A\u8BDD\u5217\u8868\u5373\u53EF\u6253\u5F00\u3002",
+  intro: "\u626B\u63CF\u672C\u673A Cursor\u3001Codex \u548C Claude Code \u7684\u4F1A\u8BDD\u4E0E\u6280\u80FD\uFF0C\u8F6C\u6210 DeepSeek Harness \u4F1A\u8BDD\u3002\u9ED8\u8BA4\u4E0D\u626B Codex \u5F52\u6863\u76EE\u5F55\u3002\u5BFC\u5165\u540E\u5237\u65B0\u4F1A\u8BDD\u5217\u8868\u5373\u53EF\u6253\u5F00\u3002",
   sessionsTab: "\u4F1A\u8BDD",
   skillsTab: "\u6280\u80FD",
   refresh: "\u91CD\u65B0\u626B\u63CF",
@@ -250,7 +261,7 @@ var zh = {
 var en = {
   nav: "Import",
   title: "Import other AI sessions",
-  intro: "Scan local Cursor, Codex, and Claude Code conversations and skills, then write them as DeepSeek Harness sessions. Refresh the session list after import.",
+  intro: "Scan local Cursor, Codex, and Claude Code conversations and skills, then write them as DeepSeek Harness sessions. Codex archived_sessions is skipped unless you pass --archived. Refresh the session list after import.",
   sessionsTab: "Sessions",
   skillsTab: "Skills",
   refresh: "Rescan",

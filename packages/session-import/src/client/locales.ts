@@ -3,7 +3,7 @@
 export const zh = {
   nav: '导入',
   title: '导入其他 AI 会话',
-  intro: '扫描本机 Cursor、Codex 和 Claude Code 的会话与技能，转成 DeepSeek Harness 会话。导入后刷新会话列表即可打开。',
+  intro: '扫描本机 Cursor、Codex 和 Claude Code 的会话与技能，转成 DeepSeek Harness 会话。默认不扫 Codex 归档目录。导入后刷新会话列表即可打开。',
   sessionsTab: '会话',
   skillsTab: '技能',
   refresh: '重新扫描',
@@ -34,7 +34,7 @@ export const zh = {
 export const en = {
   nav: 'Import',
   title: 'Import other AI sessions',
-  intro: 'Scan local Cursor, Codex, and Claude Code conversations and skills, then write them as DeepSeek Harness sessions. Refresh the session list after import.',
+  intro: 'Scan local Cursor, Codex, and Claude Code conversations and skills, then write them as DeepSeek Harness sessions. Codex archived_sessions is skipped unless you pass --archived. Refresh the session list after import.',
   sessionsTab: 'Sessions',
   skillsTab: 'Skills',
   refresh: 'Rescan',

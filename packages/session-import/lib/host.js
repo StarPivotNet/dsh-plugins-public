@@ -813,24 +813,25 @@ var SOURCES = /* @__PURE__ */ new Set(["claude", "codex", "cursor"]);
 function parseImportArgs(rawInput) {
   const rawTokens = rawInput.trim().split(/\s+/u).filter((token) => token.length > 0);
   const keepCwd = rawTokens.some((token) => token === "--keep-cwd");
-  const tokens = rawTokens.filter((token) => token !== "--keep-cwd");
+  const includeArchived = rawTokens.some((token) => token === "--archived");
+  const tokens = rawTokens.filter((token) => token !== "--keep-cwd" && token !== "--archived");
   if (tokens.length === 0) return { kind: "help" };
   const first = tokens[0]?.toLowerCase();
   if (first === "help" || first === "--help") return { kind: "help" };
   if (first === "list") {
     const source2 = parseSource(tokens[1]);
-    return source2 === void 0 && tokens[1] !== void 0 ? { kind: "sessions", query: tokens.slice(1).join(" "), keepCwd } : { kind: "list", source: source2 };
+    return source2 === void 0 && tokens[1] !== void 0 ? { kind: "sessions", query: tokens.slice(1).join(" "), keepCwd, includeArchived } : { kind: "list", source: source2, includeArchived };
   }
   if (first === "skills" || first === "skill") {
     return { kind: "skills", source: parseSource(tokens[1]) };
   }
-  if (first === "all") return { kind: "sessions", keepCwd };
+  if (first === "all") return { kind: "sessions", keepCwd, includeArchived };
   const source = parseSource(first);
   if (source !== void 0) {
     const query = tokens.slice(1).join(" ").trim();
-    return query.length === 0 ? { kind: "sessions", source, keepCwd } : { kind: "sessions", source, query, keepCwd };
+    return query.length === 0 ? { kind: "sessions", source, keepCwd, includeArchived } : { kind: "sessions", source, query, keepCwd, includeArchived };
   }
-  return { kind: "sessions", query: tokens.join(" "), keepCwd };
+  return { kind: "sessions", query: tokens.join(" "), keepCwd, includeArchived };
 }
 function parseSource(value) {
   if (value === void 0) return void 0;
@@ -848,16 +849,15 @@ var PREVIEW_BYTES = 64e3;
 var STAT_CONCURRENCY = 32;
 var PREVIEW_CONCURRENCY = 16;
 var DISCOVER_CACHE_MS = 3e4;
-function defaultScanRoots(home = homedir()) {
+function defaultScanRoots(home = homedir(), includeArchived = false) {
+  const codex = [join(home, ".codex", "sessions")];
+  if (includeArchived) codex.push(join(home, ".codex", "archived_sessions"));
   return {
     claude: [
       join(home, ".claude", "projects"),
       join(home, ".claude", "sessions")
     ],
-    codex: [
-      join(home, ".codex", "sessions"),
-      join(home, ".codex", "archived_sessions")
-    ],
+    codex,
     cursor: [
       join(home, ".cursor", "projects"),
       join(home, ".cursor", "chats"),
@@ -1206,14 +1206,16 @@ async function handleImportCommand(ctx, rawInput, runtime) {
         "/import claude|codex|cursor \u2014 import one store",
         "/import skills \u2014 copy Claude/Codex/Cursor skills into ~/.dsh/skills",
         "/import <path-or-id> \u2014 import one file or native id",
-        "Add --keep-cwd to keep the foreign working directory instead of this workspace."
+        "Add --keep-cwd to keep the foreign working directory instead of this workspace.",
+        "Add --archived to include ~/.codex/archived_sessions."
       ].join("\n")
     };
   }
   if (command.kind === "list") {
     const listed = await listedSessions(command.source, runtime.maxFileBytes, {
       signal: runtime.signal,
-      limit: 40
+      limit: 40,
+      includeArchived: command.includeArchived
     });
     if (listed.total === 0) return { kind: "success", text: "No foreign sessions found." };
     const lines = listed.entries.map((row) => `${row.source}	${row.title}	${row.nativeId}	${row.path}`);
@@ -1257,7 +1259,7 @@ ${lines.join("\n")}${extra}` };
       return { kind: "error", text: error instanceof Error ? error.message : String(error) };
     }
   }
-  const selected = await matchingSessions(command.source, runtime.maxFileBytes, query, runtime.signal);
+  const selected = await matchingSessions(command.source, runtime.maxFileBytes, query, runtime.signal, command.includeArchived);
   if (selected.length === 0) return { kind: "error", text: "No matching foreign sessions." };
   let imported = 0;
   let skipped = 0;
@@ -1281,8 +1283,8 @@ ${failures.slice(0, 8).join("\n")}`;
   };
 }
 var discoverCache = /* @__PURE__ */ new Map();
-function rootsFor(source) {
-  const roots = defaultScanRoots();
+function rootsFor(source, includeArchived = false) {
+  const roots = defaultScanRoots(void 0, includeArchived);
   if (source === void 0) return roots;
   return {
     claude: source === "claude" ? roots.claude : [],
@@ -1290,8 +1292,8 @@ function rootsFor(source) {
     cursor: source === "cursor" ? roots.cursor : []
   };
 }
-async function discoveredSessions(source, signal) {
-  const roots = rootsFor(source);
+async function discoveredSessions(source, signal, includeArchived = false) {
+  const roots = rootsFor(source, includeArchived);
   const key = [...roots.claude, ...roots.codex, ...roots.cursor].join("|");
   const now = Date.now();
   const cached = discoverCache.get(key);
@@ -1306,20 +1308,21 @@ async function discoveredSessions(source, signal) {
   }
 }
 async function listedSessions(source, maxFileBytes, options = {}) {
-  return presentSessions(await discoveredSessions(source, options.signal), {
+  return presentSessions(await discoveredSessions(source, options.signal, options.includeArchived === true), {
     maxFileBytes,
     query: options.query,
     limit: options.limit,
     signal: options.signal
   });
 }
-async function matchingSessions(source, maxFileBytes, query, signal) {
-  return filterDiscovered(await discoveredSessions(source, signal), maxFileBytes, query);
+async function matchingSessions(source, maxFileBytes, query, signal, includeArchived = false) {
+  return filterDiscovered(await discoveredSessions(source, signal, includeArchived), maxFileBytes, query);
 }
 async function listSessions(request, maxFileBytes) {
   return listedSessions(request.source, maxFileBytes, {
     query: request.query,
-    limit: request.limit ?? DEFAULT_LIST_LIMIT
+    limit: request.limit ?? DEFAULT_LIST_LIMIT,
+    includeArchived: request.includeArchived === true
   });
 }
 async function importSessions(ctx, request, limits, maxFileBytes) {
@@ -1327,7 +1330,7 @@ async function importSessions(ctx, request, limits, maxFileBytes) {
   if (persistence === void 0) {
     throw new Error("session persistence is not configured");
   }
-  const rows = await matchingSessions(request.source, maxFileBytes);
+  const rows = await matchingSessions(request.source, maxFileBytes, void 0, void 0, request.includeArchived === true);
   const selected = request.paths === void 0 || request.paths.length === 0 ? rows : rows.filter((row) => request.paths.includes(row.path));
   let imported = 0;
   let skipped = 0;

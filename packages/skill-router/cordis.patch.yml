@@ -1,0 +1,6 @@
+# Install with:
+#   dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:packages/skill-router
+# then restart dsh web.
+- insert:
+    - id: skill-router
+      name: '@starpivot/dsh-skill-router'

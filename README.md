@@ -7,6 +7,12 @@ Public out-of-tree DeepSeek Harness plugins. One installable plugin per director
 | [`packages/plugin-marketplace`](packages/plugin-marketplace) | `@starpivot/dsh-plugin-marketplace` | Settings plugin marketplace |
 | [`packages/session-import`](packages/session-import) | `@starpivot/dsh-session-import` | Import Cursor, Codex, and Claude Code sessions and skills |
 | [`packages/better-sidebar`](packages/better-sidebar) | `@starpivot/dsh-better-sidebar` | VS Code-like right sidebar; collapse stays in the file tree |
+| [`packages/enter-newline`](packages/enter-newline) | `@starpivot/dsh-enter-newline` | Composer Enter sends or inserts a newline |
+| [`packages/skill-router`](packages/skill-router) | `@starpivot/dsh-skill-router` | Two-level skill catalog routing |
+| [`packages/model-capabilities`](packages/model-capabilities) | `@starpivot/dsh-model-capabilities` | Fill missing llm-pi-ai model capability fields |
+| [`packages/blank-session-gc`](packages/blank-session-gc) | `@starpivot/dsh-blank-session-gc` | Keep one unused blank conversation |
+| [`packages/busy-enter-steer`](packages/busy-enter-steer) | `@starpivot/dsh-busy-enter-steer` | Default busy Enter to steer |
+| [`packages/agent-teams`](packages/agent-teams) | `@starpivot/dsh-agent-teams` | Multi-agent team orchestration |
 
 ## Install
 

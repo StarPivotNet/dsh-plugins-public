@@ -1,0 +1,6 @@
+# Install with:
+#   dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:packages/enter-newline
+# then restart dsh web.
+- insert:
+    - id: ui-enter-newline
+      name: '@starpivot/dsh-enter-newline'

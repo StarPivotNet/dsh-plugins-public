@@ -1,0 +1,6 @@
+# Install with:
+#   dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:packages/blank-session-gc
+# then restart dsh web.
+- insert:
+    - id: blank-session-gc
+      name: '@starpivot/dsh-blank-session-gc'

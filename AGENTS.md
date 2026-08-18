@@ -9,6 +9,12 @@ packages/
   plugin-marketplace/   @starpivot/dsh-plugin-marketplace
   session-import/       @starpivot/dsh-session-import
   better-sidebar/       @starpivot/dsh-better-sidebar
+  enter-newline/        @starpivot/dsh-enter-newline
+  skill-router/         @starpivot/dsh-skill-router
+  model-capabilities/   @starpivot/dsh-model-capabilities
+  blank-session-gc/     @starpivot/dsh-blank-session-gc
+  busy-enter-steer/     @starpivot/dsh-busy-enter-steer
+  agent-teams/          @starpivot/dsh-agent-teams
 ```
 
 A new plugin is a new `packages/<name>` folder with its own manifest, patch layer, sources, tests, and build. Install it with `github:StarPivotNet/dsh-plugins-public#path:packages/<name>`.

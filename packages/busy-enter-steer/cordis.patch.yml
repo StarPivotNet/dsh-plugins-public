@@ -1,0 +1,6 @@
+# Install with:
+#   dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:packages/busy-enter-steer
+# then restart dsh web.
+- insert:
+    - id: busy-enter-steer
+      name: '@starpivot/dsh-busy-enter-steer'

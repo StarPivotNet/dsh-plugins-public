@@ -1,0 +1,43 @@
+{
+  "name": "@starpivot/dsh-blank-session-gc",
+  "version": "0.1.0",
+  "description": "Keep at most one unused blank conversation: scan on session create and delete the rest from workspace accounts and JSONL logs",
+  "homepage": "https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/blank-session-gc",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "session"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StarPivotNet/dsh-plugins-public.git",
+    "directory": "packages/blank-session-gc"
+  },
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node scripts/pick-victims.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "^3.18.1"
+  }
+}

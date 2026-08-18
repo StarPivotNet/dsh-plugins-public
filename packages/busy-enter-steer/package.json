@@ -1,0 +1,44 @@
+{
+  "name": "@starpivot/dsh-busy-enter-steer",
+  "version": "0.1.0",
+  "description": "Seed ui-conversation.busyEnter to steer when the user has not set it, so running-state Enter interrupts by default",
+  "homepage": "https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/busy-enter-steer",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "composer"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StarPivotNet/dsh-plugins-public.git",
+    "directory": "packages/busy-enter-steer"
+  },
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node scripts/should-seed.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  }
+}

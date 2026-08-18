@@ -47,6 +47,10 @@ export function apply(ctx: ClientContext): void {
     importSessions: paths => call('importSessions', { paths }),
     listSkills: () => call('listSkills'),
     importSkills: paths => call('importSkills', { paths }),
+    listMemories: () => call('listMemories'),
+    importMemories: paths => call('importMemories', { paths }),
+    listAutomations: () => call('listAutomations'),
+    importAutomations: paths => call('importAutomations', { paths }),
   })
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',

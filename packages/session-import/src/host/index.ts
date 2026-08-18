@@ -21,6 +21,7 @@ import {
   presentSessions,
 } from './scan.ts'
 import { copySkill, defaultSkillRoots, discoverSkills } from './skills.ts'
+import { discoverAutomations, discoverMemories, importMemories } from './compat.ts'
 
 export const name = 'session-import'
 
@@ -56,7 +57,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     commandCtx.commands.register({
       name: 'import',
       description: 'Import Cursor, Codex, or Claude Code sessions and skills',
-      input: { hint: '[list|all|skills|claude|codex|cursor|path]' },
+      input: { hint: '[list|all|skills|memory|automations|claude|codex|cursor|path]' },
       handler: invocation => handleImportCommand(commandCtx, invocation.rawInput, {
         limits,
         maxFileBytes,
@@ -79,6 +80,14 @@ export function apply(ctx: Context, config: Config = {}): void {
             return { ok: true, value: { entries: await discoverSkills(defaultSkillRoots()) } }
           case 'importSkills':
             return { ok: true, value: await importSkills(payload as { paths?: string[] }, skillTarget) }
+          case 'listMemories':
+            return { ok: true, value: { entries: await discoverMemories() } }
+          case 'importMemories':
+            return { ok: true, value: await importMemories((payload as { paths?: string[] }).paths ?? []) }
+          case 'listAutomations':
+            return { ok: true, value: { entries: await discoverAutomations() } }
+          case 'importAutomations':
+            return { ok: true, value: await importAutomations(connectionCtx, payload as { paths?: string[] }) }
           default:
             return { ok: false, error: { code: 'NOT_FOUND', message: 'unknown session-import endpoint' } }
         }
@@ -115,6 +124,8 @@ async function handleImportCommand(
         '/import all — import every discovered session into this workspace',
         '/import claude|codex|cursor — import one store',
         '/import skills — copy Claude/Codex/Cursor skills into ~/.dsh/skills',
+        '/import memory — copy Claude/Codex instruction files into ~/.dsh/AGENTS.md',
+        '/import automations — create DSH timers from ~/.codex/automations',
         '/import <path-or-id> — import one file or native id',
         'Add --keep-cwd to keep the foreign working directory instead of this workspace.',
         'Add --archived to include ~/.codex/archived_sessions.',
@@ -150,6 +161,20 @@ async function handleImportCommand(
     return {
       kind: 'success',
       text: `Copied ${String(copied)} skill(s) to ${runtime.skillTarget}${overwritten > 0 ? ` (${String(overwritten)} overwritten)` : ''}.`,
+    }
+  }
+  if (command.kind === 'memory') {
+    const result = await importMemories([])
+    return {
+      kind: result.failed.length > 0 && result.copied === 0 ? 'error' : 'success',
+      text: `Copied ${String(result.copied)} memory file(s), merged ${String(result.merged)} into ~/.dsh/AGENTS.md${result.failed.length > 0 ? `, failed ${String(result.failed.length)}` : ''}.`,
+    }
+  }
+  if (command.kind === 'automations') {
+    const result = await importAutomations(ctx, {})
+    return {
+      kind: result.failed.length > 0 && result.imported === 0 ? 'error' : 'success',
+      text: `Imported ${String(result.imported)} automation(s), skipped ${String(result.skipped)}, unsupported ${String(result.unsupported)}, failed ${String(result.failed.length)}.`,
     }
   }
   const persistence = requirePersistence(ctx)
@@ -378,6 +403,104 @@ function workspaceCwdOf(ctx: Context): string | undefined {
     if (typeof session.header?.cwd === 'string' && session.header.cwd.length > 0) return session.header.cwd
   }
   return process.cwd()
+}
+
+async function importAutomations(
+  ctx: Context,
+  request: { paths?: string[] },
+): Promise<{ imported: number; skipped: number; unsupported: number; failed: { path: string; message: string }[] }> {
+  const automation = ctx.get('automation') as {
+    list?: () => readonly { name?: string; task?: string }[]
+    create?: (request: {
+      name: string
+      task: string
+      workspaceId: string
+      enabled?: boolean
+      everySeconds?: number
+      localClock?: { time: string; weekdays?: readonly number[]; time_zone: string }
+    }) => Promise<{ id?: string }>
+  } | undefined
+  if (automation?.create === undefined || automation.list === undefined) {
+    throw new Error('automation service is not configured')
+  }
+  const workspace = ctx.get('workspaceRegistry') as {
+    list?: () => readonly { id: string; path?: string }[]
+    resolveByPath?: (path: string) => Promise<{ id: string } | undefined>
+    create?: (path: string, title?: string) => Promise<{ id: string }>
+  } | undefined
+  const rows = await discoverAutomations()
+  const selected = request.paths === undefined || request.paths.length === 0
+    ? rows
+    : rows.filter(row => request.paths!.includes(row.path))
+  const existing = new Set(automation.list().map(rule => `${rule.name ?? ''}\0${rule.task ?? ''}`))
+  let imported = 0
+  let skipped = 0
+  let unsupported = 0
+  const failed: { path: string; message: string }[] = []
+  for (const row of selected) {
+    if (row.schedule.kind === 'unsupported') {
+      unsupported += 1
+      failed.push({ path: row.path, message: row.schedule.reason })
+      continue
+    }
+    if (existing.has(`${row.name}\0${row.prompt}`)) {
+      skipped += 1
+      continue
+    }
+    try {
+      const workspaceId = await resolveWorkspaceId(workspace, row.cwd, workspaceCwdOf(ctx))
+      if (workspaceId === undefined) {
+        failed.push({ path: row.path, message: 'no DSH workspace available for this automation' })
+        continue
+      }
+      const created = row.schedule.kind === 'every'
+        ? await automation.create({
+          name: row.name,
+          task: row.prompt,
+          workspaceId,
+          enabled: row.status.toUpperCase() === 'ACTIVE',
+          everySeconds: row.schedule.everySeconds,
+        })
+        : await automation.create({
+          name: row.name,
+          task: row.prompt,
+          workspaceId,
+          enabled: row.status.toUpperCase() === 'ACTIVE',
+          localClock: {
+            time: row.schedule.time,
+            ...(row.schedule.weekdays === undefined ? {} : { weekdays: row.schedule.weekdays }),
+            time_zone: row.schedule.timeZone,
+          },
+        })
+      if (created === undefined) failed.push({ path: row.path, message: 'automation.create returned nothing' })
+      else imported += 1
+    } catch (error) {
+      failed.push({ path: row.path, message: error instanceof Error ? error.message : String(error) })
+    }
+  }
+  return { imported, skipped, unsupported, failed }
+}
+
+async function resolveWorkspaceId(
+  registry: {
+    list?: () => readonly { id: string; path?: string }[]
+    resolveByPath?: (path: string) => Promise<{ id: string } | undefined>
+    create?: (path: string, title?: string) => Promise<{ id: string }>
+  } | undefined,
+  cwd: string | undefined,
+  fallbackCwd: string | undefined,
+): Promise<string | undefined> {
+  const target = cwd ?? fallbackCwd
+  if (registry === undefined) return undefined
+  if (target !== undefined && registry.resolveByPath !== undefined) {
+    const existing = await registry.resolveByPath(target)
+    if (existing !== undefined) return existing.id
+    if (registry.create !== undefined) {
+      try { return (await registry.create(target)).id }
+      catch { /* fall through to an already registered workspace */ }
+    }
+  }
+  return registry.list?.()[0]?.id
 }
 
 async function warmProjection(ctx: Context, id: string): Promise<void> {

@@ -1,6 +1,6 @@
 // src/host/index.ts
-import { homedir as homedir3 } from "node:os";
-import { join as join3 } from "node:path";
+import { homedir as homedir4 } from "node:os";
+import { join as join4 } from "node:path";
 import { settingsNamespace } from "@deepseek-ai/dsh-settings";
 import z from "@deepseek-ai/schemastery";
 
@@ -831,6 +831,12 @@ function parseImportArgs(rawInput) {
   if (first === "skills" || first === "skill") {
     return { kind: "skills", source: parseSource(tokens[1]) };
   }
+  if (first === "memory" || first === "memories" || first === "agents") {
+    return { kind: "memory" };
+  }
+  if (first === "automations" || first === "automation") {
+    return { kind: "automations" };
+  }
   if (first === "all") return { kind: "sessions", keepCwd, includeArchived };
   const source = parseSource(first);
   if (source !== void 0) {
@@ -1062,10 +1068,10 @@ async function copySkill(skill, targetRoot) {
   return { path: target, overwritten };
 }
 async function visitSkillRoot(root, source, found) {
-  const { readdir: readdir2, readFile: readFile3, stat: stat2 } = await import("node:fs/promises");
+  const { readdir: readdir3, readFile: readFile4, stat: stat3 } = await import("node:fs/promises");
   let entries;
   try {
-    entries = await readdir2(root, { withFileTypes: true });
+    entries = await readdir3(root, { withFileTypes: true });
   } catch {
     return;
   }
@@ -1074,9 +1080,9 @@ async function visitSkillRoot(root, source, found) {
     if (entry.isDirectory()) {
       const skillFile = join2(full, "SKILL.md");
       try {
-        const info = await stat2(skillFile);
+        const info = await stat3(skillFile);
         if (!info.isFile()) continue;
-        const parsed = parseSkillFile(await readFile3(skillFile, "utf8"), source, skillFile);
+        const parsed = parseSkillFile(await readFile4(skillFile, "utf8"), source, skillFile);
         if (parsed !== void 0) found.push(parsed);
       } catch {
         continue;
@@ -1086,7 +1092,7 @@ async function visitSkillRoot(root, source, found) {
     if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) continue;
     if (entry.name.toLowerCase() === "readme.md") continue;
     try {
-      const parsed = parseSkillFile(await readFile3(full, "utf8"), source, full);
+      const parsed = parseSkillFile(await readFile4(full, "utf8"), source, full);
       if (parsed !== void 0) found.push(parsed);
     } catch {
       continue;
@@ -1144,6 +1150,230 @@ function firstHeading(body) {
   return match?.[1]?.trim();
 }
 
+// src/host/compat.ts
+import { homedir as homedir3 } from "node:os";
+import { basename as basename3, dirname as dirname2, join as join3 } from "node:path";
+import { mkdir as mkdir2, readFile as readFile3, readdir as readdir2, stat as stat2, writeFile as writeFile2 } from "node:fs/promises";
+var WEEKDAY_TO_ISO = {
+  MO: 1,
+  TU: 2,
+  WE: 3,
+  TH: 4,
+  FR: 5,
+  SA: 6,
+  SU: 7
+};
+function defaultMemoryRoots(home = homedir3()) {
+  return [
+    { source: "claude", kind: "agents", path: join3(home, ".claude", "CLAUDE.md"), name: "claude-claude-md" },
+    { source: "codex", kind: "agents", path: join3(home, ".codex", "AGENTS.md"), name: "codex-agents-md" },
+    { source: "codex", kind: "memory", path: join3(home, ".codex", "memories", "MEMORY.md"), name: "codex-memory" },
+    { source: "codex", kind: "memory", path: join3(home, ".codex", "memories", "memory_summary.md"), name: "codex-memory-summary" }
+  ];
+}
+async function discoverMemories(home = homedir3()) {
+  const found = [];
+  for (const root of defaultMemoryRoots(home)) {
+    let info;
+    try {
+      info = await stat2(root.path);
+    } catch {
+      continue;
+    }
+    if (!info.isFile()) continue;
+    let text = "";
+    try {
+      text = await readFile3(root.path, "utf8");
+    } catch {
+      continue;
+    }
+    found.push({
+      source: root.source,
+      kind: root.kind,
+      name: root.name,
+      path: root.path,
+      bytes: info.size,
+      preview: firstPreview(text)
+    });
+  }
+  return found;
+}
+async function importMemories(paths, home = homedir3()) {
+  const targetRoot = join3(home, ".dsh", "imported-memory");
+  await mkdir2(targetRoot, { recursive: true });
+  let copied = 0;
+  let merged = 0;
+  const failed = [];
+  const known = await discoverMemories(home);
+  const selected = paths.length === 0 ? known : known.filter((row) => paths.includes(row.path));
+  for (const row of selected) {
+    try {
+      const text = await readFile3(row.path, "utf8");
+      const dest = join3(targetRoot, `${row.name}.md`);
+      await writeFile2(dest, ensureTrailingNewline(text), "utf8");
+      copied += 1;
+      if (row.kind === "agents") {
+        await mergeAgentsFile(join3(home, ".dsh", "AGENTS.md"), row.path, text);
+        merged += 1;
+      }
+    } catch (error) {
+      failed.push({ path: row.path, message: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { copied, merged, failed };
+}
+async function discoverAutomations(home = homedir3()) {
+  const root = join3(home, ".codex", "automations");
+  let entries;
+  try {
+    entries = await readdir2(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const found = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const path = join3(root, entry.name, "automation.toml");
+    try {
+      const text = await readFile3(path, "utf8");
+      const parsed = parseAutomationToml(text, path);
+      if (parsed !== void 0) found.push(parsed);
+    } catch {
+      continue;
+    }
+  }
+  found.sort((left, right) => left.name.localeCompare(right.name) || left.path.localeCompare(right.path));
+  return found;
+}
+function parseAutomationToml(text, path) {
+  const fields = parseSimpleToml(text);
+  const nativeId = String(fields.id ?? basename3(dirname2(path)));
+  const name2 = String(fields.name ?? nativeId);
+  const prompt = String(fields.prompt ?? "");
+  if (prompt.trim().length === 0) return void 0;
+  const rrule = typeof fields.rrule === "string" ? fields.rrule : void 0;
+  const cwd = firstCwd(fields.cwds);
+  return {
+    source: "codex",
+    nativeId,
+    name: name2,
+    path,
+    status: String(fields.status ?? "UNKNOWN"),
+    cwd,
+    rrule,
+    prompt,
+    schedule: mapRrule(rrule)
+  };
+}
+function mapRrule(rrule, timeZone = "Asia/Shanghai") {
+  if (rrule === void 0 || rrule.trim().length === 0) {
+    return { kind: "unsupported", reason: "missing RRULE" };
+  }
+  const body = rrule.replace(/^RRULE:/u, "");
+  const parts = Object.fromEntries(
+    body.split(";").map((part) => {
+      const [rawKey, rawValue = ""] = part.split("=");
+      return [rawKey.toUpperCase(), rawValue];
+    })
+  );
+  const freq = parts.FREQ;
+  const interval = Number.parseInt(parts.INTERVAL ?? "1", 10);
+  if (freq === "MINUTELY" && Number.isSafeInteger(interval) && interval > 0) {
+    const everySeconds = interval * 60;
+    if (everySeconds < 300) return { kind: "unsupported", reason: `interval ${String(everySeconds)}s is below DSH minEverySeconds=300` };
+    return { kind: "every", everySeconds };
+  }
+  if (freq === "HOURLY" && Number.isSafeInteger(interval) && interval > 0) {
+    return { kind: "every", everySeconds: interval * 3600 };
+  }
+  if (freq === "DAILY" || freq === "WEEKLY") {
+    const hour = clampInt(parts.BYHOUR, 0, 23, 2);
+    const minute = clampInt(parts.BYMINUTE, 0, 59, 0);
+    const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    const weekdays = parseWeekdays(parts.BYDAY);
+    if (freq === "DAILY" && (parts.INTERVAL === void 0 || parts.INTERVAL === "1") && weekdays === void 0) {
+      return { kind: "local-clock", time, timeZone };
+    }
+    if (freq === "WEEKLY" && (parts.INTERVAL === void 0 || parts.INTERVAL === "1")) {
+      return { kind: "local-clock", time, ...weekdays === void 0 ? {} : { weekdays }, timeZone };
+    }
+  }
+  return { kind: "unsupported", reason: `unsupported RRULE ${rrule}` };
+}
+function parseWeekdays(raw) {
+  if (raw === void 0 || raw.length === 0) return void 0;
+  const days = [...new Set(
+    raw.split(",").map((token) => WEEKDAY_TO_ISO[token.replace(/^-?\d+/u, "").toUpperCase()]).filter((day) => day !== void 0)
+  )].sort((left, right) => left - right);
+  if (days.length === 0) return void 0;
+  if (days.length === 7) return void 0;
+  return days;
+}
+function clampInt(raw, min, max, fallback) {
+  const value = Number.parseInt(raw ?? "", 10);
+  if (!Number.isSafeInteger(value) || value < min || value > max) return fallback;
+  return value;
+}
+function firstCwd(value) {
+  if (typeof value === "string" && value.startsWith("/")) return value;
+  if (Array.isArray(value)) {
+    const first = value.find((item) => typeof item === "string" && item.startsWith("/"));
+    return first;
+  }
+  return void 0;
+}
+function firstPreview(text) {
+  const line = text.replace(/\s+/gu, " ").trim();
+  return line.length <= 160 ? line : `${line.slice(0, 159)}\u2026`;
+}
+function ensureTrailingNewline(text) {
+  return text.endsWith("\n") ? text : `${text}
+`;
+}
+async function mergeAgentsFile(target, sourcePath, text) {
+  await mkdir2(dirname2(target), { recursive: true });
+  let existing = "";
+  try {
+    existing = await readFile3(target, "utf8");
+  } catch {
+    existing = "";
+  }
+  const marker = `<!-- imported-from ${sourcePath} -->`;
+  if (existing.includes(marker)) return;
+  const block = `${existing.trimEnd()}${existing.trim().length === 0 ? "" : "\n\n"}${marker}
+${text.trimEnd()}
+`;
+  await writeFile2(target, block, "utf8");
+}
+function parseSimpleToml(text) {
+  const fields = {};
+  for (const raw of text.split(/\r?\n/u)) {
+    const line = raw.trim();
+    if (line.length === 0 || line.startsWith("#") || line.startsWith("[")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    fields[key] = decodeTomlValue(line.slice(eq + 1).trim());
+  }
+  return fields;
+}
+function decodeTomlValue(raw) {
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  if (/^-?\d+$/u.test(raw)) return Number(raw);
+  if (raw.startsWith('"') && raw.endsWith('"')) return unescapeTomlString(raw.slice(1, -1));
+  if (raw.startsWith("[") && raw.endsWith("]")) {
+    const inner = raw.slice(1, -1).trim();
+    if (inner.length === 0) return [];
+    return inner.split(",").map((part) => decodeTomlValue(part.trim()));
+  }
+  if (raw.startsWith("{") && raw.endsWith("}")) return raw;
+  return raw;
+}
+function unescapeTomlString(value) {
+  return value.replace(/\\n/gu, "\n").replace(/\\t/gu, "	").replace(/\\"/gu, '"').replace(/\\\\/gu, "\\");
+}
+
 // src/host/index.ts
 var name = "session-import";
 var SESSION_IMPORT_SETTINGS_NAMESPACE = "session-import";
@@ -1155,7 +1385,7 @@ function apply(ctx, config = {}) {
     maxTextChars: config.maxTextChars ?? DEFAULT_CONVERT_LIMITS.maxTextChars
   };
   const maxFileBytes = config.maxFileBytes ?? 32 * 1024 * 1024;
-  const skillTarget = config.skillTarget ?? join3(homedir3(), ".dsh", "skills");
+  const skillTarget = config.skillTarget ?? join4(homedir4(), ".dsh", "skills");
   ctx.inject(["settings"], (settingsCtx) => {
     const settings = settingsCtx.get("settings");
     settings.register(SETTINGS_NS, z.object({
@@ -1166,7 +1396,7 @@ function apply(ctx, config = {}) {
     commandCtx.commands.register({
       name: "import",
       description: "Import Cursor, Codex, or Claude Code sessions and skills",
-      input: { hint: "[list|all|skills|claude|codex|cursor|path]" },
+      input: { hint: "[list|all|skills|memory|automations|claude|codex|cursor|path]" },
       handler: (invocation) => handleImportCommand(commandCtx, invocation.rawInput, {
         limits,
         maxFileBytes,
@@ -1188,6 +1418,14 @@ function apply(ctx, config = {}) {
             return { ok: true, value: { entries: await discoverSkills(defaultSkillRoots()) } };
           case "importSkills":
             return { ok: true, value: await importSkills(payload, skillTarget) };
+          case "listMemories":
+            return { ok: true, value: { entries: await discoverMemories() } };
+          case "importMemories":
+            return { ok: true, value: await importMemories(payload.paths ?? []) };
+          case "listAutomations":
+            return { ok: true, value: { entries: await discoverAutomations() } };
+          case "importAutomations":
+            return { ok: true, value: await importAutomations(connectionCtx, payload) };
           default:
             return { ok: false, error: { code: "NOT_FOUND", message: "unknown session-import endpoint" } };
         }
@@ -1211,6 +1449,8 @@ async function handleImportCommand(ctx, rawInput, runtime) {
         "/import all \u2014 import every discovered session into this workspace",
         "/import claude|codex|cursor \u2014 import one store",
         "/import skills \u2014 copy Claude/Codex/Cursor skills into ~/.dsh/skills",
+        "/import memory \u2014 copy Claude/Codex instruction files into ~/.dsh/AGENTS.md",
+        "/import automations \u2014 create DSH timers from ~/.codex/automations",
         "/import <path-or-id> \u2014 import one file or native id",
         "Add --keep-cwd to keep the foreign working directory instead of this workspace.",
         "Add --archived to include ~/.codex/archived_sessions."
@@ -1244,6 +1484,20 @@ ${lines.join("\n")}${extra}` };
     return {
       kind: "success",
       text: `Copied ${String(copied)} skill(s) to ${runtime.skillTarget}${overwritten > 0 ? ` (${String(overwritten)} overwritten)` : ""}.`
+    };
+  }
+  if (command.kind === "memory") {
+    const result = await importMemories([]);
+    return {
+      kind: result.failed.length > 0 && result.copied === 0 ? "error" : "success",
+      text: `Copied ${String(result.copied)} memory file(s), merged ${String(result.merged)} into ~/.dsh/AGENTS.md${result.failed.length > 0 ? `, failed ${String(result.failed.length)}` : ""}.`
+    };
+  }
+  if (command.kind === "automations") {
+    const result = await importAutomations(ctx, {});
+    return {
+      kind: result.failed.length > 0 && result.imported === 0 ? "error" : "success",
+      text: `Imported ${String(result.imported)} automation(s), skipped ${String(result.skipped)}, unsupported ${String(result.unsupported)}, failed ${String(result.failed.length)}.`
     };
   }
   const persistence = requirePersistence(ctx);
@@ -1400,8 +1654,8 @@ function looksLikePath(value) {
   return value.startsWith("/") || value.startsWith("~") || /^[A-Za-z]:[\\/]/u.test(value);
 }
 function expandHome(value) {
-  if (value === "~") return homedir3();
-  if (value.startsWith("~/")) return join3(homedir3(), value.slice(2));
+  if (value === "~") return homedir4();
+  if (value.startsWith("~/")) return join4(homedir4(), value.slice(2));
   return value;
 }
 function requirePersistence(ctx) {
@@ -1413,6 +1667,75 @@ function workspaceCwdOf(ctx) {
     if (typeof session.header?.cwd === "string" && session.header.cwd.length > 0) return session.header.cwd;
   }
   return process.cwd();
+}
+async function importAutomations(ctx, request) {
+  const automation = ctx.get("automation");
+  if (automation?.create === void 0 || automation.list === void 0) {
+    throw new Error("automation service is not configured");
+  }
+  const workspace = ctx.get("workspaceRegistry");
+  const rows = await discoverAutomations();
+  const selected = request.paths === void 0 || request.paths.length === 0 ? rows : rows.filter((row) => request.paths.includes(row.path));
+  const existing = new Set(automation.list().map((rule) => `${rule.name ?? ""}\0${rule.task ?? ""}`));
+  let imported = 0;
+  let skipped = 0;
+  let unsupported = 0;
+  const failed = [];
+  for (const row of selected) {
+    if (row.schedule.kind === "unsupported") {
+      unsupported += 1;
+      failed.push({ path: row.path, message: row.schedule.reason });
+      continue;
+    }
+    if (existing.has(`${row.name}\0${row.prompt}`)) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      const workspaceId = await resolveWorkspaceId(workspace, row.cwd, workspaceCwdOf(ctx));
+      if (workspaceId === void 0) {
+        failed.push({ path: row.path, message: "no DSH workspace available for this automation" });
+        continue;
+      }
+      const created = row.schedule.kind === "every" ? await automation.create({
+        name: row.name,
+        task: row.prompt,
+        workspaceId,
+        enabled: row.status.toUpperCase() === "ACTIVE",
+        everySeconds: row.schedule.everySeconds
+      }) : await automation.create({
+        name: row.name,
+        task: row.prompt,
+        workspaceId,
+        enabled: row.status.toUpperCase() === "ACTIVE",
+        localClock: {
+          time: row.schedule.time,
+          ...row.schedule.weekdays === void 0 ? {} : { weekdays: row.schedule.weekdays },
+          time_zone: row.schedule.timeZone
+        }
+      });
+      if (created === void 0) failed.push({ path: row.path, message: "automation.create returned nothing" });
+      else imported += 1;
+    } catch (error) {
+      failed.push({ path: row.path, message: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { imported, skipped, unsupported, failed };
+}
+async function resolveWorkspaceId(registry, cwd, fallbackCwd) {
+  const target = cwd ?? fallbackCwd;
+  if (registry === void 0) return void 0;
+  if (target !== void 0 && registry.resolveByPath !== void 0) {
+    const existing = await registry.resolveByPath(target);
+    if (existing !== void 0) return existing.id;
+    if (registry.create !== void 0) {
+      try {
+        return (await registry.create(target)).id;
+      } catch {
+      }
+    }
+  }
+  return registry.list?.()[0]?.id;
 }
 async function warmProjection(ctx, id) {
   const cache = ctx.get("sessionProjectionCache");

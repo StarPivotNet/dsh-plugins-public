@@ -1,6 +1,6 @@
 {
   "name": "@starpivot/dsh-session-import",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Import Cursor, Codex, and Claude Code sessions and skills into DeepSeek Harness",
   "homepage": "https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/session-import",
   "keywords": [
@@ -39,7 +39,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepublishOnly": "node scripts/build.mjs",
-    "test": "node --experimental-strip-types --test src/convert/text.spec.ts src/convert/events.spec.ts src/convert/claude.spec.ts src/convert/codex.spec.ts src/convert/cursor.spec.ts src/convert/detect.spec.ts src/host/parse-args.spec.ts src/host/skills.spec.ts src/host/import.spec.ts src/host/scan.spec.ts"
+    "test": "node --experimental-strip-types --test src/convert/text.spec.ts src/convert/events.spec.ts src/convert/claude.spec.ts src/convert/codex.spec.ts src/convert/cursor.spec.ts src/convert/detect.spec.ts src/host/parse-args.spec.ts src/host/skills.spec.ts src/host/import.spec.ts src/host/scan.spec.ts src/host/compat.spec.ts"
   },
   "dsh": {
     "bundle": {

@@ -1,4 +1,4 @@
-/** Settings section: scan and import foreign sessions and skills. */
+/** Settings section: scan and import foreign sessions, skills, memory, and automations. */
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -23,14 +23,40 @@ export interface SessionImportSkill {
   readonly path: string
 }
 
+export interface SessionImportMemory {
+  readonly source: 'claude' | 'codex'
+  readonly kind: 'agents' | 'memory'
+  readonly name: string
+  readonly path: string
+  readonly bytes: number
+  readonly preview: string
+}
+
+export interface SessionImportAutomation {
+  readonly source: 'codex'
+  readonly nativeId: string
+  readonly name: string
+  readonly path: string
+  readonly status: string
+  readonly cwd?: string
+  readonly rrule?: string
+  readonly prompt: string
+  readonly schedule: { kind: 'local-clock' | 'every' | 'unsupported'; time?: string; everySeconds?: number; reason?: string }
+}
+
 export interface SessionImportSectionInjected {
   listSessions: (source?: SessionImportRow['source'], query?: string) => Promise<{ entries: readonly SessionImportRow[]; total?: number }>
   importSessions: (paths: readonly string[]) => Promise<{ imported: number; skipped: number; failed: readonly { path: string; message: string }[] }>
   listSkills: () => Promise<{ entries: readonly SessionImportSkill[] }>
   importSkills: (paths: readonly string[]) => Promise<{ copied: number; overwritten: number; failed: readonly { path: string; message: string }[] }>
+  listMemories: () => Promise<{ entries: readonly SessionImportMemory[] }>
+  importMemories: (paths: readonly string[]) => Promise<{ copied: number; merged: number; failed: readonly { path: string; message: string }[] }>
+  listAutomations: () => Promise<{ entries: readonly SessionImportAutomation[] }>
+  importAutomations: (paths: readonly string[]) => Promise<{ imported: number; skipped: number; unsupported: number; failed: readonly { path: string; message: string }[] }>
 }
 
 const SESSION_SOURCES: readonly SessionImportRow['source'][] = ['claude', 'codex', 'cursor']
+type ImportTab = 'sessions' | 'skills' | 'memory' | 'automations'
 
 export type SessionImportSectionProps =
   PropsRuntime<'settings.section'>
@@ -38,13 +64,15 @@ export type SessionImportSectionProps =
   & InjectFace<SessionImportSectionInjected>
 
 export function SessionImportSection(props: SessionImportSectionProps): ReactNode {
-  const { t, listSessions, importSessions, listSkills, importSkills } = props
-  const [tab, setTab] = useState<'sessions' | 'skills'>('sessions')
+  const { t, listSessions, importSessions, listSkills, importSkills, listMemories, importMemories, listAutomations, importAutomations } = props
+  const [tab, setTab] = useState<ImportTab>('sessions')
   const [source, setSource] = useState<'all' | SessionImportRow['source']>('all')
   const [query, setQuery] = useState('')
   const [rows, setRows] = useState<readonly SessionImportRow[]>([])
   const [total, setTotal] = useState(0)
   const [skills, setSkills] = useState<readonly SessionImportSkill[]>([])
+  const [memories, setMemories] = useState<readonly SessionImportMemory[]>([])
+  const [automations, setAutomations] = useState<readonly SessionImportAutomation[]>([])
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('loading')
   const [busy, setBusy] = useState(false)
@@ -69,9 +97,17 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
           setRows([...collected])
           setTotal(discovered)
         }
-      } else {
+      } else if (tab === 'skills') {
         const snapshot = await listSkills()
         setSkills(snapshot.entries)
+        setTotal(snapshot.entries.length)
+      } else if (tab === 'memory') {
+        const snapshot = await listMemories()
+        setMemories(snapshot.entries)
+        setTotal(snapshot.entries.length)
+      } else {
+        const snapshot = await listAutomations()
+        setAutomations(snapshot.entries)
         setTotal(snapshot.entries.length)
       }
       setStatus('idle')
@@ -84,26 +120,13 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
     void load()
   }, [tab, source])
 
-  const visibleRows = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    if (needle.length === 0) return rows
-    return rows.filter(row => (
-      row.title.toLowerCase().includes(needle)
-      || row.path.toLowerCase().includes(needle)
-      || row.nativeId.toLowerCase().includes(needle)
-    ))
-  }, [rows, query])
-
+  const visibleRows = useMemo(() => filterByQuery(rows, query, row => [row.title, row.path, row.nativeId]), [rows, query])
   const visibleSkills = useMemo(() => {
     const filtered = source === 'all' ? skills : skills.filter(skill => skill.source === source)
-    const needle = query.trim().toLowerCase()
-    if (needle.length === 0) return filtered
-    return filtered.filter(skill => (
-      skill.name.toLowerCase().includes(needle)
-      || skill.description.toLowerCase().includes(needle)
-      || skill.path.toLowerCase().includes(needle)
-    ))
+    return filterByQuery(filtered, query, skill => [skill.name, skill.description, skill.path])
   }, [skills, source, query])
+  const visibleMemories = useMemo(() => filterByQuery(memories, query, row => [row.name, row.preview, row.path]), [memories, query])
+  const visibleAutomations = useMemo(() => filterByQuery(automations, query, row => [row.name, row.nativeId, row.path, row.prompt]), [automations, query])
 
   const toggle = (path: string): void => {
     setSelected(current => {
@@ -122,15 +145,19 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
       if (tab === 'sessions') {
         const result = await importSessions(paths)
         setMessage(`${t('imported')} ${String(result.imported)} / ${String(result.skipped)}`)
-        if (result.failed.length > 0) {
-          setFailure(`${t('failed')} ${String(result.failed.length)}：${result.failed.slice(0, 3).map(item => item.message).join('；')}`)
-        }
-      } else {
+        setImportFailure(t, result.failed, setFailure)
+      } else if (tab === 'skills') {
         const result = await importSkills(paths)
         setMessage(`${t('importedSkills')} ${String(result.copied)}`)
-        if (result.failed.length > 0) {
-          setFailure(`${t('failed')} ${String(result.failed.length)}：${result.failed.slice(0, 3).map(item => item.message).join('；')}`)
-        }
+        setImportFailure(t, result.failed, setFailure)
+      } else if (tab === 'memory') {
+        const result = await importMemories(paths)
+        setMessage(`${t('importedMemory')} ${String(result.copied)} / ${String(result.merged)}`)
+        setImportFailure(t, result.failed, setFailure)
+      } else {
+        const result = await importAutomations(paths)
+        setMessage(`${t('importedAutomations')} ${String(result.imported)} / ${String(result.skipped)} / ${String(result.unsupported)}`)
+        setImportFailure(t, result.failed, setFailure)
       }
     } catch {
       setFailure(t('error'))
@@ -139,7 +166,13 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
     }
   }
 
-  const currentPaths = tab === 'sessions' ? visibleRows.map(row => row.path) : visibleSkills.map(skill => skill.path)
+  const currentPaths = tab === 'sessions'
+    ? visibleRows.map(row => row.path)
+    : tab === 'skills'
+      ? visibleSkills.map(skill => skill.path)
+      : tab === 'memory'
+        ? visibleMemories.map(row => row.path)
+        : visibleAutomations.map(row => row.path)
   const selectedPaths = currentPaths.filter(path => selected.has(path))
 
   return (
@@ -147,23 +180,24 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
       <h2 className={css.heading}>{t('title')}</h2>
       <p className={css.intro}>{t('intro')}</p>
       <div className={css.tabs} role="tablist">
-        <button type="button" className={css.tab} data-active={tab === 'sessions'} onClick={() => { setTab('sessions'); setSelected(new Set()) }}>
-          {t('sessionsTab')}
-        </button>
-        <button type="button" className={css.tab} data-active={tab === 'skills'} onClick={() => { setTab('skills'); setSelected(new Set()) }}>
-          {t('skillsTab')}
-        </button>
+        {(['sessions', 'skills', 'memory', 'automations'] as const).map(next => (
+          <button key={next} type="button" className={css.tab} data-active={tab === next} onClick={() => { setTab(next); setSelected(new Set()) }}>
+            {t(`${next}Tab` as SessionImportKey)}
+          </button>
+        ))}
       </div>
       <div className={css.toolbar}>
-        <label>
-          <span className={css.hint}>{t('sourceFilter')}</span>
-          <select className={css.select} value={source} onChange={event => { setSource(event.target.value as typeof source) }}>
-            <option value="all">{t('sourceAll')}</option>
-            <option value="claude">{t('sourceClaude')}</option>
-            <option value="codex">{t('sourceCodex')}</option>
-            <option value="cursor">{t('sourceCursor')}</option>
-          </select>
-        </label>
+        {tab === 'sessions' || tab === 'skills' ? (
+          <label>
+            <span className={css.hint}>{t('sourceFilter')}</span>
+            <select className={css.select} value={source} onChange={event => { setSource(event.target.value as typeof source) }}>
+              <option value="all">{t('sourceAll')}</option>
+              <option value="claude">{t('sourceClaude')}</option>
+              <option value="codex">{t('sourceCodex')}</option>
+              <option value="cursor">{t('sourceCursor')}</option>
+            </select>
+          </label>
+        ) : null}
         <input
           className={css.search}
           value={query}
@@ -183,41 +217,9 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
       </div>
       {message.length > 0 ? <p className={css.status}>{message}</p> : null}
       {failure.length > 0 ? <p className={css.failure} role="alert">{failure}</p> : null}
-      {status === 'error' ? (
-        <p className={css.failure} role="alert">{t('error')}</p>
-      ) : tab === 'sessions' && visibleRows.length === 0 ? (
-        <p className={css.empty}>{status === 'loading' ? t('refreshing') : t('empty')}</p>
-      ) : tab === 'sessions' ? (
-        <div className={css.list}>
-          {visibleRows.map(row => (
-            <label key={row.path} className={css.row}>
-              <input type="checkbox" checked={selected.has(row.path)} onChange={() => { toggle(row.path) }} />
-              <span>
-                <p className={css.title}>{row.title}</p>
-                <p className={css.meta}><span className={css.tag}>{row.source}</span> {t('nativeId')}: {row.nativeId}</p>
-                {row.cwd === undefined ? null : <p className={css.meta}>{t('cwd')}: {row.cwd}</p>}
-                <p className={css.meta}>{row.path}</p>
-              </span>
-              <span className={css.meta}>{formatBytes(row.bytes)}</span>
-            </label>
-          ))}
-        </div>
-      ) : (
-        visibleSkills.length === 0 ? <p className={css.empty}>{t('skillsEmpty')}</p> : (
-          <div className={css.list}>
-            {visibleSkills.map(skill => (
-              <label key={skill.path} className={css.row}>
-                <input type="checkbox" checked={selected.has(skill.path)} onChange={() => { toggle(skill.path) }} />
-                <span>
-                  <p className={css.title}>{skill.name}</p>
-                  <p className={css.meta}><span className={css.tag}>{skill.source}</span> {skill.description}</p>
-                  <p className={css.meta}>{skill.path}</p>
-                </span>
-              </label>
-            ))}
-          </div>
-        )
-      )}
+      {renderBody({
+        t, tab, status, visibleRows, visibleSkills, visibleMemories, visibleAutomations, selected, toggle,
+      })}
       {status === 'idle' && tab === 'sessions' && total > visibleRows.length ? (
         <p className={css.hint}>{t('truncated').replace('{shown}', String(visibleRows.length)).replace('{total}', String(total))}</p>
       ) : null}
@@ -226,9 +228,115 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
   )
 }
 
+function renderBody(options: {
+  t: SessionImportSectionProps['t']
+  tab: ImportTab
+  status: 'idle' | 'loading' | 'error'
+  visibleRows: readonly SessionImportRow[]
+  visibleSkills: readonly SessionImportSkill[]
+  visibleMemories: readonly SessionImportMemory[]
+  visibleAutomations: readonly SessionImportAutomation[]
+  selected: ReadonlySet<string>
+  toggle: (path: string) => void
+}): ReactNode {
+  const { t, tab, status, visibleRows, visibleSkills, visibleMemories, visibleAutomations, selected, toggle } = options
+  if (status === 'error') return <p className={css.failure} role="alert">{t('error')}</p>
+  if (tab === 'sessions') {
+    if (visibleRows.length === 0) return <p className={css.empty}>{status === 'loading' ? t('refreshing') : t('empty')}</p>
+    return (
+      <div className={css.list}>
+        {visibleRows.map(row => (
+          <label key={row.path} className={css.row}>
+            <input type="checkbox" checked={selected.has(row.path)} onChange={() => { toggle(row.path) }} />
+            <span>
+              <p className={css.title}>{row.title}</p>
+              <p className={css.meta}><span className={css.tag}>{row.source}</span> {t('nativeId')}: {row.nativeId}</p>
+              {row.cwd === undefined ? null : <p className={css.meta}>{t('cwd')}: {row.cwd}</p>}
+              <p className={css.meta}>{row.path}</p>
+            </span>
+            <span className={css.meta}>{formatBytes(row.bytes)}</span>
+          </label>
+        ))}
+      </div>
+    )
+  }
+  if (tab === 'skills') {
+    if (visibleSkills.length === 0) return <p className={css.empty}>{status === 'loading' ? t('refreshing') : t('skillsEmpty')}</p>
+    return (
+      <div className={css.list}>
+        {visibleSkills.map(skill => (
+          <label key={skill.path} className={css.row}>
+            <input type="checkbox" checked={selected.has(skill.path)} onChange={() => { toggle(skill.path) }} />
+            <span>
+              <p className={css.title}>{skill.name}</p>
+              <p className={css.meta}><span className={css.tag}>{skill.source}</span> {skill.description}</p>
+              <p className={css.meta}>{skill.path}</p>
+            </span>
+          </label>
+        ))}
+      </div>
+    )
+  }
+  if (tab === 'memory') {
+    if (visibleMemories.length === 0) return <p className={css.empty}>{status === 'loading' ? t('refreshing') : t('memoryEmpty')}</p>
+    return (
+      <div className={css.list}>
+        {visibleMemories.map(row => (
+          <label key={row.path} className={css.row}>
+            <input type="checkbox" checked={selected.has(row.path)} onChange={() => { toggle(row.path) }} />
+            <span>
+              <p className={css.title}>{row.name}</p>
+              <p className={css.meta}><span className={css.tag}>{row.source}</span> {row.kind}</p>
+              <p className={css.meta}>{row.preview}</p>
+              <p className={css.meta}>{row.path}</p>
+            </span>
+            <span className={css.meta}>{formatBytes(row.bytes)}</span>
+          </label>
+        ))}
+      </div>
+    )
+  }
+  if (visibleAutomations.length === 0) return <p className={css.empty}>{status === 'loading' ? t('refreshing') : t('automationsEmpty')}</p>
+  return (
+    <div className={css.list}>
+      {visibleAutomations.map(row => (
+        <label key={row.path} className={css.row}>
+          <input type="checkbox" checked={selected.has(row.path)} onChange={() => { toggle(row.path) }} />
+          <span>
+            <p className={css.title}>{row.name}</p>
+            <p className={css.meta}><span className={css.tag}>{row.status}</span> {scheduleLabel(row)}</p>
+            {row.cwd === undefined ? null : <p className={css.meta}>{t('cwd')}: {row.cwd}</p>}
+            <p className={css.meta}>{row.path}</p>
+          </span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
+function scheduleLabel(row: SessionImportAutomation): string {
+  if (row.schedule.kind === 'every') return `every ${String(row.schedule.everySeconds)}s`
+  if (row.schedule.kind === 'local-clock') return row.schedule.time ?? row.rrule ?? 'local-clock'
+  return row.schedule.reason ?? row.rrule ?? 'unsupported'
+}
+
+function filterByQuery<T>(items: readonly T[], query: string, values: (item: T) => readonly string[]): readonly T[] {
+  const needle = query.trim().toLowerCase()
+  if (needle.length === 0) return items
+  return items.filter(item => values(item).some(value => value.toLowerCase().includes(needle)))
+}
+
+function setImportFailure(
+  t: SessionImportSectionProps['t'],
+  failed: readonly { message: string }[],
+  setFailure: (value: string) => void,
+): void {
+  if (failed.length === 0) return
+  setFailure(`${t('failed')} ${String(failed.length)}：${failed.slice(0, 3).map(item => item.message).join('；')}`)
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${String(bytes)} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
-

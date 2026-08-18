@@ -41,19 +41,21 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var SessionImportSection_default = { "search": "YmEt6W_search", "hint": "YmEt6W_hint", "failure": "YmEt6W_failure", "tab": "YmEt6W_tab", "row": "YmEt6W_row", "select": "YmEt6W_select", "toolbar": "YmEt6W_toolbar", "section": "YmEt6W_section", "status": "YmEt6W_status", "meta": "YmEt6W_meta", "tabs": "YmEt6W_tabs", "tag": "YmEt6W_tag", "heading": "YmEt6W_heading", "list": "YmEt6W_list", "title": "YmEt6W_title", "empty": "YmEt6W_empty", "intro": "YmEt6W_intro", "button": "YmEt6W_button" };
+var SessionImportSection_default = { "status": "YmEt6W_status", "failure": "YmEt6W_failure", "tag": "YmEt6W_tag", "toolbar": "YmEt6W_toolbar", "search": "YmEt6W_search", "heading": "YmEt6W_heading", "hint": "YmEt6W_hint", "list": "YmEt6W_list", "intro": "YmEt6W_intro", "meta": "YmEt6W_meta", "title": "YmEt6W_title", "tabs": "YmEt6W_tabs", "select": "YmEt6W_select", "button": "YmEt6W_button", "tab": "YmEt6W_tab", "row": "YmEt6W_row", "section": "YmEt6W_section", "empty": "YmEt6W_empty" };
 
 // src/client/SessionImportSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
 var SESSION_SOURCES = ["claude", "codex", "cursor"];
 function SessionImportSection(props) {
-  const { t, listSessions, importSessions, listSkills, importSkills } = props;
+  const { t, listSessions, importSessions, listSkills, importSkills, listMemories, importMemories, listAutomations, importAutomations } = props;
   const [tab, setTab] = (0, import_react.useState)("sessions");
   const [source, setSource] = (0, import_react.useState)("all");
   const [query, setQuery] = (0, import_react.useState)("");
   const [rows, setRows] = (0, import_react.useState)([]);
   const [total, setTotal] = (0, import_react.useState)(0);
   const [skills, setSkills] = (0, import_react.useState)([]);
+  const [memories, setMemories] = (0, import_react.useState)([]);
+  const [automations, setAutomations] = (0, import_react.useState)([]);
   const [selected, setSelected] = (0, import_react.useState)(/* @__PURE__ */ new Set());
   const [status, setStatus] = (0, import_react.useState)("loading");
   const [busy, setBusy] = (0, import_react.useState)(false);
@@ -77,9 +79,17 @@ function SessionImportSection(props) {
           setRows([...collected]);
           setTotal(discovered);
         }
-      } else {
+      } else if (tab === "skills") {
         const snapshot = await listSkills();
         setSkills(snapshot.entries);
+        setTotal(snapshot.entries.length);
+      } else if (tab === "memory") {
+        const snapshot = await listMemories();
+        setMemories(snapshot.entries);
+        setTotal(snapshot.entries.length);
+      } else {
+        const snapshot = await listAutomations();
+        setAutomations(snapshot.entries);
         setTotal(snapshot.entries.length);
       }
       setStatus("idle");
@@ -90,17 +100,13 @@ function SessionImportSection(props) {
   (0, import_react.useEffect)(() => {
     void load();
   }, [tab, source]);
-  const visibleRows = (0, import_react.useMemo)(() => {
-    const needle = query.trim().toLowerCase();
-    if (needle.length === 0) return rows;
-    return rows.filter((row) => row.title.toLowerCase().includes(needle) || row.path.toLowerCase().includes(needle) || row.nativeId.toLowerCase().includes(needle));
-  }, [rows, query]);
+  const visibleRows = (0, import_react.useMemo)(() => filterByQuery(rows, query, (row) => [row.title, row.path, row.nativeId]), [rows, query]);
   const visibleSkills = (0, import_react.useMemo)(() => {
     const filtered = source === "all" ? skills : skills.filter((skill) => skill.source === source);
-    const needle = query.trim().toLowerCase();
-    if (needle.length === 0) return filtered;
-    return filtered.filter((skill) => skill.name.toLowerCase().includes(needle) || skill.description.toLowerCase().includes(needle) || skill.path.toLowerCase().includes(needle));
+    return filterByQuery(filtered, query, (skill) => [skill.name, skill.description, skill.path]);
   }, [skills, source, query]);
+  const visibleMemories = (0, import_react.useMemo)(() => filterByQuery(memories, query, (row) => [row.name, row.preview, row.path]), [memories, query]);
+  const visibleAutomations = (0, import_react.useMemo)(() => filterByQuery(automations, query, (row) => [row.name, row.nativeId, row.path, row.prompt]), [automations, query]);
   const toggle = (path) => {
     setSelected((current) => {
       const next = new Set(current);
@@ -117,15 +123,19 @@ function SessionImportSection(props) {
       if (tab === "sessions") {
         const result = await importSessions(paths);
         setMessage(`${t("imported")} ${String(result.imported)} / ${String(result.skipped)}`);
-        if (result.failed.length > 0) {
-          setFailure(`${t("failed")} ${String(result.failed.length)}\uFF1A${result.failed.slice(0, 3).map((item) => item.message).join("\uFF1B")}`);
-        }
-      } else {
+        setImportFailure(t, result.failed, setFailure);
+      } else if (tab === "skills") {
         const result = await importSkills(paths);
         setMessage(`${t("importedSkills")} ${String(result.copied)}`);
-        if (result.failed.length > 0) {
-          setFailure(`${t("failed")} ${String(result.failed.length)}\uFF1A${result.failed.slice(0, 3).map((item) => item.message).join("\uFF1B")}`);
-        }
+        setImportFailure(t, result.failed, setFailure);
+      } else if (tab === "memory") {
+        const result = await importMemories(paths);
+        setMessage(`${t("importedMemory")} ${String(result.copied)} / ${String(result.merged)}`);
+        setImportFailure(t, result.failed, setFailure);
+      } else {
+        const result = await importAutomations(paths);
+        setMessage(`${t("importedAutomations")} ${String(result.imported)} / ${String(result.skipped)} / ${String(result.unsupported)}`);
+        setImportFailure(t, result.failed, setFailure);
       }
     } catch {
       setFailure(t("error"));
@@ -133,23 +143,17 @@ function SessionImportSection(props) {
       setBusy(false);
     }
   };
-  const currentPaths = tab === "sessions" ? visibleRows.map((row) => row.path) : visibleSkills.map((skill) => skill.path);
+  const currentPaths = tab === "sessions" ? visibleRows.map((row) => row.path) : tab === "skills" ? visibleSkills.map((skill) => skill.path) : tab === "memory" ? visibleMemories.map((row) => row.path) : visibleAutomations.map((row) => row.path);
   const selectedPaths = currentPaths.filter((path) => selected.has(path));
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: SessionImportSection_default.section, children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { className: SessionImportSection_default.heading, children: t("title") }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.intro, children: t("intro") }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: SessionImportSection_default.tabs, role: "tablist", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: SessionImportSection_default.tab, "data-active": tab === "sessions", onClick: () => {
-        setTab("sessions");
-        setSelected(/* @__PURE__ */ new Set());
-      }, children: t("sessionsTab") }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: SessionImportSection_default.tab, "data-active": tab === "skills", onClick: () => {
-        setTab("skills");
-        setSelected(/* @__PURE__ */ new Set());
-      }, children: t("skillsTab") })
-    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.tabs, role: "tablist", children: ["sessions", "skills", "memory", "automations"].map((next) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: SessionImportSection_default.tab, "data-active": tab === next, onClick: () => {
+      setTab(next);
+      setSelected(/* @__PURE__ */ new Set());
+    }, children: t(`${next}Tab`) }, next)) }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: SessionImportSection_default.toolbar, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
+      tab === "sessions" || tab === "skills" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: SessionImportSection_default.hint, children: t("sourceFilter") }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { className: SessionImportSection_default.select, value: source, onChange: (event) => {
           setSource(event.target.value);
@@ -159,7 +163,7 @@ function SessionImportSection(props) {
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "codex", children: t("sourceCodex") }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "cursor", children: t("sourceCursor") })
         ] })
-      ] }),
+      ] }) : null,
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         "input",
         {
@@ -186,7 +190,27 @@ function SessionImportSection(props) {
     ] }),
     message.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.status, children: message }) : null,
     failure.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.failure, role: "alert", children: failure }) : null,
-    status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.failure, role: "alert", children: t("error") }) : tab === "sessions" && visibleRows.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.empty, children: status === "loading" ? t("refreshing") : t("empty") }) : tab === "sessions" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.list, children: visibleRows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: SessionImportSection_default.row, children: [
+    renderBody({
+      t,
+      tab,
+      status,
+      visibleRows,
+      visibleSkills,
+      visibleMemories,
+      visibleAutomations,
+      selected,
+      toggle
+    }),
+    status === "idle" && tab === "sessions" && total > visibleRows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.hint, children: t("truncated").replace("{shown}", String(visibleRows.length)).replace("{total}", String(total)) }) : null,
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.hint, children: t("commandHint") })
+  ] });
+}
+function renderBody(options) {
+  const { t, tab, status, visibleRows, visibleSkills, visibleMemories, visibleAutomations, selected, toggle } = options;
+  if (status === "error") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.failure, role: "alert", children: t("error") });
+  if (tab === "sessions") {
+    if (visibleRows.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.empty, children: status === "loading" ? t("refreshing") : t("empty") });
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.list, children: visibleRows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: SessionImportSection_default.row, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "checkbox", checked: selected.has(row.path), onChange: () => {
         toggle(row.path);
       } }),
@@ -207,7 +231,11 @@ function SessionImportSection(props) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.meta, children: row.path })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: SessionImportSection_default.meta, children: formatBytes(row.bytes) })
-    ] }, row.path)) }) : visibleSkills.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.empty, children: t("skillsEmpty") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.list, children: visibleSkills.map((skill) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: SessionImportSection_default.row, children: [
+    ] }, row.path)) });
+  }
+  if (tab === "skills") {
+    if (visibleSkills.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.empty, children: status === "loading" ? t("refreshing") : t("skillsEmpty") });
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.list, children: visibleSkills.map((skill) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: SessionImportSection_default.row, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "checkbox", checked: selected.has(skill.path), onChange: () => {
         toggle(skill.path);
       } }),
@@ -220,10 +248,61 @@ function SessionImportSection(props) {
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.meta, children: skill.path })
       ] })
-    ] }, skill.path)) }),
-    status === "idle" && tab === "sessions" && total > visibleRows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.hint, children: t("truncated").replace("{shown}", String(visibleRows.length)).replace("{total}", String(total)) }) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.hint, children: t("commandHint") })
-  ] });
+    ] }, skill.path)) });
+  }
+  if (tab === "memory") {
+    if (visibleMemories.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.empty, children: status === "loading" ? t("refreshing") : t("memoryEmpty") });
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.list, children: visibleMemories.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: SessionImportSection_default.row, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "checkbox", checked: selected.has(row.path), onChange: () => {
+        toggle(row.path);
+      } }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.title, children: row.name }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: SessionImportSection_default.meta, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: SessionImportSection_default.tag, children: row.source }),
+          " ",
+          row.kind
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.meta, children: row.preview }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.meta, children: row.path })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: SessionImportSection_default.meta, children: formatBytes(row.bytes) })
+    ] }, row.path)) });
+  }
+  if (visibleAutomations.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.empty, children: status === "loading" ? t("refreshing") : t("automationsEmpty") });
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.list, children: visibleAutomations.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: SessionImportSection_default.row, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "checkbox", checked: selected.has(row.path), onChange: () => {
+      toggle(row.path);
+    } }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.title, children: row.name }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: SessionImportSection_default.meta, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: SessionImportSection_default.tag, children: row.status }),
+        " ",
+        scheduleLabel(row)
+      ] }),
+      row.cwd === void 0 ? null : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: SessionImportSection_default.meta, children: [
+        t("cwd"),
+        ": ",
+        row.cwd
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.meta, children: row.path })
+    ] })
+  ] }, row.path)) });
+}
+function scheduleLabel(row) {
+  if (row.schedule.kind === "every") return `every ${String(row.schedule.everySeconds)}s`;
+  if (row.schedule.kind === "local-clock") return row.schedule.time ?? row.rrule ?? "local-clock";
+  return row.schedule.reason ?? row.rrule ?? "unsupported";
+}
+function filterByQuery(items, query, values) {
+  const needle = query.trim().toLowerCase();
+  if (needle.length === 0) return items;
+  return items.filter((item) => values(item).some((value) => value.toLowerCase().includes(needle)));
+}
+function setImportFailure(t, failed, setFailure) {
+  if (failed.length === 0) return;
+  setFailure(`${t("failed")} ${String(failed.length)}\uFF1A${failed.slice(0, 3).map((item) => item.message).join("\uFF1B")}`);
 }
 function formatBytes(bytes) {
   if (bytes < 1024) return `${String(bytes)} B`;
@@ -235,9 +314,11 @@ function formatBytes(bytes) {
 var zh = {
   nav: "\u5BFC\u5165",
   title: "\u5BFC\u5165\u5176\u4ED6 AI \u4F1A\u8BDD",
-  intro: "\u626B\u63CF\u672C\u673A Cursor\u3001Codex \u548C Claude Code \u7684\u4F1A\u8BDD\u4E0E\u6280\u80FD\uFF0C\u8F6C\u6210 DeepSeek Harness \u4F1A\u8BDD\u3002\u9ED8\u8BA4\u4E0D\u626B Codex \u5F52\u6863\u76EE\u5F55\u3002\u5BFC\u5165\u540E\u5237\u65B0\u4F1A\u8BDD\u5217\u8868\u5373\u53EF\u6253\u5F00\u3002",
+  intro: "\u626B\u63CF\u672C\u673A Cursor\u3001Codex \u548C Claude Code \u7684\u4F1A\u8BDD\u3001\u6280\u80FD\u3001\u9879\u76EE\u8BB0\u5FC6\u548C\u81EA\u52A8\u5316\u3002\u9ED8\u8BA4\u4E0D\u626B Codex \u5F52\u6863\u76EE\u5F55\u3002\u5BFC\u5165\u540E\u5237\u65B0\u4F1A\u8BDD\u5217\u8868\u6216\u81EA\u52A8\u5316\u9875\u5373\u53EF\u6253\u5F00\u3002",
   sessionsTab: "\u4F1A\u8BDD",
   skillsTab: "\u6280\u80FD",
+  memoryTab: "\u8BB0\u5FC6",
+  automationsTab: "\u81EA\u52A8\u5316",
   refresh: "\u91CD\u65B0\u626B\u63CF",
   refreshing: "\u626B\u63CF\u4E2D\u2026",
   importSelected: "\u5BFC\u5165\u9009\u4E2D",
@@ -246,6 +327,8 @@ var zh = {
   empty: "\u6CA1\u6709\u53D1\u73B0\u53EF\u5BFC\u5165\u7684\u4F1A\u8BDD\u3002",
   truncated: "\u5DF2\u663E\u793A\u6700\u8FD1 {shown} \u6761\uFF0C\u672C\u673A\u5171\u53D1\u73B0 {total} \u6761\u3002\u53EF\u7528\u6807\u9898\u6216\u8DEF\u5F84\u7EE7\u7EED\u7B5B\u9009\u3002",
   skillsEmpty: "\u6CA1\u6709\u53D1\u73B0\u53EF\u5BFC\u5165\u7684\u6280\u80FD\u3002",
+  memoryEmpty: "\u6CA1\u6709\u53D1\u73B0\u53EF\u5BFC\u5165\u7684\u8BB0\u5FC6\u6587\u4EF6\u3002",
+  automationsEmpty: "\u6CA1\u6709\u53D1\u73B0\u53EF\u5BFC\u5165\u7684\u81EA\u52A8\u5316\u3002",
   sourceFilter: "\u6765\u6E90",
   sourceAll: "\u5168\u90E8",
   sourceClaude: "Claude Code",
@@ -254,20 +337,24 @@ var zh = {
   search: "\u6309\u6807\u9898\u6216\u8DEF\u5F84\u7B5B\u9009",
   imported: "\u5BFC\u5165\u5B8C\u6210\uFF08\u65B0\u5BFC\u5165 / \u5DF2\u5B58\u5728\uFF09",
   importedSkills: "\u6280\u80FD\u5DF2\u590D\u5236\u5230 ~/.dsh/skills\u3002",
+  importedMemory: "\u8BB0\u5FC6\u5DF2\u590D\u5236\uFF08\u6587\u4EF6 / \u5408\u5E76\u8FDB AGENTS.md\uFF09",
+  importedAutomations: "\u81EA\u52A8\u5316\u5BFC\u5165\u5B8C\u6210\uFF08\u65B0\u5EFA / \u5DF2\u5B58\u5728 / \u4E0D\u652F\u6301\uFF09",
   failed: "\u90E8\u5206\u9879\u76EE\u5BFC\u5165\u5931\u8D25\u3002",
   error: "\u6682\u65F6\u65E0\u6CD5\u626B\u63CF\u672C\u673A\u4F1A\u8BDD\u3002",
   retry: "\u91CD\u8BD5",
   cwd: "\u5DE5\u4F5C\u76EE\u5F55",
   nativeId: "\u539F\u59CB id",
   bytes: "\u5927\u5C0F",
-  commandHint: "\u4E5F\u53EF\u4EE5\u5728\u5BF9\u8BDD\u91CC\u7528 /import list\u3001/import all\u3001/import skills\u3002"
+  commandHint: "\u4E5F\u53EF\u4EE5\u5728\u5BF9\u8BDD\u91CC\u7528 /import list\u3001/import all\u3001/import skills\u3001/import memory\u3001/import automations\u3002"
 };
 var en = {
   nav: "Import",
   title: "Import other AI sessions",
-  intro: "Scan local Cursor, Codex, and Claude Code conversations and skills, then write them as DeepSeek Harness sessions. Codex archived_sessions is skipped unless you pass --archived. Refresh the session list after import.",
+  intro: "Scan local Cursor, Codex, and Claude Code conversations, skills, memory files, and automations. Codex archived_sessions is skipped unless you pass --archived.",
   sessionsTab: "Sessions",
   skillsTab: "Skills",
+  memoryTab: "Memory",
+  automationsTab: "Automations",
   refresh: "Rescan",
   refreshing: "Scanning\u2026",
   importSelected: "Import selected",
@@ -276,6 +363,8 @@ var en = {
   empty: "No foreign sessions found.",
   truncated: "Showing the newest {shown} of {total} conversations. Filter by title or path to narrow the list.",
   skillsEmpty: "No foreign skills found.",
+  memoryEmpty: "No foreign memory files found.",
+  automationsEmpty: "No foreign automations found.",
   sourceFilter: "Source",
   sourceAll: "All",
   sourceClaude: "Claude Code",
@@ -284,13 +373,15 @@ var en = {
   search: "Filter by title or path",
   imported: "Import finished (new / already present).",
   importedSkills: "Skills copied into ~/.dsh/skills.",
+  importedMemory: "Memory copied (files / merged into AGENTS.md).",
+  importedAutomations: "Automations imported (new / already present / unsupported).",
   failed: "Some items failed to import.",
   error: "Could not scan local sessions.",
   retry: "Retry",
   cwd: "Working directory",
   nativeId: "Native id",
   bytes: "Size",
-  commandHint: "You can also run /import list, /import all, or /import skills in chat."
+  commandHint: "You can also run /import list, /import all, /import skills, /import memory, or /import automations in chat."
 };
 
 // src/client/index.ts
@@ -317,7 +408,11 @@ function apply(ctx) {
     }),
     importSessions: (paths) => call("importSessions", { paths }),
     listSkills: () => call("listSkills"),
-    importSkills: (paths) => call("importSkills", { paths })
+    importSkills: (paths) => call("importSkills", { paths }),
+    listMemories: () => call("listMemories"),
+    importMemories: (paths) => call("importMemories", { paths }),
+    listAutomations: () => call("listAutomations"),
+    importAutomations: (paths) => call("importAutomations", { paths })
   });
   ctx.slots.inject("settings.section", () => ctx.slots.register({
     name: "settings.section",

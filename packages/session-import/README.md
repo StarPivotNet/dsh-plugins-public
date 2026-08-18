@@ -19,6 +19,8 @@ After restart, Settings gains **导入 / Import**:
 
 - **会话** — scan the local Claude Code, Codex, and Cursor homes, then write selected conversations as cold DSH sessions
 - **技能** — copy Claude / Codex / Cursor `SKILL.md` bundles and Markdown commands into `~/.dsh/skills`
+- **记忆** — copy `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, and Codex `MEMORY.md` into `~/.dsh/imported-memory`, and merge the instruction files into `~/.dsh/AGENTS.md`
+- **自动化** — map Codex `~/.codex/automations/*/automation.toml` RRULEs onto DSH timers. Daily/weekly local clocks and intervals of at least 5 minutes are created; faster heartbeats are listed as unsupported
 
 Imported conversations keep user text, assistant text, reasoning, and tool-call / tool-result pairs. They are written under the current workspace cwd, stamped with the import time, and given a title event so they appear at the top of this project's session list. Open one to resume it with the current DSH agent. Pass `--keep-cwd` to keep the foreign working directory instead. Re-importing the same native id is counted as already present, not as a failure.
 
@@ -29,6 +31,8 @@ Slash commands:
 - `/import all` — import every discovered conversation
 - `/import claude|codex|cursor [id-or-path]` — import one store, or one match
 - `/import skills [claude|codex|cursor]` — copy skills into `~/.dsh/skills`
+- `/import memory` — copy Claude/Codex instruction and memory files
+- `/import automations` — create DSH timers from Codex automations
 
 ## Where it reads
 

@@ -23,6 +23,11 @@ test('skills imports skill files', () => {
   assert.deepEqual(parseImportArgs('skills cursor'), { kind: 'skills', source: 'cursor' })
 })
 
+test('memory and automations are dedicated commands', () => {
+  assert.deepEqual(parseImportArgs('memory'), { kind: 'memory' })
+  assert.deepEqual(parseImportArgs('automations'), { kind: 'automations' })
+})
+
 test('an absolute path is a session query', () => {
   assert.deepEqual(parseImportArgs('/tmp/s.jsonl'), { kind: 'sessions', query: '/tmp/s.jsonl', keepCwd: false, includeArchived: false })
 })

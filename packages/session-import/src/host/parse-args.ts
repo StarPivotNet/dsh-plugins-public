@@ -10,6 +10,7 @@ export type ImportCommand =
   | { readonly kind: 'skills'; readonly source?: ImportSource }
   | { readonly kind: 'memory' }
   | { readonly kind: 'automations' }
+  | { readonly kind: 'repair' }
 
 const SOURCES = new Set<ImportSource>(['claude', 'codex', 'cursor', 'grok'])
 
@@ -36,6 +37,9 @@ export function parseImportArgs(rawInput: string): ImportCommand {
   }
   if (first === 'automations' || first === 'automation') {
     return { kind: 'automations' }
+  }
+  if (first === 'repair' || first === 'fix') {
+    return { kind: 'repair' }
   }
   if (first === 'all') return { kind: 'sessions', keepCwd, includeArchived }
   const source = parseSource(first)

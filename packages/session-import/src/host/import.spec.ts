@@ -3,6 +3,7 @@ import test from 'node:test'
 import { persistConverted, withWorkspaceCwd } from './import.ts'
 import { ensureWorkspace } from './workspace.ts'
 import { convertClaudeSession } from '../convert/claude.ts'
+import { parseImportArgs } from './parse-args.ts'
 
 test('persistConverted writes header then events once', async () => {
   const converted = convertClaudeSession(JSON.stringify({
@@ -38,6 +39,10 @@ test('persistConverted treats an existing id as already imported', async () => {
   const result = await persistConverted(persistence, converted)
   assert.equal(result.ok, true)
   assert.equal(result.ok && result.alreadyImported, true)
+})
+
+test('repair command is parsed independently of import', () => {
+  assert.deepEqual(parseImportArgs('repair'), { kind: 'repair' })
 })
 
 test('ensureWorkspace creates a missing registry row', async () => {

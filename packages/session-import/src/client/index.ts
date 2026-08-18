@@ -52,6 +52,7 @@ export function apply(ctx: ClientContext): void {
     importMemories: paths => call('importMemories', { paths }),
     listAutomations: () => call('listAutomations'),
     importAutomations: paths => call('importAutomations', { paths }),
+    repairImported: () => call('repairImported', {}),
   })
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',

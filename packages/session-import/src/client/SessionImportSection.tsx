@@ -54,6 +54,7 @@ export interface SessionImportSectionInjected {
   importMemories: (paths: readonly string[]) => Promise<{ copied: number; merged: number; failed: readonly { path: string; message: string }[] }>
   listAutomations: () => Promise<{ entries: readonly SessionImportAutomation[] }>
   importAutomations: (paths: readonly string[]) => Promise<{ imported: number; skipped: number; unsupported: number; failed: readonly { path: string; message: string }[] }>
+  repairImported: () => Promise<{ repaired: number; skipped: number; failed: readonly { id: string; message: string }[] }>
 }
 
 const SESSION_SOURCES: readonly SessionImportRow['source'][] = ['claude', 'codex', 'cursor', 'grok']
@@ -65,7 +66,7 @@ export type SessionImportSectionProps =
   & InjectFace<SessionImportSectionInjected>
 
 export function SessionImportSection(props: SessionImportSectionProps): ReactNode {
-  const { t, listSessions, importSessions, importOneSession, listSkills, importSkills, listMemories, importMemories, listAutomations, importAutomations } = props
+  const { t, listSessions, importSessions, importOneSession, listSkills, importSkills, listMemories, importMemories, listAutomations, importAutomations, repairImported } = props
   const [tab, setTab] = useState<ImportTab>('sessions')
   const [source, setSource] = useState<'all' | SessionImportRow['source']>('all')
   const [query, setQuery] = useState('')
@@ -173,6 +174,23 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
     }
   }
 
+  const runRepair = async (): Promise<void> => {
+    setBusy(true)
+    setMessage('')
+    setFailure('')
+    try {
+      const result = await repairImported()
+      setMessage(`${t('repaired')} ${String(result.repaired)} / ${String(result.skipped)}`)
+      if (result.failed.length > 0) {
+        setFailure(`${t('failed')} ${String(result.failed.length)}：${result.failed.slice(0, 3).map(item => item.message).join('；')}`)
+      }
+    } catch {
+      setFailure(t('error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const currentPaths = tab === 'sessions'
     ? visibleRows.map(row => row.path)
     : tab === 'skills'
@@ -224,6 +242,11 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
         <button type="button" className={css.button} data-primary="true" disabled={busy || currentPaths.length === 0} onClick={() => { void runImport(currentPaths) }}>
           {t('importAll')}
         </button>
+        {tab === 'sessions' ? (
+          <button type="button" className={css.button} disabled={busy} onClick={() => { void runRepair() }}>
+            {t('repair')}
+          </button>
+        ) : null}
       </div>
       {message.length > 0 ? <p className={css.status}>{message}</p> : null}
       {progress !== undefined ? (

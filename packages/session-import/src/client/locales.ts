@@ -12,6 +12,7 @@ export const zh = {
   refreshing: '扫描中…',
   importSelected: '导入选中',
   importAll: '全部导入',
+  repair: '修复分组',
   importing: '导入中…',
   importProgress: '正在导入 {done}/{total}',
   empty: '没有发现可导入的会话。',
@@ -27,6 +28,7 @@ export const zh = {
   sourceGrok: 'Grok Build',
   search: '按标题或路径筛选',
   imported: '导入完成（新导入 / 已存在）',
+  repaired: '已按原项目重新分组（已修复 / 无需改动）',
   importedSkills: '技能已复制到 ~/.dsh/skills。',
   importedMemory: '记忆已复制（文件 / 合并进 AGENTS.md）',
   importedAutomations: '自动化导入完成（新建 / 已存在 / 不支持）',
@@ -36,7 +38,7 @@ export const zh = {
   cwd: '工作目录',
   nativeId: '原始 id',
   bytes: '大小',
-  commandHint: '也可以在对话里用 /import list、/import all、/import skills、/import memory、/import automations。',
+  commandHint: '也可以在对话里用 /import list、/import all、/import repair、/import skills、/import memory、/import automations。',
 }
 
 export const en = {
@@ -51,6 +53,7 @@ export const en = {
   refreshing: 'Scanning…',
   importSelected: 'Import selected',
   importAll: 'Import all',
+  repair: 'Repair grouping',
   importing: 'Importing…',
   importProgress: 'Importing {done}/{total}',
   empty: 'No foreign sessions found.',
@@ -66,6 +69,7 @@ export const en = {
   sourceGrok: 'Grok Build',
   search: 'Filter by title or path',
   imported: 'Import finished (new / already present).',
+  repaired: 'Moved leftover imports back to their original projects (repaired / unchanged).',
   importedSkills: 'Skills copied into ~/.dsh/skills.',
   importedMemory: 'Memory copied (files / merged into AGENTS.md).',
   importedAutomations: 'Automations imported (new / already present / unsupported).',
@@ -75,7 +79,7 @@ export const en = {
   cwd: 'Working directory',
   nativeId: 'Native id',
   bytes: 'Size',
-  commandHint: 'You can also run /import list, /import all, /import skills, /import memory, or /import automations in chat.',
+  commandHint: 'You can also run /import list, /import all, /import repair, /import skills, /import memory, or /import automations in chat.',
 }
 
 export type SessionImportKey = keyof typeof zh

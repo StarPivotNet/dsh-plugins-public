@@ -1,7 +1,7 @@
 // src/host/index.ts
-import { homedir as homedir4 } from "node:os";
-import { join as join5 } from "node:path";
-import { stat as stat3 } from "node:fs/promises";
+import { homedir as homedir5 } from "node:os";
+import { join as join6 } from "node:path";
+import { stat as stat4 } from "node:fs/promises";
 import { settingsNamespace } from "@deepseek-ai/dsh-settings";
 import z from "@deepseek-ai/schemastery";
 
@@ -118,9 +118,9 @@ function convertConversation(conversation, path, limits = DEFAULT_CONVERT_LIMITS
   };
   const closeStep = (time) => {
     if (openStep === null || turn === 0) return;
-    for (const [callId, open2] of [...pending]) {
-      if (open2.turn !== turn || open2.step !== openStep) continue;
-      push("tool/result", toolResultEvent(open2.turn, open2.step, callId, "(imported call had no recorded result)", true, limits), time, true);
+    for (const [callId, open3] of [...pending]) {
+      if (open3.turn !== turn || open3.step !== openStep) continue;
+      push("tool/result", toolResultEvent(open3.turn, open3.step, callId, "(imported call had no recorded result)", true, limits), time, true);
       pending.delete(callId);
     }
     push("step/end", { turn, step: openStep }, time);
@@ -207,14 +207,14 @@ function convertConversation(conversation, path, limits = DEFAULT_CONVERT_LIMITS
       if (pending.size === 0) closeStep(item.time);
       continue;
     }
-    const open2 = pending.get(item.callId);
-    if (open2 === void 0) {
+    const open3 = pending.get(item.callId);
+    if (open3 === void 0) {
       skipped += 1;
       continue;
     }
     pending.delete(item.callId);
-    push("tool/result", toolResultEvent(open2.turn, open2.step, item.callId, item.text, item.isError, limits), item.time, true);
-    const remaining = [...pending.values()].some((entry) => entry.turn === open2.turn && entry.step === open2.step);
+    push("tool/result", toolResultEvent(open3.turn, open3.step, item.callId, item.text, item.isError, limits), item.time, true);
+    const remaining = [...pending.values()].some((entry) => entry.turn === open3.turn && entry.step === open3.step);
     if (!remaining) closeStep(item.time);
   }
   const lastTime = epochMs(conversation.items.at(-1)?.time ?? conversation.updatedAt);
@@ -1046,6 +1046,9 @@ function parseImportArgs(rawInput) {
   if (first === "automations" || first === "automation") {
     return { kind: "automations" };
   }
+  if (first === "repair" || first === "fix") {
+    return { kind: "repair" };
+  }
   if (first === "all") return { kind: "sessions", keepCwd, includeArchived };
   const source = parseSource(first);
   if (source !== void 0) {
@@ -1325,10 +1328,10 @@ async function copySkill(skill, targetRoot) {
   return { path: target, overwritten };
 }
 async function visitSkillRoot(root, source, found) {
-  const { readdir: readdir3, readFile: readFile4, stat: stat4 } = await import("node:fs/promises");
+  const { readdir: readdir4, readFile: readFile5, stat: stat5 } = await import("node:fs/promises");
   let entries;
   try {
-    entries = await readdir3(root, { withFileTypes: true });
+    entries = await readdir4(root, { withFileTypes: true });
   } catch {
     return;
   }
@@ -1337,9 +1340,9 @@ async function visitSkillRoot(root, source, found) {
     if (entry.isDirectory()) {
       const skillFile = join3(full, "SKILL.md");
       try {
-        const info = await stat4(skillFile);
+        const info = await stat5(skillFile);
         if (!info.isFile()) continue;
-        const parsed = parseSkillFile(await readFile4(skillFile, "utf8"), source, skillFile);
+        const parsed = parseSkillFile(await readFile5(skillFile, "utf8"), source, skillFile);
         if (parsed !== void 0) found.push(parsed);
       } catch {
         continue;
@@ -1349,7 +1352,7 @@ async function visitSkillRoot(root, source, found) {
     if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) continue;
     if (entry.name.toLowerCase() === "readme.md") continue;
     try {
-      const parsed = parseSkillFile(await readFile4(full, "utf8"), source, full);
+      const parsed = parseSkillFile(await readFile5(full, "utf8"), source, full);
       if (parsed !== void 0) found.push(parsed);
     } catch {
       continue;
@@ -1657,6 +1660,269 @@ async function ensureWorkspace(registry, cwd) {
   }
 }
 
+// src/host/repair.ts
+import { homedir as homedir4 } from "node:os";
+import { basename as basename5, dirname as dirname5, join as join5 } from "node:path";
+import { mkdir as mkdir4, open as open2, readdir as readdir3, readFile as readFile4, rename, stat as stat3, writeFile as writeFile3 } from "node:fs/promises";
+import { constants, zstdCompress, zstdDecompress } from "node:zlib";
+import { promisify } from "node:util";
+var zstdCompressAsync = promisify(zstdCompress);
+var zstdDecompressAsync = promisify(zstdDecompress);
+var ZSTD_MAGIC = Buffer.from([40, 181, 47, 253]);
+var CHECKSUM = { params: { [constants.ZSTD_c_checksumFlag]: 1 } };
+async function discoverForeignOrigins() {
+  const found = /* @__PURE__ */ new Map();
+  const roots = defaultScanRoots();
+  await Promise.all([
+    collectCodexOrigins(roots.codex, found),
+    collectGrokOrigins(roots.grok, found),
+    collectClaudeOrigins(roots.claude, found)
+  ]);
+  return found;
+}
+async function repairImportedSessions(ctx) {
+  const origins = await discoverForeignOrigins();
+  const persistence = ctx.get("sessionPersistence");
+  const headers = persistence?.list === void 0 ? [] : await persistence.list();
+  const registry = ctx.get("workspaceRegistry");
+  let repaired = 0;
+  let skipped = 0;
+  const failed = [];
+  for (const header of headers.filter((item) => item.id.startsWith("import-"))) {
+    const origin = origins.get(header.id);
+    if (origin === void 0) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      const changed = await repairOneOnDisk(header.id, origin);
+      await rehomeLive(registry, header.id, origin.cwd);
+      if (changed) repaired += 1;
+      else skipped += 1;
+    } catch (error) {
+      failed.push({ id: header.id, message: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { repaired, skipped, failed };
+}
+async function repairOneOnDisk(id, origin) {
+  const sessionRoot = join5(homedir4(), ".dsh", "sessions");
+  const dir = (await listImportSessionDirs(sessionRoot)).find((item) => item.id === id)?.dir;
+  if (dir === void 0) throw new Error("no stored log for " + id);
+  const header = await readStoredHeader(join5(dir, "session.jsonl.zstd"));
+  if (header.cwd === origin.cwd) return false;
+  await rewriteHeaderCwd(join5(dir, "session.jsonl.zstd"), origin.cwd);
+  await moveSessionDir(sessionRoot, dir, origin.cwd, id);
+  return true;
+}
+async function rehomeLive(registry, id, cwd) {
+  if (registry === void 0) return;
+  for (const workspace2 of registry.list?.() ?? []) {
+    try {
+      await workspace2.detachSession?.(id);
+    } catch {
+    }
+  }
+  const workspace = await ensureWorkspace(registry, cwd);
+  await workspace?.attachSession?.(id);
+}
+async function collectCodexOrigins(roots, found) {
+  for (const root of roots) {
+    for (const path of await walkFiles(root, 8, (name2) => isSessionFile("codex", name2))) {
+      const preview = await readHead(path, 64e3);
+      const nativeId = basename5(path).replace(/\.jsonl$/u, "").replace(/^rollout-\d{4}-\d{2}-\d{2}T[0-9-]+-/u, "");
+      const payload = firstJsonObject(preview);
+      const body = isRecord(payload?.payload) ? payload.payload : payload;
+      const cwd = asString(body?.cwd);
+      if (cwd === void 0) continue;
+      const title = sessionName(asString(body?.thread_name) ?? firstCodexUserText(preview) ?? nativeId);
+      found.set(importedSessionId("codex", nativeId), { id: importedSessionId("codex", nativeId), cwd, title });
+    }
+  }
+}
+async function collectGrokOrigins(roots, found) {
+  for (const root of roots) {
+    for (const path of await walkFiles(root, 8, (name2) => isSessionFile("grok", name2))) {
+      let summary;
+      try {
+        summary = parseGrokSummary(await readFile4(join5(dirname5(path), "summary.json"), "utf8"));
+      } catch {
+        summary = {};
+      }
+      const nativeId = summary.id ?? basename5(dirname5(path));
+      if (summary.cwd === void 0) continue;
+      found.set(importedSessionId("grok", nativeId), {
+        id: importedSessionId("grok", nativeId),
+        cwd: summary.cwd,
+        title: sessionName(summary.title ?? nativeId)
+      });
+    }
+  }
+}
+async function collectClaudeOrigins(roots, found) {
+  for (const root of roots) {
+    for (const path of await walkFiles(root, 8, (name2) => isSessionFile("claude", name2))) {
+      const preview = await readHead(path, 64e3);
+      const record = firstJsonObject(preview);
+      const nativeId = asString(record?.sessionId) ?? basename5(path).replace(/\.jsonl$/u, "");
+      const cwd = asString(record?.cwd);
+      if (cwd === void 0) continue;
+      found.set(importedSessionId("claude", nativeId), {
+        id: importedSessionId("claude", nativeId),
+        cwd,
+        title: sessionName(firstClaudeUserText(preview) ?? nativeId)
+      });
+    }
+  }
+}
+async function walkFiles(root, depth, accept) {
+  if (depth < 0) return [];
+  let entries;
+  try {
+    entries = await readdir3(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const files = [];
+  const dirs = [];
+  for (const entry of entries) {
+    const full = join5(root, entry.name);
+    if (entry.isDirectory()) dirs.push(full);
+    else if (entry.isFile() && accept(entry.name)) files.push(full);
+  }
+  const nested = await Promise.all(dirs.map((dir) => walkFiles(dir, depth - 1, accept)));
+  return files.concat(...nested);
+}
+async function listImportSessionDirs(root) {
+  const found = [];
+  let projects;
+  try {
+    projects = await readdir3(root, { withFileTypes: true });
+  } catch {
+    return found;
+  }
+  for (const project of projects) {
+    if (!project.isDirectory()) continue;
+    let sessions;
+    try {
+      sessions = await readdir3(join5(root, project.name), { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const session of sessions) {
+      if (session.isDirectory() && session.name.startsWith("import-")) {
+        found.push({ id: session.name, dir: join5(root, project.name, session.name) });
+      }
+    }
+  }
+  return found;
+}
+async function rewriteHeaderCwd(path, cwd) {
+  const buffer = await readFile4(path);
+  const firstEnd = firstZstdFrameEnd(buffer);
+  const headerText = (await zstdDecompressAsync(buffer.subarray(0, firstEnd))).toString("utf8");
+  const header = JSON.parse(headerText);
+  header.cwd = cwd;
+  const next = await zstdCompressAsync(JSON.stringify(header) + "\n", CHECKSUM);
+  await writeFile3(path, Buffer.concat([next, buffer.subarray(firstEnd)]));
+}
+async function readStoredHeader(path) {
+  const buffer = await readFile4(path);
+  const firstEnd = firstZstdFrameEnd(buffer);
+  return JSON.parse((await zstdDecompressAsync(buffer.subarray(0, firstEnd))).toString("utf8"));
+}
+async function moveSessionDir(root, from, cwd, id) {
+  const dest = join5(root, projectKey(cwd), id);
+  if (from === dest) return;
+  await mkdir4(join5(root, projectKey(cwd)), { recursive: true });
+  try {
+    await rename(from, dest);
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+  }
+}
+function firstZstdFrameEnd(buffer) {
+  const next = buffer.indexOf(ZSTD_MAGIC, 4);
+  return next === -1 ? buffer.length : next;
+}
+function projectKey(cwd) {
+  let readable = "";
+  let separatorRun = false;
+  for (const ch of cwd) {
+    if (ch === "/" || ch === "\\" || ch === ":") {
+      if (!separatorRun) readable += "-";
+      separatorRun = true;
+    } else if (ch !== "~" && /^[A-Za-z0-9._-]$/u.test(ch)) {
+      readable += ch;
+      separatorRun = false;
+    } else {
+      readable += "~" + ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0");
+      separatorRun = false;
+    }
+  }
+  return "--" + (readable.replace(/^-+/u, "") || "root").slice(0, 251) + "--";
+}
+function firstJsonObject(text) {
+  for (const line of text.split(/\r?\n/u)) {
+    if (line.trim().length === 0) continue;
+    try {
+      const parsed = JSON.parse(line);
+      if (isRecord(parsed)) return parsed;
+    } catch {
+      continue;
+    }
+  }
+  return void 0;
+}
+function firstCodexUserText(text) {
+  for (const line of text.split(/\r?\n/u).slice(0, 80)) {
+    let record;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!isRecord(record)) continue;
+    const payload = isRecord(record.payload) ? record.payload : record;
+    if (record.type === "event_msg" && payload.type === "user_message" && typeof payload.message === "string") {
+      if (!isInstructionDump(payload.message)) return payload.message;
+    }
+    if (payload.type === "message" && payload.role === "user") {
+      const content = payload.content;
+      const blob = Array.isArray(content) ? content.map((item) => isRecord(item) ? asString(item.text) ?? "" : "").join("") : asString(content);
+      if (blob !== void 0 && blob.length > 0 && !isInstructionDump(blob)) return blob;
+    }
+  }
+  return void 0;
+}
+function firstClaudeUserText(text) {
+  for (const line of text.split(/\r?\n/u).slice(0, 40)) {
+    let record;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!isRecord(record) || record.type !== "user" || !isRecord(record.message)) continue;
+    const content = record.message.content;
+    const blob = typeof content === "string" ? content : Array.isArray(content) ? content.map((item) => isRecord(item) ? asString(item.text) ?? "" : "").join("") : "";
+    if (blob.length > 0 && !isInstructionDump(blob)) return blob;
+  }
+  return void 0;
+}
+async function readHead(path, bytes) {
+  const handle = await open2(path, "r");
+  try {
+    const info = await stat3(path);
+    const size = Math.min(bytes, Number(info.size));
+    const buffer = Buffer.alloc(size);
+    await handle.read(buffer, 0, size, 0);
+    return buffer.toString("utf8");
+  } finally {
+    await handle.close();
+  }
+}
+
 // src/host/index.ts
 var name = "session-import";
 var SESSION_IMPORT_SETTINGS_NAMESPACE = "session-import";
@@ -1668,7 +1934,7 @@ function apply(ctx, config = {}) {
     maxTextChars: config.maxTextChars ?? DEFAULT_CONVERT_LIMITS.maxTextChars
   };
   const maxFileBytes = config.maxFileBytes ?? 32 * 1024 * 1024;
-  const skillTarget = config.skillTarget ?? join5(homedir4(), ".dsh", "skills");
+  const skillTarget = config.skillTarget ?? join6(homedir5(), ".dsh", "skills");
   ctx.inject(["settings"], (settingsCtx) => {
     const settings = settingsCtx.get("settings");
     settings.register(SETTINGS_NS, z.object({
@@ -1711,6 +1977,8 @@ function apply(ctx, config = {}) {
             return { ok: true, value: { entries: await discoverAutomations() } };
           case "importAutomations":
             return { ok: true, value: await importAutomations(connectionCtx, payload) };
+          case "repairImported":
+            return { ok: true, value: await repairImportedSessions(connectionCtx) };
           default:
             return { ok: false, error: { code: "NOT_FOUND", message: "unknown session-import endpoint" } };
         }
@@ -1736,6 +2004,7 @@ async function handleImportCommand(ctx, rawInput, runtime) {
         "/import skills \u2014 copy Claude/Codex/Cursor skills into ~/.dsh/skills",
         "/import memory \u2014 copy Claude/Codex instruction files into ~/.dsh/AGENTS.md",
         "/import automations \u2014 create DSH timers from ~/.codex/automations",
+        "/import repair \u2014 move leftover imports back to their original workspaces",
         "/import <path-or-id> \u2014 import one file or native id",
         "Imports keep the foreign working directory and create a DSH workspace when it is missing.",
         "Add --here to rewrite imported sessions into the current workspace instead.",
@@ -1784,6 +2053,13 @@ ${lines.join("\n")}${extra}` };
     return {
       kind: result.failed.length > 0 && result.imported === 0 ? "error" : "success",
       text: `Imported ${String(result.imported)} automation(s), skipped ${String(result.skipped)}, unsupported ${String(result.unsupported)}, failed ${String(result.failed.length)}.`
+    };
+  }
+  if (command.kind === "repair") {
+    const result = await repairImportedSessions(ctx);
+    return {
+      kind: result.failed.length > 0 && result.repaired === 0 ? "error" : "success",
+      text: `Repaired ${String(result.repaired)} leftover import(s), skipped ${String(result.skipped)}, failed ${String(result.failed.length)}.`
     };
   }
   const persistence = requirePersistence(ctx);
@@ -1918,7 +2194,7 @@ async function importOneSession(ctx, request, limits, maxFileBytes) {
   const persistence = requirePersistence(ctx);
   if (persistence === void 0) throw new Error("session persistence is not configured");
   try {
-    const info = await stat3(path);
+    const info = await stat4(path);
     if (info.size > maxFileBytes) {
       return { imported: 0, skipped: 0, failed: [{ path, message: `file exceeds maxFileBytes (${String(info.size)})` }] };
     }
@@ -1960,8 +2236,8 @@ function looksLikePath(value) {
   return value.startsWith("/") || value.startsWith("~") || /^[A-Za-z]:[\\/]/u.test(value);
 }
 function expandHome(value) {
-  if (value === "~") return homedir4();
-  if (value.startsWith("~/")) return join5(homedir4(), value.slice(2));
+  if (value === "~") return homedir5();
+  if (value.startsWith("~/")) return join6(homedir5(), value.slice(2));
   return value;
 }
 function requirePersistence(ctx) {

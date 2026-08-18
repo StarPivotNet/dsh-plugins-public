@@ -33,6 +33,7 @@ Slash commands:
 - `/import skills [claude|codex|cursor]` — copy skills into `~/.dsh/skills`
 - `/import memory` — copy Claude/Codex instruction and memory files
 - `/import automations` — create DSH timers from Codex automations
+- `/import repair` — move leftover imports back to their original project workspaces
 
 ## Where it reads
 

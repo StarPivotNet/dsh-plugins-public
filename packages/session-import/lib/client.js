@@ -41,13 +41,13 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var SessionImportSection_default = { "section": "YmEt6W_section", "tabs": "YmEt6W_tabs", "status": "YmEt6W_status", "failure": "YmEt6W_failure", "list": "YmEt6W_list", "progress": "YmEt6W_progress", "toolbar": "YmEt6W_toolbar", "title": "YmEt6W_title", "button": "YmEt6W_button", "tag": "YmEt6W_tag", "progressBar": "YmEt6W_progressBar", "intro": "YmEt6W_intro", "select": "YmEt6W_select", "search": "YmEt6W_search", "tab": "YmEt6W_tab", "hint": "YmEt6W_hint", "row": "YmEt6W_row", "meta": "YmEt6W_meta", "heading": "YmEt6W_heading", "empty": "YmEt6W_empty" };
+var SessionImportSection_default = { "hint": "YmEt6W_hint", "tabs": "YmEt6W_tabs", "meta": "YmEt6W_meta", "row": "YmEt6W_row", "tag": "YmEt6W_tag", "title": "YmEt6W_title", "progressBar": "YmEt6W_progressBar", "list": "YmEt6W_list", "intro": "YmEt6W_intro", "progress": "YmEt6W_progress", "toolbar": "YmEt6W_toolbar", "section": "YmEt6W_section", "heading": "YmEt6W_heading", "failure": "YmEt6W_failure", "empty": "YmEt6W_empty", "tab": "YmEt6W_tab", "search": "YmEt6W_search", "select": "YmEt6W_select", "status": "YmEt6W_status", "button": "YmEt6W_button" };
 
 // src/client/SessionImportSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
 var SESSION_SOURCES = ["claude", "codex", "cursor", "grok"];
 function SessionImportSection(props) {
-  const { t, listSessions, importSessions, importOneSession, listSkills, importSkills, listMemories, importMemories, listAutomations, importAutomations } = props;
+  const { t, listSessions, importSessions, importOneSession, listSkills, importSkills, listMemories, importMemories, listAutomations, importAutomations, repairImported } = props;
   const [tab, setTab] = (0, import_react.useState)("sessions");
   const [source, setSource] = (0, import_react.useState)("all");
   const [query, setQuery] = (0, import_react.useState)("");
@@ -149,6 +149,22 @@ function SessionImportSection(props) {
       setProgress(void 0);
     }
   };
+  const runRepair = async () => {
+    setBusy(true);
+    setMessage("");
+    setFailure("");
+    try {
+      const result = await repairImported();
+      setMessage(`${t("repaired")} ${String(result.repaired)} / ${String(result.skipped)}`);
+      if (result.failed.length > 0) {
+        setFailure(`${t("failed")} ${String(result.failed.length)}\uFF1A${result.failed.slice(0, 3).map((item) => item.message).join("\uFF1B")}`);
+      }
+    } catch {
+      setFailure(t("error"));
+    } finally {
+      setBusy(false);
+    }
+  };
   const currentPaths = tab === "sessions" ? visibleRows.map((row) => row.path) : tab === "skills" ? visibleSkills.map((skill) => skill.path) : tab === "memory" ? visibleMemories.map((row) => row.path) : visibleAutomations.map((row) => row.path);
   const selectedPaths = currentPaths.filter((path) => selected.has(path));
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: SessionImportSection_default.section, children: [
@@ -193,7 +209,10 @@ function SessionImportSection(props) {
       }, children: busy && tab === "sessions" && progress !== void 0 ? `${t("importing")} ${String(progress.done)}/${String(progress.total)}` : busy ? t("importing") : t("importSelected") }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: SessionImportSection_default.button, "data-primary": "true", disabled: busy || currentPaths.length === 0, onClick: () => {
         void runImport(currentPaths);
-      }, children: t("importAll") })
+      }, children: t("importAll") }),
+      tab === "sessions" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: SessionImportSection_default.button, disabled: busy, onClick: () => {
+        void runRepair();
+      }, children: t("repair") }) : null
     ] }),
     message.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.status, children: message }) : null,
     progress !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.progress, role: "progressbar", "aria-valuemin": 0, "aria-valuemax": progress.total, "aria-valuenow": progress.done, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.progressBar, style: { width: `${progress.total === 0 ? 0 : Math.round(progress.done / progress.total * 100)}%` } }) }) : null,
@@ -366,6 +385,7 @@ var zh = {
   refreshing: "\u626B\u63CF\u4E2D\u2026",
   importSelected: "\u5BFC\u5165\u9009\u4E2D",
   importAll: "\u5168\u90E8\u5BFC\u5165",
+  repair: "\u4FEE\u590D\u5206\u7EC4",
   importing: "\u5BFC\u5165\u4E2D\u2026",
   importProgress: "\u6B63\u5728\u5BFC\u5165 {done}/{total}",
   empty: "\u6CA1\u6709\u53D1\u73B0\u53EF\u5BFC\u5165\u7684\u4F1A\u8BDD\u3002",
@@ -381,6 +401,7 @@ var zh = {
   sourceGrok: "Grok Build",
   search: "\u6309\u6807\u9898\u6216\u8DEF\u5F84\u7B5B\u9009",
   imported: "\u5BFC\u5165\u5B8C\u6210\uFF08\u65B0\u5BFC\u5165 / \u5DF2\u5B58\u5728\uFF09",
+  repaired: "\u5DF2\u6309\u539F\u9879\u76EE\u91CD\u65B0\u5206\u7EC4\uFF08\u5DF2\u4FEE\u590D / \u65E0\u9700\u6539\u52A8\uFF09",
   importedSkills: "\u6280\u80FD\u5DF2\u590D\u5236\u5230 ~/.dsh/skills\u3002",
   importedMemory: "\u8BB0\u5FC6\u5DF2\u590D\u5236\uFF08\u6587\u4EF6 / \u5408\u5E76\u8FDB AGENTS.md\uFF09",
   importedAutomations: "\u81EA\u52A8\u5316\u5BFC\u5165\u5B8C\u6210\uFF08\u65B0\u5EFA / \u5DF2\u5B58\u5728 / \u4E0D\u652F\u6301\uFF09",
@@ -390,7 +411,7 @@ var zh = {
   cwd: "\u5DE5\u4F5C\u76EE\u5F55",
   nativeId: "\u539F\u59CB id",
   bytes: "\u5927\u5C0F",
-  commandHint: "\u4E5F\u53EF\u4EE5\u5728\u5BF9\u8BDD\u91CC\u7528 /import list\u3001/import all\u3001/import skills\u3001/import memory\u3001/import automations\u3002"
+  commandHint: "\u4E5F\u53EF\u4EE5\u5728\u5BF9\u8BDD\u91CC\u7528 /import list\u3001/import all\u3001/import repair\u3001/import skills\u3001/import memory\u3001/import automations\u3002"
 };
 var en = {
   nav: "Import",
@@ -404,6 +425,7 @@ var en = {
   refreshing: "Scanning\u2026",
   importSelected: "Import selected",
   importAll: "Import all",
+  repair: "Repair grouping",
   importing: "Importing\u2026",
   importProgress: "Importing {done}/{total}",
   empty: "No foreign sessions found.",
@@ -419,6 +441,7 @@ var en = {
   sourceGrok: "Grok Build",
   search: "Filter by title or path",
   imported: "Import finished (new / already present).",
+  repaired: "Moved leftover imports back to their original projects (repaired / unchanged).",
   importedSkills: "Skills copied into ~/.dsh/skills.",
   importedMemory: "Memory copied (files / merged into AGENTS.md).",
   importedAutomations: "Automations imported (new / already present / unsupported).",
@@ -428,7 +451,7 @@ var en = {
   cwd: "Working directory",
   nativeId: "Native id",
   bytes: "Size",
-  commandHint: "You can also run /import list, /import all, /import skills, /import memory, or /import automations in chat."
+  commandHint: "You can also run /import list, /import all, /import repair, /import skills, /import memory, or /import automations in chat."
 };
 
 // src/client/index.ts
@@ -460,7 +483,8 @@ function apply(ctx) {
     listMemories: () => call("listMemories"),
     importMemories: (paths) => call("importMemories", { paths }),
     listAutomations: () => call("listAutomations"),
-    importAutomations: (paths) => call("importAutomations", { paths })
+    importAutomations: (paths) => call("importAutomations", { paths }),
+    repairImported: () => call("repairImported", {})
   });
   ctx.slots.inject("settings.section", () => ctx.slots.register({
     name: "settings.section",

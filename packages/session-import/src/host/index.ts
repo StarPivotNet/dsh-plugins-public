@@ -24,6 +24,7 @@ import {
 import { copySkill, defaultSkillRoots, discoverSkills } from './skills.ts'
 import { discoverAutomations, discoverMemories, importMemories } from './compat.ts'
 import { ensureWorkspace, type WorkspaceRegistryHandle } from './workspace.ts'
+import { repairImportedSessions } from './repair.ts'
 
 export const name = 'session-import'
 
@@ -92,6 +93,8 @@ export function apply(ctx: Context, config: Config = {}): void {
             return { ok: true, value: { entries: await discoverAutomations() } }
           case 'importAutomations':
             return { ok: true, value: await importAutomations(connectionCtx, payload as { paths?: string[] }) }
+          case 'repairImported':
+            return { ok: true, value: await repairImportedSessions(connectionCtx) }
           default:
             return { ok: false, error: { code: 'NOT_FOUND', message: 'unknown session-import endpoint' } }
         }
@@ -130,6 +133,7 @@ async function handleImportCommand(
         '/import skills — copy Claude/Codex/Cursor skills into ~/.dsh/skills',
         '/import memory — copy Claude/Codex instruction files into ~/.dsh/AGENTS.md',
         '/import automations — create DSH timers from ~/.codex/automations',
+        '/import repair — move leftover imports back to their original workspaces',
         '/import <path-or-id> — import one file or native id',
         'Imports keep the foreign working directory and create a DSH workspace when it is missing.',
         'Add --here to rewrite imported sessions into the current workspace instead.',
@@ -180,6 +184,13 @@ async function handleImportCommand(
     return {
       kind: result.failed.length > 0 && result.imported === 0 ? 'error' : 'success',
       text: `Imported ${String(result.imported)} automation(s), skipped ${String(result.skipped)}, unsupported ${String(result.unsupported)}, failed ${String(result.failed.length)}.`,
+    }
+  }
+  if (command.kind === 'repair') {
+    const result = await repairImportedSessions(ctx)
+    return {
+      kind: result.failed.length > 0 && result.repaired === 0 ? 'error' : 'success',
+      text: `Repaired ${String(result.repaired)} leftover import(s), skipped ${String(result.skipped)}, failed ${String(result.failed.length)}.`,
     }
   }
   const persistence = requirePersistence(ctx)

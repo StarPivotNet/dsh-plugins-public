@@ -28,6 +28,10 @@ test('memory and automations are dedicated commands', () => {
   assert.deepEqual(parseImportArgs('automations'), { kind: 'automations' })
 })
 
+test('repair is a dedicated command', () => {
+  assert.deepEqual(parseImportArgs('repair'), { kind: 'repair' })
+})
+
 test('an absolute path is a session query', () => {
   assert.deepEqual(parseImportArgs('/tmp/s.jsonl'), { kind: 'sessions', query: '/tmp/s.jsonl', keepCwd: true, includeArchived: false })
 })

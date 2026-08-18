@@ -1,6 +1,7 @@
 // src/host/index.ts
 import { homedir as homedir4 } from "node:os";
 import { join as join5 } from "node:path";
+import { stat as stat3 } from "node:fs/promises";
 import { settingsNamespace } from "@deepseek-ai/dsh-settings";
 import z from "@deepseek-ai/schemastery";
 
@@ -1324,7 +1325,7 @@ async function copySkill(skill, targetRoot) {
   return { path: target, overwritten };
 }
 async function visitSkillRoot(root, source, found) {
-  const { readdir: readdir3, readFile: readFile4, stat: stat3 } = await import("node:fs/promises");
+  const { readdir: readdir3, readFile: readFile4, stat: stat4 } = await import("node:fs/promises");
   let entries;
   try {
     entries = await readdir3(root, { withFileTypes: true });
@@ -1336,7 +1337,7 @@ async function visitSkillRoot(root, source, found) {
     if (entry.isDirectory()) {
       const skillFile = join3(full, "SKILL.md");
       try {
-        const info = await stat3(skillFile);
+        const info = await stat4(skillFile);
         if (!info.isFile()) continue;
         const parsed = parseSkillFile(await readFile4(skillFile, "utf8"), source, skillFile);
         if (parsed !== void 0) found.push(parsed);
@@ -1914,12 +1915,21 @@ async function importSessions(ctx, request, limits, maxFileBytes) {
 async function importOneSession(ctx, request, limits, maxFileBytes) {
   const path = request.path?.trim() ?? "";
   if (path.length === 0) throw new Error("importOneSession requires path");
-  const result = await importSessions(ctx, {
-    paths: [path],
-    source: request.source,
-    keepCwd: request.keepCwd
-  }, limits, maxFileBytes);
-  return result;
+  const persistence = requirePersistence(ctx);
+  if (persistence === void 0) throw new Error("session persistence is not configured");
+  try {
+    const info = await stat3(path);
+    if (info.size > maxFileBytes) {
+      return { imported: 0, skipped: 0, failed: [{ path, message: `file exceeds maxFileBytes (${String(info.size)})` }] };
+    }
+    const converted = relocate(await convertFile(path, request.source), workspaceCwdOf(ctx), request.keepCwd !== false);
+    const outcome = await persistConverted(persistence, converted);
+    if (!outcome.ok) return { imported: 0, skipped: 0, failed: [{ path, message: outcome.message }] };
+    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd, outcome.converted.title);
+    return outcome.alreadyImported ? { imported: 0, skipped: 1, failed: [], title: outcome.converted.title } : { imported: 1, skipped: 0, failed: [], title: outcome.converted.title };
+  } catch (error) {
+    return { imported: 0, skipped: 0, failed: [{ path, message: error instanceof Error ? error.message : String(error) }] };
+  }
 }
 async function importSkills(request, skillTarget) {
   const skills = await discoverSkills(defaultSkillRoots());
@@ -2022,18 +2032,8 @@ async function resolveWorkspaceId(registry, cwd, fallbackCwd) {
   const workspace = await ensureWorkspace(registry, cwd ?? fallbackCwd);
   return workspace?.id ?? registry?.list?.()[0]?.id;
 }
-async function settleImported(ctx, id, cwd, title) {
-  await warmProjection(ctx, id);
+async function settleImported(ctx, id, cwd, _title) {
   await attachImported(ctx, id, cwd);
-  await publishTitle(ctx, id, title);
-}
-async function warmProjection(ctx, id) {
-  const cache = ctx.get("sessionProjectionCache");
-  if (cache?.coldSnapshot === void 0) return;
-  try {
-    await cache.coldSnapshot(id);
-  } catch {
-  }
 }
 async function attachImported(ctx, id, cwd) {
   const registry = ctx.get("workspaceRegistry");
@@ -2041,20 +2041,6 @@ async function attachImported(ctx, id, cwd) {
   try {
     const workspace = await ensureWorkspace(registry, cwd ?? workspaceCwdOf(ctx));
     await workspace?.attachSession?.(id);
-  } catch {
-  }
-}
-async function publishTitle(ctx, id, title) {
-  const name2 = title?.trim();
-  if (name2 === void 0 || name2.length === 0) return;
-  const persistence = ctx.get("sessionPersistence");
-  const titles = ctx.get("sessionTitle");
-  if (persistence?.prepare === void 0 || titles?.rename === void 0) return;
-  try {
-    const prepared = await persistence.prepare(id);
-    const published = await prepared.publish?.();
-    const session = published?.session ?? ctx.get("sessions")?.get?.(id);
-    if (session !== void 0) titles.rename(session, name2);
   } catch {
   }
 }

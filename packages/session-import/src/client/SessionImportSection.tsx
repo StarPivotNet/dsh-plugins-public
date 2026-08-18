@@ -354,7 +354,7 @@ async function importSessionPaths(
   for (const [index, path] of paths.entries()) {
     onProgress(index, total, path)
     try {
-      const result = await importOneSession(path)
+      const result = await withTimeout(importOneSession(path), 60_000, path)
       imported += result.imported
       skipped += result.skipped
       failed.push(...result.failed)
@@ -364,6 +364,20 @@ async function importSessionPaths(
   }
   onProgress(total, total, '')
   return { imported, skipped, failed }
+}
+
+async function withTimeout<T>(work: Promise<T>, ms: number, path: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      work,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => { reject(new Error(`${path} timed out after ${String(ms)}ms`)) }, ms)
+      }),
+    ])
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
 }
 
 function setImportFailure(

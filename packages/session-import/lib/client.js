@@ -41,7 +41,7 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var SessionImportSection_default = { "search": "YmEt6W_search", "heading": "YmEt6W_heading", "list": "YmEt6W_list", "section": "YmEt6W_section", "tabs": "YmEt6W_tabs", "hint": "YmEt6W_hint", "toolbar": "YmEt6W_toolbar", "failure": "YmEt6W_failure", "tab": "YmEt6W_tab", "status": "YmEt6W_status", "title": "YmEt6W_title", "meta": "YmEt6W_meta", "intro": "YmEt6W_intro", "progress": "YmEt6W_progress", "empty": "YmEt6W_empty", "row": "YmEt6W_row", "progressBar": "YmEt6W_progressBar", "select": "YmEt6W_select", "tag": "YmEt6W_tag", "button": "YmEt6W_button" };
+var SessionImportSection_default = { "section": "YmEt6W_section", "tabs": "YmEt6W_tabs", "status": "YmEt6W_status", "failure": "YmEt6W_failure", "list": "YmEt6W_list", "progress": "YmEt6W_progress", "toolbar": "YmEt6W_toolbar", "title": "YmEt6W_title", "button": "YmEt6W_button", "tag": "YmEt6W_tag", "progressBar": "YmEt6W_progressBar", "intro": "YmEt6W_intro", "select": "YmEt6W_select", "search": "YmEt6W_search", "tab": "YmEt6W_tab", "hint": "YmEt6W_hint", "row": "YmEt6W_row", "meta": "YmEt6W_meta", "heading": "YmEt6W_heading", "empty": "YmEt6W_empty" };
 
 // src/client/SessionImportSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
@@ -317,7 +317,7 @@ async function importSessionPaths(importOneSession, paths, onProgress) {
   for (const [index, path] of paths.entries()) {
     onProgress(index, total, path);
     try {
-      const result = await importOneSession(path);
+      const result = await withTimeout(importOneSession(path), 6e4, path);
       imported += result.imported;
       skipped += result.skipped;
       failed.push(...result.failed);
@@ -327,6 +327,21 @@ async function importSessionPaths(importOneSession, paths, onProgress) {
   }
   onProgress(total, total, "");
   return { imported, skipped, failed };
+}
+async function withTimeout(work, ms, path) {
+  let timer;
+  try {
+    return await Promise.race([
+      work,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`${path} timed out after ${String(ms)}ms`));
+        }, ms);
+      })
+    ]);
+  } finally {
+    if (timer !== void 0) clearTimeout(timer);
+  }
 }
 function setImportFailure(t, failed, setFailure) {
   if (failed.length === 0) return;

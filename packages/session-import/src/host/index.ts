@@ -5,6 +5,7 @@
  */
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { stat } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
@@ -347,12 +348,23 @@ async function importOneSession(
 ): Promise<{ imported: number; skipped: number; failed: { path: string; message: string }[]; title?: string }> {
   const path = request.path?.trim() ?? ''
   if (path.length === 0) throw new Error('importOneSession requires path')
-  const result = await importSessions(ctx, {
-    paths: [path],
-    source: request.source,
-    keepCwd: request.keepCwd,
-  }, limits, maxFileBytes)
-  return result
+  const persistence = requirePersistence(ctx)
+  if (persistence === undefined) throw new Error('session persistence is not configured')
+  try {
+    const info = await stat(path)
+    if (info.size > maxFileBytes) {
+      return { imported: 0, skipped: 0, failed: [{ path, message: `file exceeds maxFileBytes (${String(info.size)})` }] }
+    }
+    const converted = relocate(await convertFile(path, request.source), workspaceCwdOf(ctx), request.keepCwd !== false)
+    const outcome = await persistConverted(persistence, converted)
+    if (!outcome.ok) return { imported: 0, skipped: 0, failed: [{ path, message: outcome.message }] }
+    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd, outcome.converted.title)
+    return outcome.alreadyImported
+      ? { imported: 0, skipped: 1, failed: [], title: outcome.converted.title }
+      : { imported: 1, skipped: 0, failed: [], title: outcome.converted.title }
+  } catch (error) {
+    return { imported: 0, skipped: 0, failed: [{ path, message: error instanceof Error ? error.message : String(error) }] }
+  }
 }
 
 async function importSkills(
@@ -511,20 +523,8 @@ async function resolveWorkspaceId(
   return workspace?.id ?? registry?.list?.()[0]?.id
 }
 
-async function settleImported(ctx: Context, id: string, cwd: string | undefined, title?: string): Promise<void> {
-  await warmProjection(ctx, id)
+async function settleImported(ctx: Context, id: string, cwd: string | undefined, _title?: string): Promise<void> {
   await attachImported(ctx, id, cwd)
-  await publishTitle(ctx, id, title)
-}
-
-async function warmProjection(ctx: Context, id: string): Promise<void> {
-  const cache = ctx.get('sessionProjectionCache') as { coldSnapshot?: (sessionId: string) => Promise<unknown> } | undefined
-  if (cache?.coldSnapshot === undefined) return
-  try {
-    await cache.coldSnapshot(id)
-  } catch {
-    // Listing can still probe the log; a missing title row is recoverable.
-  }
 }
 
 async function attachImported(ctx: Context, id: string, cwd: string | undefined): Promise<void> {
@@ -538,23 +538,6 @@ async function attachImported(ctx: Context, id: string, cwd: string | undefined)
   }
 }
 
-async function publishTitle(ctx: Context, id: string, title: string | undefined): Promise<void> {
-  const name = title?.trim()
-  if (name === undefined || name.length === 0) return
-  const persistence = ctx.get('sessionPersistence') as {
-    prepare?: (sessionId: string) => Promise<{ publish?: () => Promise<{ session?: unknown }> }>
-  } | undefined
-  const titles = ctx.get('sessionTitle') as { rename?: (session: unknown, next: string) => unknown } | undefined
-  if (persistence?.prepare === undefined || titles?.rename === undefined) return
-  try {
-    const prepared = await persistence.prepare(id)
-    const published = await prepared.publish?.()
-    const session = published?.session
-      ?? (ctx.get('sessions') as { get?: (sessionId: string) => unknown } | undefined)?.get?.(id)
-    if (session !== undefined) titles.rename(session, name)
-  } catch {
-    // Title stays in the seed log; listing can pick it up after the next Host reload.
-  }
-}
+
 
 

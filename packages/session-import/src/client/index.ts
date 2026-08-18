@@ -45,6 +45,7 @@ export function apply(ctx: ClientContext): void {
       ...(query === undefined || query.length === 0 ? {} : { query }),
     }),
     importSessions: paths => call('importSessions', { paths }),
+    importOneSession: path => call('importOneSession', { path }),
     listSkills: () => call('listSkills'),
     importSkills: paths => call('importSkills', { paths }),
     listMemories: () => call('listMemories'),

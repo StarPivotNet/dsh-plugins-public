@@ -47,6 +47,7 @@ export interface SessionImportAutomation {
 export interface SessionImportSectionInjected {
   listSessions: (source?: SessionImportRow['source'], query?: string) => Promise<{ entries: readonly SessionImportRow[]; total?: number }>
   importSessions: (paths: readonly string[]) => Promise<{ imported: number; skipped: number; failed: readonly { path: string; message: string }[] }>
+  importOneSession: (path: string) => Promise<{ imported: number; skipped: number; failed: readonly { path: string; message: string }[] }>
   listSkills: () => Promise<{ entries: readonly SessionImportSkill[] }>
   importSkills: (paths: readonly string[]) => Promise<{ copied: number; overwritten: number; failed: readonly { path: string; message: string }[] }>
   listMemories: () => Promise<{ entries: readonly SessionImportMemory[] }>
@@ -64,7 +65,7 @@ export type SessionImportSectionProps =
   & InjectFace<SessionImportSectionInjected>
 
 export function SessionImportSection(props: SessionImportSectionProps): ReactNode {
-  const { t, listSessions, importSessions, listSkills, importSkills, listMemories, importMemories, listAutomations, importAutomations } = props
+  const { t, listSessions, importSessions, importOneSession, listSkills, importSkills, listMemories, importMemories, listAutomations, importAutomations } = props
   const [tab, setTab] = useState<ImportTab>('sessions')
   const [source, setSource] = useState<'all' | SessionImportRow['source']>('all')
   const [query, setQuery] = useState('')
@@ -76,6 +77,7 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('loading')
   const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number; current: string } | undefined>(undefined)
   const [message, setMessage] = useState('')
   const [failure, setFailure] = useState('')
 
@@ -141,9 +143,13 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
     setBusy(true)
     setMessage('')
     setFailure('')
+    setProgress(undefined)
     try {
       if (tab === 'sessions') {
-        const result = await importSessions(paths)
+        const result = await importSessionPaths(importOneSession, paths, (done, total, current) => {
+          setProgress({ done, total, current })
+          setMessage(t('importProgress').replace('{done}', String(done)).replace('{total}', String(total)))
+        })
         setMessage(`${t('imported')} ${String(result.imported)} / ${String(result.skipped)}`)
         setImportFailure(t, result.failed, setFailure)
       } else if (tab === 'skills') {
@@ -163,6 +169,7 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
       setFailure(t('error'))
     } finally {
       setBusy(false)
+      setProgress(undefined)
     }
   }
 
@@ -210,13 +217,21 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
           {status === 'loading' ? t('refreshing') : t('refresh')}
         </button>
         <button type="button" className={css.button} disabled={busy || selectedPaths.length === 0} onClick={() => { void runImport(selectedPaths) }}>
-          {busy ? t('importing') : t('importSelected')}
+          {busy && tab === 'sessions' && progress !== undefined
+            ? `${t('importing')} ${String(progress.done)}/${String(progress.total)}`
+            : busy ? t('importing') : t('importSelected')}
         </button>
         <button type="button" className={css.button} data-primary="true" disabled={busy || currentPaths.length === 0} onClick={() => { void runImport(currentPaths) }}>
           {t('importAll')}
         </button>
       </div>
       {message.length > 0 ? <p className={css.status}>{message}</p> : null}
+      {progress !== undefined ? (
+        <div className={css.progress} role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.done}>
+          <div className={css.progressBar} style={{ width: `${progress.total === 0 ? 0 : Math.round((progress.done / progress.total) * 100)}%` }} />
+        </div>
+      ) : null}
+      {progress?.current !== undefined && progress.current.length > 0 ? <p className={css.hint}>{progress.current}</p> : null}
       {failure.length > 0 ? <p className={css.failure} role="alert">{failure}</p> : null}
       {renderBody({
         t, tab, status, visibleRows, visibleSkills, visibleMemories, visibleAutomations, selected, toggle,
@@ -325,6 +340,30 @@ function filterByQuery<T>(items: readonly T[], query: string, values: (item: T) 
   const needle = query.trim().toLowerCase()
   if (needle.length === 0) return items
   return items.filter(item => values(item).some(value => value.toLowerCase().includes(needle)))
+}
+
+async function importSessionPaths(
+  importOneSession: SessionImportSectionInjected['importOneSession'],
+  paths: readonly string[],
+  onProgress: (done: number, total: number, current: string) => void,
+): Promise<{ imported: number; skipped: number; failed: { path: string; message: string }[] }> {
+  let imported = 0
+  let skipped = 0
+  const failed: { path: string; message: string }[] = []
+  const total = paths.length
+  for (const [index, path] of paths.entries()) {
+    onProgress(index, total, path)
+    try {
+      const result = await importOneSession(path)
+      imported += result.imported
+      skipped += result.skipped
+      failed.push(...result.failed)
+    } catch (error) {
+      failed.push({ path, message: error instanceof Error ? error.message : String(error) })
+    }
+  }
+  onProgress(total, total, '')
+  return { imported, skipped, failed }
 }
 
 function setImportFailure(

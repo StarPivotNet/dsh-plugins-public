@@ -1170,11 +1170,12 @@ async function visit(path, source, found, depth, signal) {
     } catch {
       return;
     }
+    const nativeId = source === "grok" ? grokNativeIdFromPath(full) : nativeIdFromName(source, basename(full));
     found.push({
       source,
-      nativeId: nativeIdFromName(source, basename(full)),
+      nativeId,
       path: full,
-      title: fallbackTitle(nativeIdFromName(source, basename(full))),
+      title: fallbackTitle(nativeId),
       createdAt: Math.round(info.birthtimeMs || info.mtimeMs),
       updatedAt: Math.round(info.mtimeMs),
       bytes: info.size
@@ -1208,12 +1209,27 @@ function nativeIdFromName(source, name2) {
   if (source === "codex") return bare.replace(/^rollout-\d{4}-\d{2}-\d{2}T[0-9-]+-/, "");
   return bare;
 }
+function grokNativeIdFromPath(path) {
+  const parts = path.replace(/\\/gu, "/").split("/");
+  const file = parts.at(-1) ?? "session";
+  if (file === "updates.jsonl" || file === "chat_history.jsonl") return parts.at(-2) ?? file;
+  return file.replace(/\.(jsonl|json)$/u, "");
+}
 function enrichFromPreview(row, text) {
   const head = text.slice(0, PREVIEW_BYTES);
-  let title = row.title;
+  let title = row.source === "grok" && row.nativeId === "updates" ? grokNativeIdFromPath(row.path) : row.title;
   let cwd = row.cwd;
-  let nativeId = row.nativeId;
+  let nativeId = row.source === "grok" && row.nativeId === "updates" ? grokNativeIdFromPath(row.path) : row.nativeId;
   let createdAt = row.createdAt;
+  const whole = parsePreviewObject(head);
+  if (whole !== void 0) {
+    if (typeof whole.generated_title === "string") title = whole.generated_title;
+    else if (typeof whole.session_summary === "string") title = whole.session_summary;
+    if (isRecord(whole.info)) {
+      if (typeof whole.info.id === "string") nativeId = whole.info.id;
+      if (typeof whole.info.cwd === "string") cwd = whole.info.cwd;
+    }
+  }
   for (const line of head.split(/\r?\n/u).slice(0, 40)) {
     if (line.trim().length === 0) continue;
     let record;
@@ -1250,6 +1266,16 @@ function enrichFromPreview(row, text) {
     if (isRecord(record.info) && typeof record.info.cwd === "string") cwd = record.info.cwd;
   }
   return { ...row, nativeId, title, cwd, createdAt };
+}
+function parsePreviewObject(text) {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) return void 0;
+  try {
+    const parsed = JSON.parse(trimmed);
+    return isRecord(parsed) ? parsed : void 0;
+  } catch {
+    return void 0;
+  }
 }
 
 // src/host/skills.ts
@@ -1670,6 +1696,8 @@ function apply(ctx, config = {}) {
             return { ok: true, value: await listSessions(payload, maxFileBytes) };
           case "importSessions":
             return { ok: true, value: await importSessions(connectionCtx, payload, limits, maxFileBytes) };
+          case "importOneSession":
+            return { ok: true, value: await importOneSession(connectionCtx, payload, limits, maxFileBytes) };
           case "listSkills":
             return { ok: true, value: { entries: await discoverSkills(defaultSkillRoots()) } };
           case "importSkills":
@@ -1882,6 +1910,16 @@ async function importSessions(ctx, request, limits, maxFileBytes) {
     }
   }
   return { imported, skipped, failed };
+}
+async function importOneSession(ctx, request, limits, maxFileBytes) {
+  const path = request.path?.trim() ?? "";
+  if (path.length === 0) throw new Error("importOneSession requires path");
+  const result = await importSessions(ctx, {
+    paths: [path],
+    source: request.source,
+    keepCwd: request.keepCwd
+  }, limits, maxFileBytes);
+  return result;
 }
 async function importSkills(request, skillTarget) {
   const skills = await discoverSkills(defaultSkillRoots());

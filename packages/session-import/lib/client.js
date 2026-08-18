@@ -32,7 +32,7 @@ module.exports = __toCommonJS(index_exports);
 var import_react = require("react");
 
 // src/client/SessionImportSection.module.css
-var css = '.YmEt6W_section{width:100%;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px;display:flex}.YmEt6W_heading{margin:0;font-size:18px;font-weight:600}.YmEt6W_intro,.YmEt6W_hint,.YmEt6W_empty,.YmEt6W_status{color:var(--dsw-alias-label-tertiary);margin:0;font-size:13px;line-height:20px}.YmEt6W_failure{color:var(--dsw-alias-state-error-primary);margin:0;font-size:13px;line-height:20px}.YmEt6W_tabs{border-bottom:1px solid var(--dsw-alias-border-l2);align-items:flex-end;gap:22px;display:flex}.YmEt6W_tab{color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;background:0 0;border:0;padding:7px 1px 9px;font-size:13px;line-height:20px;position:relative}.YmEt6W_tab[data-active=true]{color:var(--dsw-alias-label-primary)}.YmEt6W_tab[data-active=true]:after{content:"";background:var(--dsw-alias-label-primary);height:2px;position:absolute;bottom:-1px;left:0;right:0}.YmEt6W_toolbar{flex-wrap:wrap;align-items:center;gap:8px;display:flex}.YmEt6W_select,.YmEt6W_search{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:inherit;font:inherit;border-radius:8px;padding:6px 10px;font-size:13px}.YmEt6W_search{flex:180px;min-width:160px}.YmEt6W_button{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:inherit;font:inherit;cursor:pointer;border-radius:8px;padding:6px 12px;font-size:13px}.YmEt6W_button[data-primary=true]{background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-layer-1);border-color:#0000}.YmEt6W_button:disabled{opacity:.5;cursor:default}.YmEt6W_list{flex-direction:column;gap:8px;display:flex}.YmEt6W_row{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);border-radius:10px;grid-template-columns:20px minmax(0,1fr) auto;align-items:start;gap:10px;padding:10px 12px;display:grid}.YmEt6W_title{margin:0;font-size:13px;font-weight:600;line-height:20px}.YmEt6W_meta{color:var(--dsw-alias-label-tertiary);word-break:break-all;margin:2px 0 0;font-size:12px;line-height:18px}.YmEt6W_tag{background:var(--dsw-alias-bg-layer-2,transparent);border-radius:999px;align-items:center;padding:1px 8px;font-size:11px;line-height:16px;display:inline-flex}';
+var css = '.YmEt6W_section{width:100%;color:var(--dsw-alias-label-primary);flex-direction:column;gap:12px;display:flex}.YmEt6W_heading{margin:0;font-size:18px;font-weight:600}.YmEt6W_intro,.YmEt6W_hint,.YmEt6W_empty,.YmEt6W_status{color:var(--dsw-alias-label-tertiary);margin:0;font-size:13px;line-height:20px}.YmEt6W_failure{color:var(--dsw-alias-state-error-primary);margin:0;font-size:13px;line-height:20px}.YmEt6W_tabs{border-bottom:1px solid var(--dsw-alias-border-l2);align-items:flex-end;gap:22px;display:flex}.YmEt6W_tab{color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;background:0 0;border:0;padding:7px 1px 9px;font-size:13px;line-height:20px;position:relative}.YmEt6W_tab[data-active=true]{color:var(--dsw-alias-label-primary)}.YmEt6W_tab[data-active=true]:after{content:"";background:var(--dsw-alias-label-primary);height:2px;position:absolute;bottom:-1px;left:0;right:0}.YmEt6W_toolbar{flex-wrap:wrap;align-items:center;gap:8px;display:flex}.YmEt6W_select,.YmEt6W_search{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:inherit;font:inherit;border-radius:8px;padding:6px 10px;font-size:13px}.YmEt6W_search{flex:180px;min-width:160px}.YmEt6W_button{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:inherit;font:inherit;cursor:pointer;border-radius:8px;padding:6px 12px;font-size:13px}.YmEt6W_button[data-primary=true]{background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-layer-1);border-color:#0000}.YmEt6W_button:disabled{opacity:.5;cursor:default}.YmEt6W_list{flex-direction:column;gap:8px;display:flex}.YmEt6W_row{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);border-radius:10px;grid-template-columns:20px minmax(0,1fr) auto;align-items:start;gap:10px;padding:10px 12px;display:grid}.YmEt6W_title{margin:0;font-size:13px;font-weight:600;line-height:20px}.YmEt6W_meta{color:var(--dsw-alias-label-tertiary);word-break:break-all;margin:2px 0 0;font-size:12px;line-height:18px}.YmEt6W_tag{background:var(--dsw-alias-bg-layer-2,transparent);border-radius:999px;align-items:center;padding:1px 8px;font-size:11px;line-height:16px;display:inline-flex}.YmEt6W_progress{background:var(--dsw-alias-bg-layer-2);border-radius:999px;height:6px;overflow:hidden}.YmEt6W_progressBar{background:var(--dsw-alias-label-primary);height:100%;transition:width .12s linear}';
 var tagId = "session-import/SessionImportSection.module.css";
 if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
   const tag = document.createElement("style");
@@ -41,13 +41,13 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var SessionImportSection_default = { "hint": "YmEt6W_hint", "heading": "YmEt6W_heading", "status": "YmEt6W_status", "meta": "YmEt6W_meta", "failure": "YmEt6W_failure", "section": "YmEt6W_section", "intro": "YmEt6W_intro", "title": "YmEt6W_title", "empty": "YmEt6W_empty", "tab": "YmEt6W_tab", "select": "YmEt6W_select", "search": "YmEt6W_search", "button": "YmEt6W_button", "row": "YmEt6W_row", "toolbar": "YmEt6W_toolbar", "tag": "YmEt6W_tag", "list": "YmEt6W_list", "tabs": "YmEt6W_tabs" };
+var SessionImportSection_default = { "search": "YmEt6W_search", "heading": "YmEt6W_heading", "list": "YmEt6W_list", "section": "YmEt6W_section", "tabs": "YmEt6W_tabs", "hint": "YmEt6W_hint", "toolbar": "YmEt6W_toolbar", "failure": "YmEt6W_failure", "tab": "YmEt6W_tab", "status": "YmEt6W_status", "title": "YmEt6W_title", "meta": "YmEt6W_meta", "intro": "YmEt6W_intro", "progress": "YmEt6W_progress", "empty": "YmEt6W_empty", "row": "YmEt6W_row", "progressBar": "YmEt6W_progressBar", "select": "YmEt6W_select", "tag": "YmEt6W_tag", "button": "YmEt6W_button" };
 
 // src/client/SessionImportSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
 var SESSION_SOURCES = ["claude", "codex", "cursor", "grok"];
 function SessionImportSection(props) {
-  const { t, listSessions, importSessions, listSkills, importSkills, listMemories, importMemories, listAutomations, importAutomations } = props;
+  const { t, listSessions, importSessions, importOneSession, listSkills, importSkills, listMemories, importMemories, listAutomations, importAutomations } = props;
   const [tab, setTab] = (0, import_react.useState)("sessions");
   const [source, setSource] = (0, import_react.useState)("all");
   const [query, setQuery] = (0, import_react.useState)("");
@@ -59,6 +59,7 @@ function SessionImportSection(props) {
   const [selected, setSelected] = (0, import_react.useState)(/* @__PURE__ */ new Set());
   const [status, setStatus] = (0, import_react.useState)("loading");
   const [busy, setBusy] = (0, import_react.useState)(false);
+  const [progress, setProgress] = (0, import_react.useState)(void 0);
   const [message, setMessage] = (0, import_react.useState)("");
   const [failure, setFailure] = (0, import_react.useState)("");
   const load = async (nextQuery = query) => {
@@ -119,9 +120,13 @@ function SessionImportSection(props) {
     setBusy(true);
     setMessage("");
     setFailure("");
+    setProgress(void 0);
     try {
       if (tab === "sessions") {
-        const result = await importSessions(paths);
+        const result = await importSessionPaths(importOneSession, paths, (done, total2, current) => {
+          setProgress({ done, total: total2, current });
+          setMessage(t("importProgress").replace("{done}", String(done)).replace("{total}", String(total2)));
+        });
         setMessage(`${t("imported")} ${String(result.imported)} / ${String(result.skipped)}`);
         setImportFailure(t, result.failed, setFailure);
       } else if (tab === "skills") {
@@ -141,6 +146,7 @@ function SessionImportSection(props) {
       setFailure(t("error"));
     } finally {
       setBusy(false);
+      setProgress(void 0);
     }
   };
   const currentPaths = tab === "sessions" ? visibleRows.map((row) => row.path) : tab === "skills" ? visibleSkills.map((skill) => skill.path) : tab === "memory" ? visibleMemories.map((row) => row.path) : visibleAutomations.map((row) => row.path);
@@ -184,12 +190,14 @@ function SessionImportSection(props) {
       }, children: status === "loading" ? t("refreshing") : t("refresh") }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: SessionImportSection_default.button, disabled: busy || selectedPaths.length === 0, onClick: () => {
         void runImport(selectedPaths);
-      }, children: busy ? t("importing") : t("importSelected") }),
+      }, children: busy && tab === "sessions" && progress !== void 0 ? `${t("importing")} ${String(progress.done)}/${String(progress.total)}` : busy ? t("importing") : t("importSelected") }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: SessionImportSection_default.button, "data-primary": "true", disabled: busy || currentPaths.length === 0, onClick: () => {
         void runImport(currentPaths);
       }, children: t("importAll") })
     ] }),
     message.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.status, children: message }) : null,
+    progress !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.progress, role: "progressbar", "aria-valuemin": 0, "aria-valuemax": progress.total, "aria-valuenow": progress.done, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: SessionImportSection_default.progressBar, style: { width: `${progress.total === 0 ? 0 : Math.round(progress.done / progress.total * 100)}%` } }) }) : null,
+    progress?.current !== void 0 && progress.current.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.hint, children: progress.current }) : null,
     failure.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: SessionImportSection_default.failure, role: "alert", children: failure }) : null,
     renderBody({
       t,
@@ -301,6 +309,25 @@ function filterByQuery(items, query, values) {
   if (needle.length === 0) return items;
   return items.filter((item) => values(item).some((value) => value.toLowerCase().includes(needle)));
 }
+async function importSessionPaths(importOneSession, paths, onProgress) {
+  let imported = 0;
+  let skipped = 0;
+  const failed = [];
+  const total = paths.length;
+  for (const [index, path] of paths.entries()) {
+    onProgress(index, total, path);
+    try {
+      const result = await importOneSession(path);
+      imported += result.imported;
+      skipped += result.skipped;
+      failed.push(...result.failed);
+    } catch (error) {
+      failed.push({ path, message: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  onProgress(total, total, "");
+  return { imported, skipped, failed };
+}
 function setImportFailure(t, failed, setFailure) {
   if (failed.length === 0) return;
   setFailure(`${t("failed")} ${String(failed.length)}\uFF1A${failed.slice(0, 3).map((item) => item.message).join("\uFF1B")}`);
@@ -325,6 +352,7 @@ var zh = {
   importSelected: "\u5BFC\u5165\u9009\u4E2D",
   importAll: "\u5168\u90E8\u5BFC\u5165",
   importing: "\u5BFC\u5165\u4E2D\u2026",
+  importProgress: "\u6B63\u5728\u5BFC\u5165 {done}/{total}",
   empty: "\u6CA1\u6709\u53D1\u73B0\u53EF\u5BFC\u5165\u7684\u4F1A\u8BDD\u3002",
   truncated: "\u5DF2\u663E\u793A\u6700\u8FD1 {shown} \u6761\uFF0C\u672C\u673A\u5171\u53D1\u73B0 {total} \u6761\u3002\u53EF\u7528\u6807\u9898\u6216\u8DEF\u5F84\u7EE7\u7EED\u7B5B\u9009\u3002",
   skillsEmpty: "\u6CA1\u6709\u53D1\u73B0\u53EF\u5BFC\u5165\u7684\u6280\u80FD\u3002",
@@ -362,6 +390,7 @@ var en = {
   importSelected: "Import selected",
   importAll: "Import all",
   importing: "Importing\u2026",
+  importProgress: "Importing {done}/{total}",
   empty: "No foreign sessions found.",
   truncated: "Showing the newest {shown} of {total} conversations. Filter by title or path to narrow the list.",
   skillsEmpty: "No foreign skills found.",
@@ -410,6 +439,7 @@ function apply(ctx) {
       ...query === void 0 || query.length === 0 ? {} : { query }
     }),
     importSessions: (paths) => call("importSessions", { paths }),
+    importOneSession: (path) => call("importOneSession", { path }),
     listSkills: () => call("listSkills"),
     importSkills: (paths) => call("importSkills", { paths }),
     listMemories: () => call("listMemories"),

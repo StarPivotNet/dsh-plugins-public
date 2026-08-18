@@ -80,6 +80,25 @@ test('readPreview returns only the file head', async () => {
   assert.equal(preview.includes('TAIL'), false)
 })
 
+test('enrichFromPreview reads a Grok summary.json object', () => {
+  const row = {
+    source: 'grok' as const,
+    nativeId: 'updates',
+    path: '/tmp/.grok/sessions/proj/01abc/updates.jsonl',
+    title: 'updates',
+    createdAt: 1,
+    updatedAt: 1,
+    bytes: 10,
+  }
+  const enriched = enrichFromPreview(row, JSON.stringify({
+    info: { id: '01abc', cwd: '/tmp/proj' },
+    generated_title: 'Merge upstream',
+  }))
+  assert.equal(enriched.title, 'Merge upstream')
+  assert.equal(enriched.nativeId, '01abc')
+  assert.equal(enriched.cwd, '/tmp/proj')
+})
+
 test('enrichFromPreview reads Claude user text and Codex session_meta', () => {
   const claude = enrichFromPreview(session('s1', 1, 10), [
     '{"type":"user","sessionId":"real","cwd":"/tmp/proj","message":{"content":"Fix the importer"}}',

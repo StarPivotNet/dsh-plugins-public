@@ -171,11 +171,12 @@ async function visit(
     let info
     try { info = await stat(full) }
     catch { return }
+    const nativeId = source === 'grok' ? grokNativeIdFromPath(full) : nativeIdFromName(source, basename(full))
     found.push({
       source,
-      nativeId: nativeIdFromName(source, basename(full)),
+      nativeId,
       path: full,
-      title: fallbackTitle(nativeIdFromName(source, basename(full))),
+      title: fallbackTitle(nativeId),
       createdAt: Math.round(info.birthtimeMs || info.mtimeMs),
       updatedAt: Math.round(info.mtimeMs),
       bytes: info.size,
@@ -220,13 +221,29 @@ export function nativeIdFromName(source: ImportSource, name: string): string {
   return bare
 }
 
+function grokNativeIdFromPath(path: string): string {
+  const parts = path.replace(/\\/gu, '/').split('/')
+  const file = parts.at(-1) ?? 'session'
+  if (file === 'updates.jsonl' || file === 'chat_history.jsonl') return parts.at(-2) ?? file
+  return file.replace(/\.(jsonl|json)$/u, '')
+}
+
 /** Enrich a discovered row with title/cwd from the first few JSONL records. */
 export function enrichFromPreview(row: DiscoveredSession, text: string): DiscoveredSession {
   const head = text.slice(0, PREVIEW_BYTES)
-  let title = row.title
+  let title = row.source === 'grok' && row.nativeId === 'updates' ? grokNativeIdFromPath(row.path) : row.title
   let cwd = row.cwd
-  let nativeId = row.nativeId
+  let nativeId = row.source === 'grok' && row.nativeId === 'updates' ? grokNativeIdFromPath(row.path) : row.nativeId
   let createdAt = row.createdAt
+  const whole = parsePreviewObject(head)
+  if (whole !== undefined) {
+    if (typeof whole.generated_title === 'string') title = whole.generated_title
+    else if (typeof whole.session_summary === 'string') title = whole.session_summary
+    if (isRecord(whole.info)) {
+      if (typeof whole.info.id === 'string') nativeId = whole.info.id
+      if (typeof whole.info.cwd === 'string') cwd = whole.info.cwd
+    }
+  }
   for (const line of head.split(/\r?\n/u).slice(0, 40)) {
     if (line.trim().length === 0) continue
     let record: unknown
@@ -260,6 +277,17 @@ export function enrichFromPreview(row: DiscoveredSession, text: string): Discove
     if (isRecord(record.info) && typeof record.info.cwd === 'string') cwd = record.info.cwd
   }
   return { ...row, nativeId, title, cwd, createdAt }
+}
+
+function parsePreviewObject(text: string): Record<string, unknown> | undefined {
+  const trimmed = text.trim()
+  if (!trimmed.startsWith('{')) return undefined
+  try {
+    const parsed: unknown = JSON.parse(trimmed)
+    return isRecord(parsed) ? parsed : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /** Basename helper exported for tests. */

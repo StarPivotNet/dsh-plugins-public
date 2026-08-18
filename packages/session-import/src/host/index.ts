@@ -77,6 +77,8 @@ export function apply(ctx: Context, config: Config = {}): void {
             return { ok: true, value: await listSessions(payload as { source?: ImportSource; query?: string; limit?: number; includeArchived?: boolean }, maxFileBytes) }
           case 'importSessions':
             return { ok: true, value: await importSessions(connectionCtx, payload as { paths?: string[]; source?: ImportSource; keepCwd?: boolean; includeArchived?: boolean }, limits, maxFileBytes) }
+          case 'importOneSession':
+            return { ok: true, value: await importOneSession(connectionCtx, payload as { path?: string; source?: ImportSource; keepCwd?: boolean }, limits, maxFileBytes) }
           case 'listSkills':
             return { ok: true, value: { entries: await discoverSkills(defaultSkillRoots()) } }
           case 'importSkills':
@@ -335,6 +337,22 @@ async function importSessions(
     }
   }
   return { imported, skipped, failed }
+}
+
+async function importOneSession(
+  ctx: Context,
+  request: { path?: string; source?: ImportSource; keepCwd?: boolean },
+  limits: { maxToolResultChars: number; maxTextChars: number },
+  maxFileBytes: number,
+): Promise<{ imported: number; skipped: number; failed: { path: string; message: string }[]; title?: string }> {
+  const path = request.path?.trim() ?? ''
+  if (path.length === 0) throw new Error('importOneSession requires path')
+  const result = await importSessions(ctx, {
+    paths: [path],
+    source: request.source,
+    keepCwd: request.keepCwd,
+  }, limits, maxFileBytes)
+  return result
 }
 
 async function importSkills(

@@ -1,8 +1,9 @@
 /**
  * The controlled file tree behind the files window's tree panel (TreePanel
  * wraps it with the search box): a lazy VSCode-style tree rooted at the
- * session's working directory plus any additional workspace folders. Levels
- * load on expansion (one API call per directory), directories sort first,
+ * session's working directory plus any additional workspace folders. Each
+ * workspace root is a foldable row (open by default). Levels load on
+ * expansion (one API call per directory), directories sort first,
  * hidden entries render dimmed. The expansion set lives in the per-session
  * state (owned by the caller); the caller also owns the refresh affordance
  * — a `refreshTick` bump wipes the level cache so the visible set reloads.
@@ -40,6 +41,35 @@ export function baseName(path: string): string {
 
 /** How long the row's "copied" label stays after a successful write. */
 const COPIED_MS = 1200
+
+/**
+ * Marker stored in `expanded` after the user first toggles a workspace
+ * root. Roots start open (VS Code multi-root); once this marker is present
+ * the root follows the same include/exclude rule as any other directory.
+ */
+export const ROOT_FOLD_SEEDED = '__dsh-sidebar-root-fold__'
+
+/** Whether a workspace root row is currently expanded. */
+export function isRootExpanded(expanded: readonly string[], root: string): boolean {
+  return expanded.includes(ROOT_FOLD_SEEDED) ? expanded.includes(root) : true
+}
+
+/**
+ * Toggle a workspace root. The first click seeds {@link ROOT_FOLD_SEEDED}
+ * and records the other still-open roots so they stay expanded.
+ */
+export function nextExpandedForRoot(
+  expanded: readonly string[],
+  roots: readonly string[],
+  root: string,
+): string[] {
+  if (!expanded.includes(ROOT_FOLD_SEEDED)) {
+    return [ROOT_FOLD_SEEDED, ...roots.filter(item => item !== root)]
+  }
+  return expanded.includes(root)
+    ? expanded.filter(item => item !== root)
+    : [...expanded, root]
+}
 
 export function FileTree(props: {
   sessionId: string
@@ -97,8 +127,12 @@ export function FileTree(props: {
     // Load the visible set; already-loaded levels (kept in the cache) are
     // not refetched. Only the refresh tick wipes the cache.
     if (roots.length === 0) return
-    for (const root of workspaceRoots(cwd, folders)) loadDir(root)
-    for (const dir of expanded) loadDir(dir)
+    for (const root of workspaceRoots(cwd, folders)) {
+      if (isRootExpanded(expanded, root)) loadDir(root)
+    }
+    for (const dir of expanded) {
+      if (dir !== ROOT_FOLD_SEEDED) loadDir(dir)
+    }
   }, [rootsKey, cwd, folders, expanded, refreshTick, loadDir])
 
   /** Copy `text`; on success flip the row's copied label for a moment. */
@@ -150,35 +184,48 @@ export function FileTree(props: {
     anchor.remove()
   }
 
-  const renderRoot = (root: string): ReactNode => (
-    <div key={root}>
-      <div
-        className={css.explorerRow}
-        style={{ paddingLeft: 6 }}
-        onContextMenu={(event) => { openRowMenu(event, root, true) }}
-      >
-        <IconFolderOpen16 size={14} />
-        <span className={css.explorerName}>{baseName(root)}</span>
-        {copiedPath === root
-          ? <span className={css.explorerCopied}>{t('copied')}</span>
-          : (
-            <button
-              type="button"
-              className={css.explorerRef}
-              aria-label={t('referenceFile')}
-              title={t('referenceFile')}
-              onClick={(event) => {
-                event.stopPropagation()
-                onReferenceFile(root)
-              }}
-            >
-              {t('referenceFile')}
-            </button>
-          )}
+  const renderRoot = (root: string): ReactNode => {
+    const isOpen = isRootExpanded(expanded, root)
+    return (
+      <div key={root}>
+        <div
+          role="button"
+          tabIndex={0}
+          className={clsx(css.explorerRow, css.explorerDir)}
+          style={{ paddingLeft: 6 }}
+          aria-expanded={isOpen}
+          onClick={() => { onToggle(root) }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              onToggle(root)
+            }
+          }}
+          onContextMenu={(event) => { openRowMenu(event, root, true) }}
+        >
+          {isOpen ? <IconFolderOpen16 size={14} /> : <IconFolderClose16 size={14} />}
+          <span className={css.explorerName}>{baseName(root)}</span>
+          {copiedPath === root
+            ? <span className={css.explorerCopied}>{t('copied')}</span>
+            : (
+              <button
+                type="button"
+                className={css.explorerRef}
+                aria-label={t('referenceFile')}
+                title={t('referenceFile')}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onReferenceFile(root)
+                }}
+              >
+                {t('referenceFile')}
+              </button>
+            )}
+        </div>
+        {isOpen && data[root] !== undefined && renderLevel(root, 1)}
       </div>
-      {data[root] !== undefined && renderLevel(root, 1)}
-    </div>
-  )
+    )
+  }
 
   const renderLevel = (dir: string, depth: number): ReactNode => {
     const level = data[dir]

@@ -1,6 +1,6 @@
 {
   "name": "@starpivot/dsh-better-sidebar",
-  "version": "0.13.4",
+  "version": "0.13.5",
   "description": "StarPivot fork of dsh-better-sidebar: a VS Code-like right sidebar with explorer, editor, terminal, Git, and browser. Collapse controls stay in the panel instead of under the desktop title bar.",
   "homepage": "https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/better-sidebar",
   "keywords": [

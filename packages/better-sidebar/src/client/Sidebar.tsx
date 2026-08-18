@@ -42,7 +42,8 @@ import { Workbench, type WorkbenchActions } from './split-pane.tsx'
 import { useNarrowViewport } from './breakpoints.ts'
 import type { NewTabOption } from './TabBar.tsx'
 import type { TabDragPayload } from './TabBar.tsx'
-import { relativeToWorkspace } from './paths.ts'
+import { nextExpandedForRoot } from './FileTree.tsx'
+import { relativeToWorkspace, workspaceRoots } from './paths.ts'
 import { OrphanedTab } from './OrphanedTab.tsx'
 import { RenderBoundary } from './RenderBoundary.tsx'
 import { detectNewDirectSubagent } from './subagent-detect.ts'
@@ -764,7 +765,15 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       cwd={cwd}
       folders={folders}
       expanded={state.expanded}
-      onToggleDir={(path) => { store.reduce(s => toggleExpanded(s, path)) }}
+      onToggleDir={(path) => {
+        store.reduce((s) => {
+          const roots = workspaceRoots(cwd, folders)
+          if (roots.includes(path)) {
+            return { ...s, expanded: nextExpandedForRoot(s.expanded, roots, path) }
+          }
+          return toggleExpanded(s, path)
+        })
+      }}
       onReferenceFile={referenceInChat}
       ctx={ctx}
       store={store}

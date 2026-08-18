@@ -34,14 +34,14 @@
 
 > 🔌 **核心理念**：服务优先——内置的 7 tab + 6 viewer 与第三方插件通过同一套 `ctx.betterSidebar` API 注册，能力完全对等；官方不再内置、可由生态提供的功能，交由生态插件实现。接入文档见下方「🔌 服务化」与 [外部插件接入指南](./docs/external-plugin-guide.md)。
 
-### StarPivot 0.13.4
+### StarPivot 0.13.5
 
 这是 [omdsh-dev/DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) 的 StarPivot fork。相对上游：
 
 - 文件树刷新按钮移到右上角按钮簇，仅在右边栏打开时显示；文件树搜索框旁不再放折叠按钮
 - 打开「自动化」等 shell overlay 页面时隐藏整组按钮
 - 「位置兼容模式」默认开启，折叠按钮整体下移躲开桌面窗口标题栏
-- 工作区关联多个文件夹时，文件树把每个文件夹都作为根目录列出
+- 工作区关联多个文件夹时，文件树把每个文件夹都作为可折叠的根目录列出
 - 浏览器地址栏把「前往 / 在浏览器中打开」收成一组附属按钮
 - 包名改为 `@starpivot/dsh-better-sidebar`
 

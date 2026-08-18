@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { convertClaudeSession } from '../convert/claude.ts'
 import { convertCodexSession } from '../convert/codex.ts'
+import { loadCodexThreadNames, lookupCodexThreadName } from './codex-index.ts'
 import { convertCursorSession } from '../convert/cursor.ts'
 import { convertGrokSession, parseGrokSummary } from '../convert/grok.ts'
 import { detectSource } from '../convert/detect.ts'
@@ -38,7 +39,16 @@ export async function convertFile(
     throw new Error(`cannot detect conversation format: ${path}`)
   }
   if (detected === 'claude') return convertClaudeSession(text, path, limits)
-  if (detected === 'codex') return convertCodexSession(text, path, limits)
+  if (detected === 'codex') {
+    const names = await loadCodexThreadNames()
+    const meta = firstCodexMeta(text)
+    return convertCodexSession(
+      text,
+      path,
+      limits,
+      lookupCodexThreadName(names, meta.id, meta.sessionId, meta.parentId),
+    )
+  }
   if (detected === 'grok') {
     let summary
     try { summary = parseGrokSummary(await readFile(join(dirname(path), 'summary.json'), 'utf8')) }
@@ -46,6 +56,29 @@ export async function convertFile(
     return convertGrokSession(text, path, limits, summary)
   }
   return convertCursorSession(text, path, limits)
+}
+
+function firstCodexMeta(text: string): { id?: string; sessionId?: string; parentId?: string } {
+  for (const line of text.split(/\r?\n/u).slice(0, 20)) {
+    if (line.trim().length === 0) continue
+    let record: unknown
+    try { record = JSON.parse(line) }
+    catch { continue }
+    if (record === null || typeof record !== 'object' || Array.isArray(record)) continue
+    const row = record as Record<string, unknown>
+    if (row.type !== 'session_meta') continue
+    const payload = row.payload !== null && typeof row.payload === 'object' && !Array.isArray(row.payload)
+      ? row.payload as Record<string, unknown>
+      : row
+    return {
+      id: typeof payload.id === 'string' ? payload.id : undefined,
+      sessionId: typeof payload.session_id === 'string' ? payload.session_id : undefined,
+      parentId: typeof payload.parent_thread_id === 'string'
+        ? payload.parent_thread_id
+        : typeof payload.forked_from_id === 'string' ? payload.forked_from_id : undefined,
+    }
+  }
+  return {}
 }
 
 /** Persist a converted conversation, skipping ids that already exist. */

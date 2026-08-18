@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { open, readdir, stat } from 'node:fs/promises'
 import { fallbackTitle, isRecord } from '../convert/text.ts'
+import { loadCodexThreadNames, lookupCodexThreadName } from './codex-index.ts'
 import type { DiscoveredSession, ImportSource } from '../convert/types.ts'
 
 /** Newest conversations the Settings page and `/import list` show by default. */
@@ -98,6 +99,7 @@ export async function presentSessions(
   const limit = options.limit ?? DEFAULT_LIST_LIMIT
   const slice = filtered.slice(0, Math.max(0, limit))
   const read = options.readPreview ?? readPreview
+  const threadNames = slice.some(row => row.source === 'codex') ? await loadCodexThreadNames() : new Map<string, string>()
   const entries = new Array<DiscoveredSession>(slice.length)
   await mapLimit(slice, PREVIEW_CONCURRENCY, async (row, index) => {
     options.signal?.throwIfAborted()
@@ -105,7 +107,7 @@ export async function presentSessions(
       const preview = row.source === 'grok'
         ? await readGrokPreview(row.path, read)
         : await read(row.path)
-      entries[index] = enrichFromPreview(row, preview)
+      entries[index] = enrichFromPreview(row, preview, threadNames)
     } catch {
       entries[index] = row
     }
@@ -229,7 +231,11 @@ function grokNativeIdFromPath(path: string): string {
 }
 
 /** Enrich a discovered row with title/cwd from the first few JSONL records. */
-export function enrichFromPreview(row: DiscoveredSession, text: string): DiscoveredSession {
+export function enrichFromPreview(
+  row: DiscoveredSession,
+  text: string,
+  threadNames: Map<string, string> = new Map(),
+): DiscoveredSession {
   const head = text.slice(0, PREVIEW_BYTES)
   let title = row.source === 'grok' && row.nativeId === 'updates' ? grokNativeIdFromPath(row.path) : row.title
   let cwd = row.cwd
@@ -262,6 +268,14 @@ export function enrichFromPreview(row: DiscoveredSession, text: string): Discove
       if (typeof payload.id === 'string') nativeId = payload.id
       if (typeof payload.cwd === 'string') cwd = payload.cwd
       if (typeof payload.thread_name === 'string') title = payload.thread_name
+      const indexed = lookupCodexThreadName(
+        threadNames,
+        typeof payload.id === 'string' ? payload.id : undefined,
+        typeof payload.session_id === 'string' ? payload.session_id : undefined,
+        typeof payload.parent_thread_id === 'string' ? payload.parent_thread_id : undefined,
+        typeof payload.forked_from_id === 'string' ? payload.forked_from_id : undefined,
+      )
+      if (indexed !== undefined) title = indexed
     }
     if (record.type === 'user' && isRecord(record.message) && typeof record.message.content === 'string' && title === row.title) {
       title = fallbackTitle(record.message.content)

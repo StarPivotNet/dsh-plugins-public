@@ -10,6 +10,7 @@ import { sessionName } from '../convert/events.ts'
 import { parseGrokSummary } from '../convert/grok.ts'
 import { asString, isInstructionDump, isRecord } from '../convert/text.ts'
 import { importedSessionId } from '../convert/types.ts'
+import { loadCodexThreadNames, lookupCodexThreadName } from './codex-index.ts'
 import { defaultScanRoots, isSessionFile } from './scan.ts'
 import { ensureWorkspace, type WorkspaceRegistryHandle } from './workspace.ts'
 
@@ -97,9 +98,12 @@ export async function repairImportedOnDisk(options: {
     try {
       const header = await readStoredHeader(join(item.dir, 'session.jsonl.zstd'))
       const title = origin.title
+      const cacheRow = cache.tables.sessions[item.id]
+      const identityCwd = cacheRow?.identity?.cwd
       const alreadyHome = header.cwd === origin.cwd && attachedTo(workspace, item.id, origin.cwd)
-      const titleSame = cache.tables.sessions[item.id]?.rows?.title?.val === title
-      if (alreadyHome && titleSame) {
+      const titleSame = cacheRow?.rows?.title?.val === title
+      const identitySame = identityCwd === origin.cwd
+      if (alreadyHome && titleSame && identitySame) {
         skipped += 1
         continue
       }
@@ -145,6 +149,7 @@ async function rehomeLive(
 }
 
 async function collectCodexOrigins(roots: readonly string[], found: Map<string, ForeignOrigin>): Promise<void> {
+  const names = await loadCodexThreadNames()
   for (const root of roots) {
     for (const path of await walkFiles(root, 8, name => isSessionFile('codex', name))) {
       const preview = await readHead(path, 64_000)
@@ -153,7 +158,19 @@ async function collectCodexOrigins(roots: readonly string[], found: Map<string, 
       const body = isRecord(payload?.payload) ? payload.payload : payload
       const cwd = asString(body?.cwd)
       if (cwd === undefined) continue
-      const title = sessionName(asString(body?.thread_name) ?? firstCodexUserText(preview) ?? nativeId)
+      const title = sessionName(
+        lookupCodexThreadName(
+          names,
+          nativeId,
+          asString(body?.id),
+          asString(body?.session_id),
+          asString(body?.parent_thread_id),
+          asString(body?.forked_from_id),
+        )
+        ?? asString(body?.thread_name)
+        ?? firstCodexUserText(preview)
+        ?? nativeId,
+      )
       found.set(importedSessionId('codex', nativeId), { id: importedSessionId('codex', nativeId), cwd, title })
     }
   }

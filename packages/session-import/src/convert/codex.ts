@@ -18,8 +18,9 @@ export function convertCodexSession(
   text: string,
   path: string,
   limits: ConvertLimits = DEFAULT_CONVERT_LIMITS,
+  threadName?: string,
 ): ConvertedSession {
-  return convertConversation(extractCodexConversation(text, path, limits), path, limits)
+  return convertConversation(extractCodexConversation(text, path, limits, threadName), path, limits)
 }
 
 /** Extract a Codex rollout file into a source-neutral conversation. */
@@ -27,6 +28,7 @@ export function extractCodexConversation(
   text: string,
   path: string,
   limits: ConvertLimits = DEFAULT_CONVERT_LIMITS,
+  threadName?: string,
 ): TranscriptConversation {
   const items: TranscriptItem[] = []
   let nativeId = idFromPath(path)
@@ -53,7 +55,7 @@ export function extractCodexConversation(
       cwd = asString(payload.cwd) ?? cwd
       model = asString(payload.model) ?? model
       provider = asString(payload.model_provider) ?? provider
-      title = asString(payload.thread_name) ?? title
+      title = asString(payload.thread_name) ?? threadName ?? title
       continue
     }
     if (type === 'turn_context') {
@@ -69,7 +71,7 @@ export function extractCodexConversation(
   return {
     source: 'codex',
     nativeId,
-    title,
+    title: title ?? threadName,
     cwd,
     createdAt: createdAt || updatedAt,
     updatedAt: updatedAt || createdAt,

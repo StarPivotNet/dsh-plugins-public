@@ -35,6 +35,11 @@ const session = [
   }),
 ].join('\n')
 
+test('uses the Codex sidebar thread name when the rollout has none', () => {
+  const converted = convertCodexSession(session, '/tmp/rollout-codex-1.jsonl', undefined, '修复下游视频播放下载')
+  assert.equal(converted.title, '修复下游视频播放下载')
+})
+
 test('converts a Codex rollout tool loop', () => {
   const converted = convertCodexSession(session, '/tmp/rollout-codex-1.jsonl')
   assert.equal(converted.source, 'codex')

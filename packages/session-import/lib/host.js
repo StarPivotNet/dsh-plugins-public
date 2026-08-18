@@ -1,6 +1,6 @@
 // src/host/index.ts
-import { homedir as homedir5 } from "node:os";
-import { join as join6 } from "node:path";
+import { homedir as homedir6 } from "node:os";
+import { join as join7 } from "node:path";
 import { stat as stat4 } from "node:fs/promises";
 import { settingsNamespace } from "@deepseek-ai/dsh-settings";
 import z from "@deepseek-ai/schemastery";
@@ -16,8 +16,8 @@ function importedSessionId(source, nativeId) {
 }
 
 // src/host/import.ts
-import { readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile as readFile2 } from "node:fs/promises";
+import { dirname, join as join2 } from "node:path";
 
 // src/convert/text.ts
 function isRecord(value) {
@@ -432,10 +432,10 @@ function cwdFromClaudeProjectPath(path) {
 }
 
 // src/convert/codex.ts
-function convertCodexSession(text, path, limits = DEFAULT_CONVERT_LIMITS) {
-  return convertConversation(extractCodexConversation(text, path, limits), path, limits);
+function convertCodexSession(text, path, limits = DEFAULT_CONVERT_LIMITS, threadName) {
+  return convertConversation(extractCodexConversation(text, path, limits, threadName), path, limits);
 }
-function extractCodexConversation(text, path, limits = DEFAULT_CONVERT_LIMITS) {
+function extractCodexConversation(text, path, limits = DEFAULT_CONVERT_LIMITS, threadName) {
   const items = [];
   let nativeId = idFromPath2(path);
   let cwd;
@@ -463,7 +463,7 @@ function extractCodexConversation(text, path, limits = DEFAULT_CONVERT_LIMITS) {
       cwd = asString(payload.cwd) ?? cwd;
       model = asString(payload.model) ?? model;
       provider = asString(payload.model_provider) ?? provider;
-      title = asString(payload.thread_name) ?? title;
+      title = asString(payload.thread_name) ?? threadName ?? title;
       continue;
     }
     if (type === "turn_context") {
@@ -478,7 +478,7 @@ function extractCodexConversation(text, path, limits = DEFAULT_CONVERT_LIMITS) {
   return {
     source: "codex",
     nativeId,
-    title,
+    title: title ?? threadName,
     cwd,
     createdAt: createdAt || updatedAt,
     updatedAt: updatedAt || createdAt,
@@ -568,6 +568,42 @@ function extractResponseItem(payload, time, limits) {
 function idFromPath2(path) {
   const base = path.split(/[\\/]/u).at(-1) ?? "session";
   return base.replace(/^rollout-/, "").replace(/\.jsonl$/u, "");
+}
+
+// src/host/codex-index.ts
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { readFile } from "node:fs/promises";
+async function loadCodexThreadNames(home = homedir()) {
+  const names = /* @__PURE__ */ new Map();
+  let text;
+  try {
+    text = await readFile(join(home, ".codex", "session_index.jsonl"), "utf8");
+  } catch {
+    return names;
+  }
+  for (const line of text.split(/\r?\n/u)) {
+    if (line.trim().length === 0) continue;
+    let record;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!isRecord(record)) continue;
+    const id = asString(record.id);
+    const title = asString(record.thread_name);
+    if (id !== void 0 && title !== void 0) names.set(id, title);
+  }
+  return names;
+}
+function lookupCodexThreadName(names, ...ids) {
+  for (const id of ids) {
+    if (id === void 0) continue;
+    const title = names.get(id);
+    if (title !== void 0) return title;
+  }
+  return void 0;
 }
 
 // src/convert/cursor.ts
@@ -975,23 +1011,53 @@ function firstRecord(text) {
 
 // src/host/import.ts
 async function convertFile(path, source, limits = DEFAULT_CONVERT_LIMITS) {
-  const text = await readFile(path, "utf8");
+  const text = await readFile2(path, "utf8");
   const detected = source ?? detectSource(path, text);
   if (detected === void 0) {
     throw new Error(`cannot detect conversation format: ${path}`);
   }
   if (detected === "claude") return convertClaudeSession(text, path, limits);
-  if (detected === "codex") return convertCodexSession(text, path, limits);
+  if (detected === "codex") {
+    const names = await loadCodexThreadNames();
+    const meta = firstCodexMeta(text);
+    return convertCodexSession(
+      text,
+      path,
+      limits,
+      lookupCodexThreadName(names, meta.id, meta.sessionId, meta.parentId)
+    );
+  }
   if (detected === "grok") {
     let summary;
     try {
-      summary = parseGrokSummary(await readFile(join(dirname(path), "summary.json"), "utf8"));
+      summary = parseGrokSummary(await readFile2(join2(dirname(path), "summary.json"), "utf8"));
     } catch {
       summary = void 0;
     }
     return convertGrokSession(text, path, limits, summary);
   }
   return convertCursorSession(text, path, limits);
+}
+function firstCodexMeta(text) {
+  for (const line of text.split(/\r?\n/u).slice(0, 20)) {
+    if (line.trim().length === 0) continue;
+    let record;
+    try {
+      record = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (record === null || typeof record !== "object" || Array.isArray(record)) continue;
+    const row = record;
+    if (row.type !== "session_meta") continue;
+    const payload = row.payload !== null && typeof row.payload === "object" && !Array.isArray(row.payload) ? row.payload : row;
+    return {
+      id: typeof payload.id === "string" ? payload.id : void 0,
+      sessionId: typeof payload.session_id === "string" ? payload.session_id : void 0,
+      parentId: typeof payload.parent_thread_id === "string" ? payload.parent_thread_id : typeof payload.forked_from_id === "string" ? payload.forked_from_id : void 0
+    };
+  }
+  return {};
 }
 function withWorkspaceCwd(converted, cwd) {
   if (cwd === void 0 || cwd.length === 0) return converted;
@@ -1073,31 +1139,31 @@ function parseSource(value) {
 }
 
 // src/host/scan.ts
-import { homedir } from "node:os";
-import { basename, dirname as dirname2, join as join2 } from "node:path";
+import { homedir as homedir2 } from "node:os";
+import { basename, dirname as dirname2, join as join3 } from "node:path";
 import { open, readdir, stat } from "node:fs/promises";
 var DEFAULT_LIST_LIMIT = 300;
 var PREVIEW_BYTES = 64e3;
 var STAT_CONCURRENCY = 32;
 var PREVIEW_CONCURRENCY = 16;
 var DISCOVER_CACHE_MS = 3e4;
-function defaultScanRoots(home = homedir(), includeArchived = false) {
-  const codex = [join2(home, ".codex", "sessions")];
-  if (includeArchived) codex.push(join2(home, ".codex", "archived_sessions"));
+function defaultScanRoots(home = homedir2(), includeArchived = false) {
+  const codex = [join3(home, ".codex", "sessions")];
+  if (includeArchived) codex.push(join3(home, ".codex", "archived_sessions"));
   return {
     claude: [
-      join2(home, ".claude", "projects"),
-      join2(home, ".claude", "sessions")
+      join3(home, ".claude", "projects"),
+      join3(home, ".claude", "sessions")
     ],
     codex,
     cursor: [
-      join2(home, ".cursor", "projects"),
-      join2(home, ".cursor", "chats"),
-      join2(home, "Library", "Application Support", "Cursor", "User", "workspaceStorage"),
-      join2(home, "AppData", "Roaming", "Cursor", "User", "workspaceStorage")
+      join3(home, ".cursor", "projects"),
+      join3(home, ".cursor", "chats"),
+      join3(home, "Library", "Application Support", "Cursor", "User", "workspaceStorage"),
+      join3(home, "AppData", "Roaming", "Cursor", "User", "workspaceStorage")
     ],
     grok: [
-      join2(home, ".grok", "sessions")
+      join3(home, ".grok", "sessions")
     ]
   };
 }
@@ -1123,12 +1189,13 @@ async function presentSessions(rows, options) {
   const limit = options.limit ?? DEFAULT_LIST_LIMIT;
   const slice = filtered.slice(0, Math.max(0, limit));
   const read = options.readPreview ?? readPreview;
+  const threadNames = slice.some((row) => row.source === "codex") ? await loadCodexThreadNames() : /* @__PURE__ */ new Map();
   const entries = new Array(slice.length);
   await mapLimit(slice, PREVIEW_CONCURRENCY, async (row, index) => {
     options.signal?.throwIfAborted();
     try {
       const preview = row.source === "grok" ? await readGrokPreview(row.path, read) : await read(row.path);
-      entries[index] = enrichFromPreview(row, preview);
+      entries[index] = enrichFromPreview(row, preview, threadNames);
     } catch {
       entries[index] = row;
     }
@@ -1137,7 +1204,7 @@ async function presentSessions(rows, options) {
 }
 async function readGrokPreview(path, read) {
   try {
-    return await read(join2(dirname2(path), "summary.json"));
+    return await read(join3(dirname2(path), "summary.json"));
   } catch {
     return read(path);
   }
@@ -1170,7 +1237,7 @@ async function visit(path, source, found, depth, signal) {
   const files = [];
   const directories = [];
   for (const entry of entries) {
-    const full = join2(path, entry.name);
+    const full = join3(path, entry.name);
     if (entry.isDirectory()) directories.push(full);
     else if (entry.isFile() && isSessionFile(source, entry.name)) files.push(full);
   }
@@ -1227,7 +1294,7 @@ function grokNativeIdFromPath(path) {
   if (file === "updates.jsonl" || file === "chat_history.jsonl") return parts.at(-2) ?? file;
   return file.replace(/\.(jsonl|json)$/u, "");
 }
-function enrichFromPreview(row, text) {
+function enrichFromPreview(row, text, threadNames = /* @__PURE__ */ new Map()) {
   const head = text.slice(0, PREVIEW_BYTES);
   let title = row.source === "grok" && row.nativeId === "updates" ? grokNativeIdFromPath(row.path) : row.title;
   let cwd = row.cwd;
@@ -1263,6 +1330,14 @@ function enrichFromPreview(row, text) {
       if (typeof payload.id === "string") nativeId = payload.id;
       if (typeof payload.cwd === "string") cwd = payload.cwd;
       if (typeof payload.thread_name === "string") title = payload.thread_name;
+      const indexed = lookupCodexThreadName(
+        threadNames,
+        typeof payload.id === "string" ? payload.id : void 0,
+        typeof payload.session_id === "string" ? payload.session_id : void 0,
+        typeof payload.parent_thread_id === "string" ? payload.parent_thread_id : void 0,
+        typeof payload.forked_from_id === "string" ? payload.forked_from_id : void 0
+      );
+      if (indexed !== void 0) title = indexed;
     }
     if (record.type === "user" && isRecord(record.message) && typeof record.message.content === "string" && title === row.title) {
       title = fallbackTitle(record.message.content);
@@ -1291,21 +1366,21 @@ function parsePreviewObject(text) {
 }
 
 // src/host/skills.ts
-import { mkdir, readFile as readFile2, writeFile } from "node:fs/promises";
-import { basename as basename2, dirname as dirname3, join as join3 } from "node:path";
-import { homedir as homedir2 } from "node:os";
-function defaultSkillRoots(home = homedir2()) {
+import { mkdir, readFile as readFile3, writeFile } from "node:fs/promises";
+import { basename as basename2, dirname as dirname3, join as join4 } from "node:path";
+import { homedir as homedir3 } from "node:os";
+function defaultSkillRoots(home = homedir3()) {
   return {
     claude: [
-      join3(home, ".claude", "skills"),
-      join3(home, ".claude", "commands")
+      join4(home, ".claude", "skills"),
+      join4(home, ".claude", "commands")
     ],
     codex: [
-      join3(home, ".codex", "skills")
+      join4(home, ".codex", "skills")
     ],
     cursor: [
-      join3(home, ".cursor", "skills"),
-      join3(home, ".cursor", "commands")
+      join4(home, ".cursor", "skills"),
+      join4(home, ".cursor", "commands")
     ]
   };
 }
@@ -1321,12 +1396,12 @@ async function discoverSkills(roots, signal) {
   return found;
 }
 async function copySkill(skill, targetRoot) {
-  const directory = join3(targetRoot, skill.name);
-  const target = join3(directory, "SKILL.md");
+  const directory = join4(targetRoot, skill.name);
+  const target = join4(directory, "SKILL.md");
   await mkdir(directory, { recursive: true });
   let overwritten = false;
   try {
-    await readFile2(target);
+    await readFile3(target);
     overwritten = true;
   } catch {
     overwritten = false;
@@ -1336,7 +1411,7 @@ async function copySkill(skill, targetRoot) {
   return { path: target, overwritten };
 }
 async function visitSkillRoot(root, source, found) {
-  const { readdir: readdir4, readFile: readFile5, stat: stat5 } = await import("node:fs/promises");
+  const { readdir: readdir4, readFile: readFile6, stat: stat5 } = await import("node:fs/promises");
   let entries;
   try {
     entries = await readdir4(root, { withFileTypes: true });
@@ -1344,13 +1419,13 @@ async function visitSkillRoot(root, source, found) {
     return;
   }
   for (const entry of entries) {
-    const full = join3(root, entry.name);
+    const full = join4(root, entry.name);
     if (entry.isDirectory()) {
-      const skillFile = join3(full, "SKILL.md");
+      const skillFile = join4(full, "SKILL.md");
       try {
         const info = await stat5(skillFile);
         if (!info.isFile()) continue;
-        const parsed = parseSkillFile(await readFile5(skillFile, "utf8"), source, skillFile);
+        const parsed = parseSkillFile(await readFile6(skillFile, "utf8"), source, skillFile);
         if (parsed !== void 0) found.push(parsed);
       } catch {
         continue;
@@ -1360,7 +1435,7 @@ async function visitSkillRoot(root, source, found) {
     if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".md")) continue;
     if (entry.name.toLowerCase() === "readme.md") continue;
     try {
-      const parsed = parseSkillFile(await readFile5(full, "utf8"), source, full);
+      const parsed = parseSkillFile(await readFile6(full, "utf8"), source, full);
       if (parsed !== void 0) found.push(parsed);
     } catch {
       continue;
@@ -1419,9 +1494,9 @@ function firstHeading(body) {
 }
 
 // src/host/compat.ts
-import { homedir as homedir3 } from "node:os";
-import { basename as basename3, dirname as dirname4, join as join4 } from "node:path";
-import { mkdir as mkdir2, readFile as readFile3, readdir as readdir2, stat as stat2, writeFile as writeFile2 } from "node:fs/promises";
+import { homedir as homedir4 } from "node:os";
+import { basename as basename3, dirname as dirname4, join as join5 } from "node:path";
+import { mkdir as mkdir2, readFile as readFile4, readdir as readdir2, stat as stat2, writeFile as writeFile2 } from "node:fs/promises";
 var WEEKDAY_TO_ISO = {
   MO: 1,
   TU: 2,
@@ -1431,15 +1506,15 @@ var WEEKDAY_TO_ISO = {
   SA: 6,
   SU: 7
 };
-function defaultMemoryRoots(home = homedir3()) {
+function defaultMemoryRoots(home = homedir4()) {
   return [
-    { source: "claude", kind: "agents", path: join4(home, ".claude", "CLAUDE.md"), name: "claude-claude-md" },
-    { source: "codex", kind: "agents", path: join4(home, ".codex", "AGENTS.md"), name: "codex-agents-md" },
-    { source: "codex", kind: "memory", path: join4(home, ".codex", "memories", "MEMORY.md"), name: "codex-memory" },
-    { source: "codex", kind: "memory", path: join4(home, ".codex", "memories", "memory_summary.md"), name: "codex-memory-summary" }
+    { source: "claude", kind: "agents", path: join5(home, ".claude", "CLAUDE.md"), name: "claude-claude-md" },
+    { source: "codex", kind: "agents", path: join5(home, ".codex", "AGENTS.md"), name: "codex-agents-md" },
+    { source: "codex", kind: "memory", path: join5(home, ".codex", "memories", "MEMORY.md"), name: "codex-memory" },
+    { source: "codex", kind: "memory", path: join5(home, ".codex", "memories", "memory_summary.md"), name: "codex-memory-summary" }
   ];
 }
-async function discoverMemories(home = homedir3()) {
+async function discoverMemories(home = homedir4()) {
   const found = [];
   for (const root of defaultMemoryRoots(home)) {
     let info;
@@ -1451,7 +1526,7 @@ async function discoverMemories(home = homedir3()) {
     if (!info.isFile()) continue;
     let text = "";
     try {
-      text = await readFile3(root.path, "utf8");
+      text = await readFile4(root.path, "utf8");
     } catch {
       continue;
     }
@@ -1466,8 +1541,8 @@ async function discoverMemories(home = homedir3()) {
   }
   return found;
 }
-async function importMemories(paths, home = homedir3()) {
-  const targetRoot = join4(home, ".dsh", "imported-memory");
+async function importMemories(paths, home = homedir4()) {
+  const targetRoot = join5(home, ".dsh", "imported-memory");
   await mkdir2(targetRoot, { recursive: true });
   let copied = 0;
   let merged = 0;
@@ -1476,12 +1551,12 @@ async function importMemories(paths, home = homedir3()) {
   const selected = paths.length === 0 ? known : known.filter((row) => paths.includes(row.path));
   for (const row of selected) {
     try {
-      const text = await readFile3(row.path, "utf8");
-      const dest = join4(targetRoot, `${row.name}.md`);
+      const text = await readFile4(row.path, "utf8");
+      const dest = join5(targetRoot, `${row.name}.md`);
       await writeFile2(dest, ensureTrailingNewline(text), "utf8");
       copied += 1;
       if (row.kind === "agents") {
-        await mergeAgentsFile(join4(home, ".dsh", "AGENTS.md"), row.path, text);
+        await mergeAgentsFile(join5(home, ".dsh", "AGENTS.md"), row.path, text);
         merged += 1;
       }
     } catch (error) {
@@ -1490,8 +1565,8 @@ async function importMemories(paths, home = homedir3()) {
   }
   return { copied, merged, failed };
 }
-async function discoverAutomations(home = homedir3()) {
-  const root = join4(home, ".codex", "automations");
+async function discoverAutomations(home = homedir4()) {
+  const root = join5(home, ".codex", "automations");
   let entries;
   try {
     entries = await readdir2(root, { withFileTypes: true });
@@ -1501,9 +1576,9 @@ async function discoverAutomations(home = homedir3()) {
   const found = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const path = join4(root, entry.name, "automation.toml");
+    const path = join5(root, entry.name, "automation.toml");
     try {
-      const text = await readFile3(path, "utf8");
+      const text = await readFile4(path, "utf8");
       const parsed = parseAutomationToml(text, path);
       if (parsed !== void 0) found.push(parsed);
     } catch {
@@ -1602,7 +1677,7 @@ async function mergeAgentsFile(target, sourcePath, text) {
   await mkdir2(dirname4(target), { recursive: true });
   let existing = "";
   try {
-    existing = await readFile3(target, "utf8");
+    existing = await readFile4(target, "utf8");
   } catch {
     existing = "";
   }
@@ -1669,9 +1744,9 @@ async function ensureWorkspace(registry, cwd) {
 }
 
 // src/host/repair.ts
-import { homedir as homedir4 } from "node:os";
-import { basename as basename5, dirname as dirname5, join as join5 } from "node:path";
-import { mkdir as mkdir4, open as open2, readdir as readdir3, readFile as readFile4, rename, stat as stat3, writeFile as writeFile3 } from "node:fs/promises";
+import { homedir as homedir5 } from "node:os";
+import { basename as basename5, dirname as dirname5, join as join6 } from "node:path";
+import { mkdir as mkdir4, open as open2, readdir as readdir3, readFile as readFile5, rename, stat as stat3, writeFile as writeFile3 } from "node:fs/promises";
 import { constants, zstdCompress, zstdDecompress } from "node:zlib";
 import { promisify } from "node:util";
 var zstdCompressAsync = promisify(zstdCompress);
@@ -1714,12 +1789,12 @@ async function repairImportedSessions(ctx) {
   return { repaired, skipped, failed };
 }
 async function repairOneOnDisk(id, origin) {
-  const sessionRoot = join5(homedir4(), ".dsh", "sessions");
+  const sessionRoot = join6(homedir5(), ".dsh", "sessions");
   const dir = (await listImportSessionDirs(sessionRoot)).find((item) => item.id === id)?.dir;
   if (dir === void 0) throw new Error("no stored log for " + id);
-  const header = await readStoredHeader(join5(dir, "session.jsonl.zstd"));
+  const header = await readStoredHeader(join6(dir, "session.jsonl.zstd"));
   if (header.cwd === origin.cwd) return false;
-  await rewriteHeaderCwd(join5(dir, "session.jsonl.zstd"), origin.cwd);
+  await rewriteHeaderCwd(join6(dir, "session.jsonl.zstd"), origin.cwd);
   await moveSessionDir(sessionRoot, dir, origin.cwd, id);
   return true;
 }
@@ -1735,6 +1810,7 @@ async function rehomeLive(registry, id, cwd) {
   await workspace?.attachSession?.(id);
 }
 async function collectCodexOrigins(roots, found) {
+  const names = await loadCodexThreadNames();
   for (const root of roots) {
     for (const path of await walkFiles(root, 8, (name2) => isSessionFile("codex", name2))) {
       const preview = await readHead(path, 64e3);
@@ -1743,7 +1819,16 @@ async function collectCodexOrigins(roots, found) {
       const body = isRecord(payload?.payload) ? payload.payload : payload;
       const cwd = asString(body?.cwd);
       if (cwd === void 0) continue;
-      const title = sessionName(asString(body?.thread_name) ?? firstCodexUserText(preview) ?? nativeId);
+      const title = sessionName(
+        lookupCodexThreadName(
+          names,
+          nativeId,
+          asString(body?.id),
+          asString(body?.session_id),
+          asString(body?.parent_thread_id),
+          asString(body?.forked_from_id)
+        ) ?? asString(body?.thread_name) ?? firstCodexUserText(preview) ?? nativeId
+      );
       found.set(importedSessionId("codex", nativeId), { id: importedSessionId("codex", nativeId), cwd, title });
     }
   }
@@ -1753,7 +1838,7 @@ async function collectGrokOrigins(roots, found) {
     for (const path of await walkFiles(root, 8, (name2) => isSessionFile("grok", name2))) {
       let summary;
       try {
-        summary = parseGrokSummary(await readFile4(join5(dirname5(path), "summary.json"), "utf8"));
+        summary = parseGrokSummary(await readFile5(join6(dirname5(path), "summary.json"), "utf8"));
       } catch {
         summary = {};
       }
@@ -1794,7 +1879,7 @@ async function walkFiles(root, depth, accept) {
   const files = [];
   const dirs = [];
   for (const entry of entries) {
-    const full = join5(root, entry.name);
+    const full = join6(root, entry.name);
     if (entry.isDirectory()) dirs.push(full);
     else if (entry.isFile() && accept(entry.name)) files.push(full);
   }
@@ -1813,20 +1898,20 @@ async function listImportSessionDirs(root) {
     if (!project.isDirectory()) continue;
     let sessions;
     try {
-      sessions = await readdir3(join5(root, project.name), { withFileTypes: true });
+      sessions = await readdir3(join6(root, project.name), { withFileTypes: true });
     } catch {
       continue;
     }
     for (const session of sessions) {
       if (session.isDirectory() && session.name.startsWith("import-")) {
-        found.push({ id: session.name, dir: join5(root, project.name, session.name) });
+        found.push({ id: session.name, dir: join6(root, project.name, session.name) });
       }
     }
   }
   return found;
 }
 async function rewriteHeaderCwd(path, cwd) {
-  const buffer = await readFile4(path);
+  const buffer = await readFile5(path);
   const firstEnd = firstZstdFrameEnd(buffer);
   const headerText = (await zstdDecompressAsync(buffer.subarray(0, firstEnd))).toString("utf8");
   const header = JSON.parse(headerText);
@@ -1835,14 +1920,14 @@ async function rewriteHeaderCwd(path, cwd) {
   await writeFile3(path, Buffer.concat([next, buffer.subarray(firstEnd)]));
 }
 async function readStoredHeader(path) {
-  const buffer = await readFile4(path);
+  const buffer = await readFile5(path);
   const firstEnd = firstZstdFrameEnd(buffer);
   return JSON.parse((await zstdDecompressAsync(buffer.subarray(0, firstEnd))).toString("utf8"));
 }
 async function moveSessionDir(root, from, cwd, id) {
-  const dest = join5(root, projectKey(cwd), id);
+  const dest = join6(root, projectKey(cwd), id);
   if (from === dest) return;
-  await mkdir4(join5(root, projectKey(cwd)), { recursive: true });
+  await mkdir4(join6(root, projectKey(cwd)), { recursive: true });
   try {
     await rename(from, dest);
   } catch (error) {
@@ -1942,7 +2027,7 @@ function apply(ctx, config = {}) {
     maxTextChars: config.maxTextChars ?? DEFAULT_CONVERT_LIMITS.maxTextChars
   };
   const maxFileBytes = config.maxFileBytes ?? 32 * 1024 * 1024;
-  const skillTarget = config.skillTarget ?? join6(homedir5(), ".dsh", "skills");
+  const skillTarget = config.skillTarget ?? join7(homedir6(), ".dsh", "skills");
   ctx.inject(["settings"], (settingsCtx) => {
     const settings = settingsCtx.get("settings");
     settings.register(SETTINGS_NS, z.object({
@@ -2244,8 +2329,8 @@ function looksLikePath(value) {
   return value.startsWith("/") || value.startsWith("~") || /^[A-Za-z]:[\\/]/u.test(value);
 }
 function expandHome(value) {
-  if (value === "~") return homedir5();
-  if (value.startsWith("~/")) return join6(homedir5(), value.slice(2));
+  if (value === "~") return homedir6();
+  if (value.startsWith("~/")) return join7(homedir6(), value.slice(2));
   return value;
 }
 function requirePersistence(ctx) {

@@ -41,11 +41,11 @@ if (typeof document !== "undefined" && document.querySelector("style[data-plugin
   tag.textContent = css;
   document.head.appendChild(tag);
 }
-var SessionImportSection_default = { "status": "YmEt6W_status", "failure": "YmEt6W_failure", "tag": "YmEt6W_tag", "toolbar": "YmEt6W_toolbar", "search": "YmEt6W_search", "heading": "YmEt6W_heading", "hint": "YmEt6W_hint", "list": "YmEt6W_list", "intro": "YmEt6W_intro", "meta": "YmEt6W_meta", "title": "YmEt6W_title", "tabs": "YmEt6W_tabs", "select": "YmEt6W_select", "button": "YmEt6W_button", "tab": "YmEt6W_tab", "row": "YmEt6W_row", "section": "YmEt6W_section", "empty": "YmEt6W_empty" };
+var SessionImportSection_default = { "search": "YmEt6W_search", "list": "YmEt6W_list", "section": "YmEt6W_section", "select": "YmEt6W_select", "tab": "YmEt6W_tab", "heading": "YmEt6W_heading", "empty": "YmEt6W_empty", "hint": "YmEt6W_hint", "row": "YmEt6W_row", "tag": "YmEt6W_tag", "meta": "YmEt6W_meta", "status": "YmEt6W_status", "intro": "YmEt6W_intro", "failure": "YmEt6W_failure", "toolbar": "YmEt6W_toolbar", "tabs": "YmEt6W_tabs", "button": "YmEt6W_button", "title": "YmEt6W_title" };
 
 // src/client/SessionImportSection.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
-var SESSION_SOURCES = ["claude", "codex", "cursor"];
+var SESSION_SOURCES = ["claude", "codex", "cursor", "grok"];
 function SessionImportSection(props) {
   const { t, listSessions, importSessions, listSkills, importSkills, listMemories, importMemories, listAutomations, importAutomations } = props;
   const [tab, setTab] = (0, import_react.useState)("sessions");
@@ -161,7 +161,8 @@ function SessionImportSection(props) {
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "all", children: t("sourceAll") }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "claude", children: t("sourceClaude") }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "codex", children: t("sourceCodex") }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "cursor", children: t("sourceCursor") })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "cursor", children: t("sourceCursor") }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "grok", children: t("sourceGrok") })
         ] })
       ] }) : null,
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -334,6 +335,7 @@ var zh = {
   sourceClaude: "Claude Code",
   sourceCodex: "Codex",
   sourceCursor: "Cursor",
+  sourceGrok: "Grok Build",
   search: "\u6309\u6807\u9898\u6216\u8DEF\u5F84\u7B5B\u9009",
   imported: "\u5BFC\u5165\u5B8C\u6210\uFF08\u65B0\u5BFC\u5165 / \u5DF2\u5B58\u5728\uFF09",
   importedSkills: "\u6280\u80FD\u5DF2\u590D\u5236\u5230 ~/.dsh/skills\u3002",
@@ -370,6 +372,7 @@ var en = {
   sourceClaude: "Claude Code",
   sourceCodex: "Codex",
   sourceCursor: "Cursor",
+  sourceGrok: "Grok Build",
   search: "Filter by title or path",
   imported: "Import finished (new / already present).",
   importedSkills: "Skills copied into ~/.dsh/skills.",

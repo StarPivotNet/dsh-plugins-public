@@ -1,7 +1,7 @@
 /** Shared session-import types used by converters and the Host plugin. */
 
 /** Supported foreign conversation stores. */
-export type ImportSource = 'claude' | 'codex' | 'cursor'
+export type ImportSource = 'claude' | 'codex' | 'cursor' | 'grok'
 
 /** One model-facing content block in a converted DSH event. */
 export type ImportContentBlock =

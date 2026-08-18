@@ -1,9 +1,11 @@
 /** Convert a discovered foreign session and persist it as a cold DSH session. */
 
 import { readFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { convertClaudeSession } from '../convert/claude.ts'
 import { convertCodexSession } from '../convert/codex.ts'
 import { convertCursorSession } from '../convert/cursor.ts'
+import { convertGrokSession, parseGrokSummary } from '../convert/grok.ts'
 import { detectSource } from '../convert/detect.ts'
 import type {
   ConvertedSession,
@@ -37,6 +39,12 @@ export async function convertFile(
   }
   if (detected === 'claude') return convertClaudeSession(text, path, limits)
   if (detected === 'codex') return convertCodexSession(text, path, limits)
+  if (detected === 'grok') {
+    let summary
+    try { summary = parseGrokSummary(await readFile(join(dirname(path), 'summary.json'), 'utf8')) }
+    catch { summary = undefined }
+    return convertGrokSession(text, path, limits, summary)
+  }
   return convertCursorSession(text, path, limits)
 }
 

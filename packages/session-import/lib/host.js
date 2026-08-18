@@ -1,6 +1,6 @@
 // src/host/index.ts
 import { homedir as homedir4 } from "node:os";
-import { join as join4 } from "node:path";
+import { join as join5 } from "node:path";
 import { settingsNamespace } from "@deepseek-ai/dsh-settings";
 import z from "@deepseek-ai/schemastery";
 
@@ -16,6 +16,7 @@ function importedSessionId(source, nativeId) {
 
 // src/host/import.ts
 import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 // src/convert/text.ts
 function isRecord(value) {
@@ -725,6 +726,198 @@ function idFromPath3(path) {
   return base.replace(/\.(jsonl|json)$/u, "");
 }
 
+// src/convert/grok.ts
+function convertGrokSession(text, path, limits = DEFAULT_CONVERT_LIMITS, summary) {
+  return convertConversation(extractGrokConversation(text, path, limits, summary), path, limits);
+}
+function parseGrokSummary(text) {
+  let record;
+  try {
+    record = JSON.parse(text);
+  } catch {
+    return {};
+  }
+  if (!isRecord(record)) return {};
+  const info = isRecord(record.info) ? record.info : {};
+  const created = Date.parse(String(record.created_at ?? ""));
+  const updated = Date.parse(String(record.updated_at ?? record.last_active_at ?? ""));
+  return {
+    id: asString(info.id) ?? asString(record.id),
+    cwd: asString(info.cwd) ?? asString(record.cwd),
+    title: asString(record.generated_title) ?? asString(record.session_summary) ?? asString(record.title),
+    model: asString(record.current_model_id) ?? asString(record.model),
+    createdAt: Number.isFinite(created) ? created : void 0,
+    updatedAt: Number.isFinite(updated) ? updated : void 0
+  };
+}
+function extractGrokConversation(text, path, limits = DEFAULT_CONVERT_LIMITS, summary = {}) {
+  const items = [];
+  let nativeId = summary.id ?? idFromPath4(path);
+  let cwd = summary.cwd;
+  let createdAt = summary.createdAt ?? 0;
+  let updatedAt = summary.updatedAt ?? 0;
+  let model = summary.model;
+  let title = summary.title;
+  const pending = /* @__PURE__ */ new Map();
+  for (const raw of text.split(/\r?\n/u)) {
+    if (raw.trim().length === 0) continue;
+    let record;
+    try {
+      record = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    if (!isRecord(record)) continue;
+    const time = grokTime(record, updatedAt);
+    if (time > updatedAt) updatedAt = time;
+    if (createdAt === 0 && time > 0) createdAt = time;
+    if (record.method === "session/update" && isRecord(record.params) && isRecord(record.params.update)) {
+      const update = record.params.update;
+      const kind = asString(update.sessionUpdate);
+      if (typeof record.params.sessionId === "string") nativeId = record.params.sessionId;
+      if (kind === "user_message_chunk") {
+        const textValue = chunkText(update.content, limits);
+        if (textValue.length > 0) items.push({ kind: "user", time, text: textValue, source: "user" });
+        continue;
+      }
+      if (kind === "agent_thought_chunk") {
+        const textValue = chunkText(update.content, limits);
+        if (textValue.length > 0) items.push({ kind: "assistant", time, text: "", reasoning: textValue, toolCalls: [] });
+        continue;
+      }
+      if (kind === "agent_message_chunk") {
+        const textValue = chunkText(update.content, limits);
+        if (textValue.length > 0) items.push({ kind: "assistant", time, text: textValue, reasoning: "", toolCalls: [] });
+        continue;
+      }
+      if (kind === "tool_call") {
+        const callId = asString(update.toolCallId) ?? `grok-tool-${String(items.length)}`;
+        const name2 = asString(update.title) ?? asString(update.kind) ?? "tool";
+        const args = encodeGrokArgs(update.rawInput);
+        pending.set(callId, { name: name2, args });
+        items.push({
+          kind: "assistant",
+          time,
+          text: "",
+          reasoning: "",
+          toolCalls: [{ callId, name: name2, arguments: args }]
+        });
+        continue;
+      }
+      if (kind === "tool_call_update" && asString(update.status) === "completed") {
+        const callId = asString(update.toolCallId);
+        if (callId === void 0) continue;
+        pending.delete(callId);
+        items.push({
+          kind: "tool-result",
+          time,
+          callId,
+          text: grokToolOutput(update.content, limits),
+          isError: false
+        });
+      }
+      continue;
+    }
+    const type = asString(record.type);
+    if (type === "user") {
+      const textValue = flattenText(record.content, limits);
+      const query = extractUserQuery(textValue);
+      if (query.length > 0) items.push({ kind: "user", time, text: query, source: "user" });
+      continue;
+    }
+    if (type === "assistant") {
+      const toolCalls = grokHistoryToolCalls(record.tool_calls);
+      items.push({
+        kind: "assistant",
+        time,
+        text: flattenText(record.content, limits),
+        reasoning: "",
+        toolCalls
+      });
+      continue;
+    }
+    if (type === "reasoning") {
+      const textValue = flattenText(record.summary ?? record.content, limits);
+      if (textValue.length > 0) items.push({ kind: "assistant", time, text: "", reasoning: textValue, toolCalls: [] });
+      continue;
+    }
+    if (type === "tool_result") {
+      const callId = asString(record.tool_call_id);
+      if (callId === void 0) continue;
+      items.push({
+        kind: "tool-result",
+        time,
+        callId,
+        text: flattenText(record.content, limits),
+        isError: false
+      });
+    }
+  }
+  return {
+    source: "grok",
+    nativeId,
+    title,
+    cwd,
+    createdAt: createdAt || updatedAt,
+    updatedAt: updatedAt || createdAt,
+    model,
+    provider: "xai",
+    items
+  };
+}
+function grokTime(record, fallback) {
+  if (typeof record.timestamp === "number") return parseTime(record.timestamp * (record.timestamp < 1e12 ? 1 : 1), fallback);
+  if (isRecord(record.params) && isRecord(record.params.update) && isRecord(record.params.update._meta)) {
+    return parseTime(record.params.update._meta.agentTimestampMs, fallback);
+  }
+  if (isRecord(record._meta)) return parseTime(record._meta.agentTimestampMs, fallback);
+  return fallback;
+}
+function chunkText(value, limits) {
+  if (isRecord(value)) return flattenText(value.text ?? value, limits);
+  return flattenText(value, limits);
+}
+function grokToolOutput(value, limits) {
+  if (!Array.isArray(value)) return flattenText(value, limits);
+  const parts = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    if (isRecord(item.content)) parts.push(flattenText(item.content.text ?? item.content, limits));
+    else parts.push(flattenText(item, limits));
+  }
+  return parts.filter((part) => part.length > 0).join("\n");
+}
+function grokHistoryToolCalls(value) {
+  if (!Array.isArray(value)) return [];
+  const calls = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const callId = asString(item.id);
+    const name2 = asString(item.name);
+    if (callId === void 0 || name2 === void 0) continue;
+    calls.push({ callId, name: name2, arguments: encodeGrokArgs(item.arguments) });
+  }
+  return calls;
+}
+function encodeGrokArgs(value) {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value ?? {});
+  } catch {
+    return "{}";
+  }
+}
+function extractUserQuery(text) {
+  const match = /<user_query>\s*([\s\S]*?)\s*<\/user_query>/u.exec(text);
+  return (match?.[1] ?? text).trim();
+}
+function idFromPath4(path) {
+  const parts = path.replace(/\\/gu, "/").split("/");
+  const file = parts.at(-1) ?? "session";
+  if (file === "updates.jsonl" || file === "chat_history.jsonl") return parts.at(-2) ?? file;
+  return file.replace(/\.(jsonl|json)$/u, "");
+}
+
 // src/convert/detect.ts
 function detectSource(path, text) {
   const normalized = path.replace(/\\/gu, "/");
@@ -733,12 +926,14 @@ function detectSource(path, text) {
   if (normalized.includes("/.cursor/") || normalized.includes("/User/workspaceStorage/") || normalized.includes("/Cursor/")) {
     return "cursor";
   }
+  if (normalized.includes("/.grok/sessions/") || normalized.endsWith("/updates.jsonl")) return "grok";
   const first = firstRecord(text);
   if (first === void 0) return void 0;
   if (asString(first.sessionId) !== void 0 && (first.type === "user" || first.type === "assistant" || first.type === "mode")) {
     return "claude";
   }
   if (first.type === "session_meta" || first.type === "response_item" || first.type === "event_msg") return "codex";
+  if (first.method === "session/update") return "grok";
   if (asString(first.composerId) !== void 0 || asString(first.bubbleId) !== void 0) return "cursor";
   if (Array.isArray(first.fullConversationHeadersOnly) || Array.isArray(first.bubbles)) return "cursor";
   return void 0;
@@ -774,6 +969,15 @@ async function convertFile(path, source, limits = DEFAULT_CONVERT_LIMITS) {
   }
   if (detected === "claude") return convertClaudeSession(text, path, limits);
   if (detected === "codex") return convertCodexSession(text, path, limits);
+  if (detected === "grok") {
+    let summary;
+    try {
+      summary = parseGrokSummary(await readFile(join(dirname(path), "summary.json"), "utf8"));
+    } catch {
+      summary = void 0;
+    }
+    return convertGrokSession(text, path, limits, summary);
+  }
   return convertCursorSession(text, path, limits);
 }
 function withWorkspaceCwd(converted, cwd) {
@@ -815,7 +1019,7 @@ async function importDiscovered(persistence, row, limits = DEFAULT_CONVERT_LIMIT
 }
 
 // src/host/parse-args.ts
-var SOURCES = /* @__PURE__ */ new Set(["claude", "codex", "cursor"]);
+var SOURCES = /* @__PURE__ */ new Set(["claude", "codex", "cursor", "grok"]);
 function parseImportArgs(rawInput) {
   const rawTokens = rawInput.trim().split(/\s+/u).filter((token) => token.length > 0);
   const keepCwd = rawTokens.some((token) => token === "--keep-cwd");
@@ -854,7 +1058,7 @@ function parseSource(value) {
 
 // src/host/scan.ts
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname as dirname2, join as join2 } from "node:path";
 import { open, readdir, stat } from "node:fs/promises";
 var DEFAULT_LIST_LIMIT = 300;
 var PREVIEW_BYTES = 64e3;
@@ -862,19 +1066,22 @@ var STAT_CONCURRENCY = 32;
 var PREVIEW_CONCURRENCY = 16;
 var DISCOVER_CACHE_MS = 3e4;
 function defaultScanRoots(home = homedir(), includeArchived = false) {
-  const codex = [join(home, ".codex", "sessions")];
-  if (includeArchived) codex.push(join(home, ".codex", "archived_sessions"));
+  const codex = [join2(home, ".codex", "sessions")];
+  if (includeArchived) codex.push(join2(home, ".codex", "archived_sessions"));
   return {
     claude: [
-      join(home, ".claude", "projects"),
-      join(home, ".claude", "sessions")
+      join2(home, ".claude", "projects"),
+      join2(home, ".claude", "sessions")
     ],
     codex,
     cursor: [
-      join(home, ".cursor", "projects"),
-      join(home, ".cursor", "chats"),
-      join(home, "Library", "Application Support", "Cursor", "User", "workspaceStorage"),
-      join(home, "AppData", "Roaming", "Cursor", "User", "workspaceStorage")
+      join2(home, ".cursor", "projects"),
+      join2(home, ".cursor", "chats"),
+      join2(home, "Library", "Application Support", "Cursor", "User", "workspaceStorage"),
+      join2(home, "AppData", "Roaming", "Cursor", "User", "workspaceStorage")
+    ],
+    grok: [
+      join2(home, ".grok", "sessions")
     ]
   };
 }
@@ -883,6 +1090,7 @@ async function discoverSessions(roots, signal) {
   await walk(roots.claude, "claude", found, signal);
   await walk(roots.codex, "codex", found, signal);
   await walk(roots.cursor, "cursor", found, signal);
+  await walk(roots.grok, "grok", found, signal);
   found.sort((left, right) => right.updatedAt - left.updatedAt || left.path.localeCompare(right.path));
   return found;
 }
@@ -903,12 +1111,20 @@ async function presentSessions(rows, options) {
   await mapLimit(slice, PREVIEW_CONCURRENCY, async (row, index) => {
     options.signal?.throwIfAborted();
     try {
-      entries[index] = enrichFromPreview(row, await read(row.path));
+      const preview = row.source === "grok" ? await readGrokPreview(row.path, read) : await read(row.path);
+      entries[index] = enrichFromPreview(row, preview);
     } catch {
       entries[index] = row;
     }
   });
   return { entries, total: filtered.length };
+}
+async function readGrokPreview(path, read) {
+  try {
+    return await read(join2(dirname2(path), "summary.json"));
+  } catch {
+    return read(path);
+  }
 }
 async function readPreview(path, maxBytes = PREVIEW_BYTES) {
   const handle = await open(path, "r");
@@ -938,7 +1154,7 @@ async function visit(path, source, found, depth, signal) {
   const files = [];
   const directories = [];
   for (const entry of entries) {
-    const full = join(path, entry.name);
+    const full = join2(path, entry.name);
     if (entry.isDirectory()) directories.push(full);
     else if (entry.isFile() && isSessionFile(source, entry.name)) files.push(full);
   }
@@ -980,6 +1196,7 @@ function isSessionFile(source, name2) {
   const lower = name2.toLowerCase();
   if (source === "claude") return lower.endsWith(".jsonl");
   if (source === "codex") return lower.endsWith(".jsonl") && (lower.startsWith("rollout-") || lower.includes("session"));
+  if (source === "grok") return lower === "updates.jsonl";
   return lower.endsWith(".jsonl") || lower.endsWith(".json") && /composer|transcript|chat|conversation/u.test(lower);
 }
 function nativeIdFromName(source, name2) {
@@ -1018,26 +1235,35 @@ function enrichFromPreview(row, text) {
     if (record.type === "user" && isRecord(record.message) && typeof record.message.content === "string" && title === row.title) {
       title = fallbackTitle(record.message.content);
     }
+    if (record.method === "session/update" && isRecord(record.params) && isRecord(record.params.update)) {
+      const update = record.params.update;
+      if (update.sessionUpdate === "user_message_chunk" && title === row.title) {
+        const content = isRecord(update.content) && typeof update.content.text === "string" ? update.content.text : "";
+        if (content.length > 0) title = fallbackTitle(content);
+      }
+    }
+    if (typeof record.generated_title === "string") title = record.generated_title;
+    if (isRecord(record.info) && typeof record.info.cwd === "string") cwd = record.info.cwd;
   }
   return { ...row, nativeId, title, cwd, createdAt };
 }
 
 // src/host/skills.ts
 import { mkdir, readFile as readFile2, writeFile } from "node:fs/promises";
-import { basename as basename2, dirname, join as join2 } from "node:path";
+import { basename as basename2, dirname as dirname3, join as join3 } from "node:path";
 import { homedir as homedir2 } from "node:os";
 function defaultSkillRoots(home = homedir2()) {
   return {
     claude: [
-      join2(home, ".claude", "skills"),
-      join2(home, ".claude", "commands")
+      join3(home, ".claude", "skills"),
+      join3(home, ".claude", "commands")
     ],
     codex: [
-      join2(home, ".codex", "skills")
+      join3(home, ".codex", "skills")
     ],
     cursor: [
-      join2(home, ".cursor", "skills"),
-      join2(home, ".cursor", "commands")
+      join3(home, ".cursor", "skills"),
+      join3(home, ".cursor", "commands")
     ]
   };
 }
@@ -1053,8 +1279,8 @@ async function discoverSkills(roots, signal) {
   return found;
 }
 async function copySkill(skill, targetRoot) {
-  const directory = join2(targetRoot, skill.name);
-  const target = join2(directory, "SKILL.md");
+  const directory = join3(targetRoot, skill.name);
+  const target = join3(directory, "SKILL.md");
   await mkdir(directory, { recursive: true });
   let overwritten = false;
   try {
@@ -1076,9 +1302,9 @@ async function visitSkillRoot(root, source, found) {
     return;
   }
   for (const entry of entries) {
-    const full = join2(root, entry.name);
+    const full = join3(root, entry.name);
     if (entry.isDirectory()) {
-      const skillFile = join2(full, "SKILL.md");
+      const skillFile = join3(full, "SKILL.md");
       try {
         const info = await stat3(skillFile);
         if (!info.isFile()) continue;
@@ -1104,7 +1330,7 @@ function parseSkillFile(text, source, path) {
   const front = match?.[1] ?? "";
   const body = (match?.[2] ?? text).trim();
   const fields = parseFrontmatter(front);
-  const fromFile = kebabName(path.endsWith("SKILL.md") ? basename2(dirname(path)) : basename2(path));
+  const fromFile = kebabName(path.endsWith("SKILL.md") ? basename2(dirname3(path)) : basename2(path));
   const name2 = kebabName(String(fields.name ?? "")) ?? fromFile;
   if (name2 === void 0) return void 0;
   const description = String(fields.description ?? firstHeading(body) ?? name2);
@@ -1152,7 +1378,7 @@ function firstHeading(body) {
 
 // src/host/compat.ts
 import { homedir as homedir3 } from "node:os";
-import { basename as basename3, dirname as dirname2, join as join3 } from "node:path";
+import { basename as basename3, dirname as dirname4, join as join4 } from "node:path";
 import { mkdir as mkdir2, readFile as readFile3, readdir as readdir2, stat as stat2, writeFile as writeFile2 } from "node:fs/promises";
 var WEEKDAY_TO_ISO = {
   MO: 1,
@@ -1165,10 +1391,10 @@ var WEEKDAY_TO_ISO = {
 };
 function defaultMemoryRoots(home = homedir3()) {
   return [
-    { source: "claude", kind: "agents", path: join3(home, ".claude", "CLAUDE.md"), name: "claude-claude-md" },
-    { source: "codex", kind: "agents", path: join3(home, ".codex", "AGENTS.md"), name: "codex-agents-md" },
-    { source: "codex", kind: "memory", path: join3(home, ".codex", "memories", "MEMORY.md"), name: "codex-memory" },
-    { source: "codex", kind: "memory", path: join3(home, ".codex", "memories", "memory_summary.md"), name: "codex-memory-summary" }
+    { source: "claude", kind: "agents", path: join4(home, ".claude", "CLAUDE.md"), name: "claude-claude-md" },
+    { source: "codex", kind: "agents", path: join4(home, ".codex", "AGENTS.md"), name: "codex-agents-md" },
+    { source: "codex", kind: "memory", path: join4(home, ".codex", "memories", "MEMORY.md"), name: "codex-memory" },
+    { source: "codex", kind: "memory", path: join4(home, ".codex", "memories", "memory_summary.md"), name: "codex-memory-summary" }
   ];
 }
 async function discoverMemories(home = homedir3()) {
@@ -1199,7 +1425,7 @@ async function discoverMemories(home = homedir3()) {
   return found;
 }
 async function importMemories(paths, home = homedir3()) {
-  const targetRoot = join3(home, ".dsh", "imported-memory");
+  const targetRoot = join4(home, ".dsh", "imported-memory");
   await mkdir2(targetRoot, { recursive: true });
   let copied = 0;
   let merged = 0;
@@ -1209,11 +1435,11 @@ async function importMemories(paths, home = homedir3()) {
   for (const row of selected) {
     try {
       const text = await readFile3(row.path, "utf8");
-      const dest = join3(targetRoot, `${row.name}.md`);
+      const dest = join4(targetRoot, `${row.name}.md`);
       await writeFile2(dest, ensureTrailingNewline(text), "utf8");
       copied += 1;
       if (row.kind === "agents") {
-        await mergeAgentsFile(join3(home, ".dsh", "AGENTS.md"), row.path, text);
+        await mergeAgentsFile(join4(home, ".dsh", "AGENTS.md"), row.path, text);
         merged += 1;
       }
     } catch (error) {
@@ -1223,7 +1449,7 @@ async function importMemories(paths, home = homedir3()) {
   return { copied, merged, failed };
 }
 async function discoverAutomations(home = homedir3()) {
-  const root = join3(home, ".codex", "automations");
+  const root = join4(home, ".codex", "automations");
   let entries;
   try {
     entries = await readdir2(root, { withFileTypes: true });
@@ -1233,7 +1459,7 @@ async function discoverAutomations(home = homedir3()) {
   const found = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const path = join3(root, entry.name, "automation.toml");
+    const path = join4(root, entry.name, "automation.toml");
     try {
       const text = await readFile3(path, "utf8");
       const parsed = parseAutomationToml(text, path);
@@ -1247,7 +1473,7 @@ async function discoverAutomations(home = homedir3()) {
 }
 function parseAutomationToml(text, path) {
   const fields = parseSimpleToml(text);
-  const nativeId = String(fields.id ?? basename3(dirname2(path)));
+  const nativeId = String(fields.id ?? basename3(dirname4(path)));
   const name2 = String(fields.name ?? nativeId);
   const prompt = String(fields.prompt ?? "");
   if (prompt.trim().length === 0) return void 0;
@@ -1331,7 +1557,7 @@ function ensureTrailingNewline(text) {
 `;
 }
 async function mergeAgentsFile(target, sourcePath, text) {
-  await mkdir2(dirname2(target), { recursive: true });
+  await mkdir2(dirname4(target), { recursive: true });
   let existing = "";
   try {
     existing = await readFile3(target, "utf8");
@@ -1385,7 +1611,7 @@ function apply(ctx, config = {}) {
     maxTextChars: config.maxTextChars ?? DEFAULT_CONVERT_LIMITS.maxTextChars
   };
   const maxFileBytes = config.maxFileBytes ?? 32 * 1024 * 1024;
-  const skillTarget = config.skillTarget ?? join4(homedir4(), ".dsh", "skills");
+  const skillTarget = config.skillTarget ?? join5(homedir4(), ".dsh", "skills");
   ctx.inject(["settings"], (settingsCtx) => {
     const settings = settingsCtx.get("settings");
     settings.register(SETTINGS_NS, z.object({
@@ -1445,9 +1671,9 @@ async function handleImportCommand(ctx, rawInput, runtime) {
       kind: "success",
       text: [
         "Import foreign agent conversations into this Harness.",
-        "/import list [claude|codex|cursor] \u2014 discover local sessions",
+        "/import list [claude|codex|cursor|grok] \u2014 discover local sessions",
         "/import all \u2014 import every discovered session into this workspace",
-        "/import claude|codex|cursor \u2014 import one store",
+        "/import claude|codex|cursor|grok \u2014 import one store",
         "/import skills \u2014 copy Claude/Codex/Cursor skills into ~/.dsh/skills",
         "/import memory \u2014 copy Claude/Codex instruction files into ~/.dsh/AGENTS.md",
         "/import automations \u2014 create DSH timers from ~/.codex/automations",
@@ -1533,7 +1759,7 @@ ${lines.join("\n")}${extra}` };
     }
     if (outcome.alreadyImported) skipped += 1;
     else imported += 1;
-    await warmProjection(ctx, outcome.converted.header.id);
+    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd);
   }
   const failed = failures.length === 0 ? "" : `
 Failed:
@@ -1550,7 +1776,8 @@ function rootsFor(source, includeArchived = false) {
   return {
     claude: source === "claude" ? roots.claude : [],
     codex: source === "codex" ? roots.codex : [],
-    cursor: source === "cursor" ? roots.cursor : []
+    cursor: source === "cursor" ? roots.cursor : [],
+    grok: source === "grok" ? roots.grok : []
   };
 }
 async function discoveredSessions(source, signal, includeArchived = false) {
@@ -1604,7 +1831,7 @@ async function importSessions(ctx, request, limits, maxFileBytes) {
     }
     if (outcome.alreadyImported) skipped += 1;
     else imported += 1;
-    await warmProjection(ctx, outcome.converted.header.id);
+    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd);
   }
   if (request.paths !== void 0) {
     for (const path of request.paths) {
@@ -1616,7 +1843,7 @@ async function importSessions(ctx, request, limits, maxFileBytes) {
         else {
           if (outcome.alreadyImported) skipped += 1;
           else imported += 1;
-          await warmProjection(ctx, outcome.converted.header.id);
+          await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd);
         }
       } catch (error) {
         failed.push({ path, message: error instanceof Error ? error.message : String(error) });
@@ -1655,7 +1882,7 @@ function looksLikePath(value) {
 }
 function expandHome(value) {
   if (value === "~") return homedir4();
-  if (value.startsWith("~/")) return join4(homedir4(), value.slice(2));
+  if (value.startsWith("~/")) return join5(homedir4(), value.slice(2));
   return value;
 }
 function requirePersistence(ctx) {
@@ -1737,11 +1964,25 @@ async function resolveWorkspaceId(registry, cwd, fallbackCwd) {
   }
   return registry.list?.()[0]?.id;
 }
+async function settleImported(ctx, id, cwd) {
+  await warmProjection(ctx, id);
+  await attachImported(ctx, id, cwd);
+}
 async function warmProjection(ctx, id) {
   const cache = ctx.get("sessionProjectionCache");
   if (cache?.coldSnapshot === void 0) return;
   try {
     await cache.coldSnapshot(id);
+  } catch {
+  }
+}
+async function attachImported(ctx, id, cwd) {
+  const registry = ctx.get("workspaceRegistry");
+  if (registry === void 0) return;
+  const target = cwd ?? workspaceCwdOf(ctx);
+  try {
+    const workspace = target !== void 0 && registry.resolveByPath !== void 0 ? await registry.resolveByPath(target) ?? (registry.create === void 0 ? void 0 : await registry.create(target)) : registry.list?.()[0];
+    await workspace?.attachSession?.(id);
   } catch {
   }
 }

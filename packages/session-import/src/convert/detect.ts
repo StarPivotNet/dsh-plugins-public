@@ -11,12 +11,14 @@ export function detectSource(path: string, text: string): ImportSource | undefin
   if (normalized.includes('/.cursor/') || normalized.includes('/User/workspaceStorage/') || normalized.includes('/Cursor/')) {
     return 'cursor'
   }
+  if (normalized.includes('/.grok/sessions/') || normalized.endsWith('/updates.jsonl')) return 'grok'
   const first = firstRecord(text)
   if (first === undefined) return undefined
   if (asString(first.sessionId) !== undefined && (first.type === 'user' || first.type === 'assistant' || first.type === 'mode')) {
     return 'claude'
   }
   if (first.type === 'session_meta' || first.type === 'response_item' || first.type === 'event_msg') return 'codex'
+  if (first.method === 'session/update') return 'grok'
   if (asString(first.composerId) !== undefined || asString(first.bubbleId) !== undefined) return 'cursor'
   if (Array.isArray(first.fullConversationHeadersOnly) || Array.isArray(first.bubbles)) return 'cursor'
   return undefined

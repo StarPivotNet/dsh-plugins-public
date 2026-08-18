@@ -41,6 +41,7 @@ Slash commands:
 | Claude Code | `~/.claude/projects/**/*.jsonl`, `~/.claude/sessions/**/*.jsonl` | `~/.claude/skills`, `~/.claude/commands` |
 | Codex | `~/.codex/sessions/**/rollout-*.jsonl`, `~/.codex/archived_sessions` | `~/.codex/skills` |
 | Cursor | `~/.cursor/projects`, `~/.cursor/chats`, Cursor `workspaceStorage` composer / transcript JSON | `~/.cursor/skills`, `~/.cursor/commands` |
+| Grok Build | `~/.grok/sessions/<cwd>/<id>/updates.jsonl` | bundled skills stay in Grok |
 
 The Settings page lists the newest 300 conversations and only reads the first 64 KiB of each file for title and cwd. It scans Claude, Codex, and Cursor one store at a time so the first matches appear before the slower stores finish. `/import list` does the same walk and prints the newest 40. Codex `archived_sessions` is skipped unless you pass `--archived`. Filter by title or path to reach older conversations; `/import all` still imports every discovered active-store file that fits `maxFileBytes`.
 

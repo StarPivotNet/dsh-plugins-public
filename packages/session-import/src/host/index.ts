@@ -120,9 +120,9 @@ async function handleImportCommand(
       kind: 'success',
       text: [
         'Import foreign agent conversations into this Harness.',
-        '/import list [claude|codex|cursor] — discover local sessions',
+        '/import list [claude|codex|cursor|grok] — discover local sessions',
         '/import all — import every discovered session into this workspace',
-        '/import claude|codex|cursor — import one store',
+        '/import claude|codex|cursor|grok — import one store',
         '/import skills — copy Claude/Codex/Cursor skills into ~/.dsh/skills',
         '/import memory — copy Claude/Codex instruction files into ~/.dsh/AGENTS.md',
         '/import automations — create DSH timers from ~/.codex/automations',
@@ -212,7 +212,7 @@ async function handleImportCommand(
     }
     if (outcome.alreadyImported) skipped += 1
     else imported += 1
-    await warmProjection(ctx, outcome.converted.header.id)
+    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd)
   }
   const failed = failures.length === 0 ? '' : `\nFailed:\n${failures.slice(0, 8).join('\n')}`
   return {
@@ -230,6 +230,7 @@ function rootsFor(source: ImportSource | undefined, includeArchived = false) {
     claude: source === 'claude' ? roots.claude : [],
     codex: source === 'codex' ? roots.codex : [],
     cursor: source === 'cursor' ? roots.cursor : [],
+    grok: source === 'grok' ? roots.grok : [],
   }
 }
 
@@ -312,7 +313,7 @@ async function importSessions(
     }
     if (outcome.alreadyImported) skipped += 1
     else imported += 1
-    await warmProjection(ctx, outcome.converted.header.id)
+    await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd)
   }
   if (request.paths !== undefined) {
     for (const path of request.paths) {
@@ -324,7 +325,7 @@ async function importSessions(
         else {
           if (outcome.alreadyImported) skipped += 1
           else imported += 1
-          await warmProjection(ctx, outcome.converted.header.id)
+          await settleImported(ctx, outcome.converted.header.id, outcome.converted.header.cwd)
         }
       } catch (error) {
         failed.push({ path, message: error instanceof Error ? error.message : String(error) })
@@ -503,6 +504,11 @@ async function resolveWorkspaceId(
   return registry.list?.()[0]?.id
 }
 
+async function settleImported(ctx: Context, id: string, cwd: string | undefined): Promise<void> {
+  await warmProjection(ctx, id)
+  await attachImported(ctx, id, cwd)
+}
+
 async function warmProjection(ctx: Context, id: string): Promise<void> {
   const cache = ctx.get('sessionProjectionCache') as { coldSnapshot?: (sessionId: string) => Promise<unknown> } | undefined
   if (cache?.coldSnapshot === undefined) return
@@ -510,5 +516,23 @@ async function warmProjection(ctx: Context, id: string): Promise<void> {
     await cache.coldSnapshot(id)
   } catch {
     // Listing can still probe the log; a missing title row is recoverable.
+  }
+}
+
+async function attachImported(ctx: Context, id: string, cwd: string | undefined): Promise<void> {
+  const registry = ctx.get('workspaceRegistry') as {
+    resolveByPath?: (path: string) => Promise<{ attachSession?: (sessionId: string) => Promise<void> } | undefined>
+    create?: (path: string) => Promise<{ attachSession?: (sessionId: string) => Promise<void> }>
+    list?: () => readonly { path?: string; attachSession?: (sessionId: string) => Promise<void> }[]
+  } | undefined
+  if (registry === undefined) return
+  const target = cwd ?? workspaceCwdOf(ctx)
+  try {
+    const workspace = target !== undefined && registry.resolveByPath !== undefined
+      ? await registry.resolveByPath(target) ?? (registry.create === undefined ? undefined : await registry.create(target))
+      : registry.list?.()[0]
+    await workspace?.attachSession?.(id)
+  } catch {
+    // The session remains openable from Ungrouped if workspace membership fails.
   }
 }

@@ -1,7 +1,7 @@
 /** Discover foreign sessions and skills on the local filesystem. */
 
 import { homedir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { open, readdir, stat } from 'node:fs/promises'
 import { fallbackTitle, isRecord } from '../convert/text.ts'
 import type { DiscoveredSession, ImportSource } from '../convert/types.ts'
@@ -26,6 +26,7 @@ export interface ScanRoots {
   readonly claude: readonly string[]
   readonly codex: readonly string[]
   readonly cursor: readonly string[]
+  readonly grok: readonly string[]
 }
 
 /** Options for turning a discovered walk into a Settings or `/import list` page. */
@@ -53,6 +54,9 @@ export function defaultScanRoots(home = homedir(), includeArchived = false): Sca
       join(home, 'Library', 'Application Support', 'Cursor', 'User', 'workspaceStorage'),
       join(home, 'AppData', 'Roaming', 'Cursor', 'User', 'workspaceStorage'),
     ],
+    grok: [
+      join(home, '.grok', 'sessions'),
+    ],
   }
 }
 
@@ -62,6 +66,7 @@ export async function discoverSessions(roots: ScanRoots, signal?: AbortSignal): 
   await walk(roots.claude, 'claude', found, signal)
   await walk(roots.codex, 'codex', found, signal)
   await walk(roots.cursor, 'cursor', found, signal)
+  await walk(roots.grok, 'grok', found, signal)
   found.sort((left, right) => right.updatedAt - left.updatedAt || left.path.localeCompare(right.path))
   return found
 }
@@ -97,12 +102,23 @@ export async function presentSessions(
   await mapLimit(slice, PREVIEW_CONCURRENCY, async (row, index) => {
     options.signal?.throwIfAborted()
     try {
-      entries[index] = enrichFromPreview(row, await read(row.path))
+      const preview = row.source === 'grok'
+        ? await readGrokPreview(row.path, read)
+        : await read(row.path)
+      entries[index] = enrichFromPreview(row, preview)
     } catch {
       entries[index] = row
     }
   })
   return { entries, total: filtered.length }
+}
+
+async function readGrokPreview(
+  path: string,
+  read: (path: string) => Promise<string>,
+): Promise<string> {
+  try { return await read(join(dirname(path), 'summary.json')) }
+  catch { return read(path) }
 }
 
 /** Read only the head of a conversation file for title and cwd. */
@@ -193,6 +209,7 @@ export function isSessionFile(source: ImportSource, name: string): boolean {
   const lower = name.toLowerCase()
   if (source === 'claude') return lower.endsWith('.jsonl')
   if (source === 'codex') return lower.endsWith('.jsonl') && (lower.startsWith('rollout-') || lower.includes('session'))
+  if (source === 'grok') return lower === 'updates.jsonl'
   return lower.endsWith('.jsonl') || (lower.endsWith('.json') && /composer|transcript|chat|conversation/u.test(lower))
 }
 
@@ -232,6 +249,15 @@ export function enrichFromPreview(row: DiscoveredSession, text: string): Discove
     if (record.type === 'user' && isRecord(record.message) && typeof record.message.content === 'string' && title === row.title) {
       title = fallbackTitle(record.message.content)
     }
+    if (record.method === 'session/update' && isRecord(record.params) && isRecord(record.params.update)) {
+      const update = record.params.update
+      if (update.sessionUpdate === 'user_message_chunk' && title === row.title) {
+        const content = isRecord(update.content) && typeof update.content.text === 'string' ? update.content.text : ''
+        if (content.length > 0) title = fallbackTitle(content)
+      }
+    }
+    if (typeof record.generated_title === 'string') title = record.generated_title
+    if (isRecord(record.info) && typeof record.info.cwd === 'string') cwd = record.info.cwd
   }
   return { ...row, nativeId, title, cwd, createdAt }
 }

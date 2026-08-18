@@ -11,7 +11,7 @@ export type ImportCommand =
   | { readonly kind: 'memory' }
   | { readonly kind: 'automations' }
 
-const SOURCES = new Set<ImportSource>(['claude', 'codex', 'cursor'])
+const SOURCES = new Set<ImportSource>(['claude', 'codex', 'cursor', 'grok'])
 
 /** Parse the free-form text after `/import`. */
 export function parseImportArgs(rawInput: string): ImportCommand {

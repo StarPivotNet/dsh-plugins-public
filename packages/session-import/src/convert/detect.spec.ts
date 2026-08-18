@@ -15,3 +15,8 @@ test('detects Codex by rollout path and session_meta', () => {
 test('detects Cursor by composer fields', () => {
   assert.equal(detectSource('/tmp/x.json', '{"composerId":"c1","conversation":[]}'), 'cursor')
 })
+
+test('detects Grok Build by path and ACP updates', () => {
+  assert.equal(detectSource('/Users/a/.grok/sessions/%2Ftmp/01abc/updates.jsonl', '{}'), 'grok')
+  assert.equal(detectSource('/tmp/updates.jsonl', '{"method":"session/update","params":{}}'), 'grok')
+})

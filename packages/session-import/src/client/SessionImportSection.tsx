@@ -6,7 +6,7 @@ import type { SessionImportKey } from './locales.ts'
 import css from './SessionImportSection.module.css'
 
 export interface SessionImportRow {
-  readonly source: 'claude' | 'codex' | 'cursor'
+  readonly source: 'claude' | 'codex' | 'cursor' | 'grok'
   readonly nativeId: string
   readonly path: string
   readonly title: string
@@ -17,7 +17,7 @@ export interface SessionImportRow {
 }
 
 export interface SessionImportSkill {
-  readonly source: 'claude' | 'codex' | 'cursor'
+  readonly source: 'claude' | 'codex' | 'cursor' | 'grok'
   readonly name: string
   readonly description: string
   readonly path: string
@@ -55,7 +55,7 @@ export interface SessionImportSectionInjected {
   importAutomations: (paths: readonly string[]) => Promise<{ imported: number; skipped: number; unsupported: number; failed: readonly { path: string; message: string }[] }>
 }
 
-const SESSION_SOURCES: readonly SessionImportRow['source'][] = ['claude', 'codex', 'cursor']
+const SESSION_SOURCES: readonly SessionImportRow['source'][] = ['claude', 'codex', 'cursor', 'grok']
 type ImportTab = 'sessions' | 'skills' | 'memory' | 'automations'
 
 export type SessionImportSectionProps =
@@ -195,6 +195,7 @@ export function SessionImportSection(props: SessionImportSectionProps): ReactNod
               <option value="claude">{t('sourceClaude')}</option>
               <option value="codex">{t('sourceCodex')}</option>
               <option value="cursor">{t('sourceCursor')}</option>
+              <option value="grok">{t('sourceGrok')}</option>
             </select>
           </label>
         ) : null}

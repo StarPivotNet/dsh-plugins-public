@@ -4,7 +4,7 @@
  * The captain (the agent that created the team) orchestrates: members are
  * continuable subagents it spawns and wakes. Members share the same tools and
  * drive their own task state, mirroring the Claude Code AgentTeams flow:
- * create team → add members → create tasks with dependencies → claim/assign →
+ * create team → add members (first claimed task) → later tasks with returned ids → claim/assign →
  * work → report → status → delete.
  * @module dsh-agent-teams/tools
  */

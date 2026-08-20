@@ -10,7 +10,7 @@
  */
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { memberActivity } from "./members.js";
+import { turnActivityOf } from "./members.js";
 import { CAPTAIN_KEY, listArchivedTeamIds, readArchivedTeam, readMailbox, readTeam, taskDepthsById, taskVisualState, } from "./state.js";
 /** The current task of a member: its first unfinished owned task. */
 function currentTaskOf(memberName, tasks) {
@@ -31,12 +31,10 @@ function currentTaskOf(memberName, tasks) {
 export async function assembleTeamSnapshot(ctx, stateRoot, workspace, state) {
     const tasks = state.tasks;
     const depths = taskDepthsById(tasks);
-    let activity = new Map();
-    try {
-        activity = await memberActivity(ctx, state.captainSessionId);
-    }
-    catch (error) {
-        ctx.logger.warn(`agent-teams: activity listing failed for ${state.name}: ${String(error)}`);
+    const activity = new Map();
+    for (const member of state.members) {
+        if (member.id !== '')
+            activity.set(member.id, turnActivityOf(ctx, member.id));
     }
     const unreadByMember = new Map();
     for (const member of state.members.filter((candidate) => candidate.status !== 'removed')) {

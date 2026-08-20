@@ -19,6 +19,18 @@ export interface RelationshipStage<T extends RelationshipTask> {
  * its local open state is being reset.
  */
 export declare function activityPanelExpandedForSession(open: boolean, owner: string | undefined, current: string | undefined): boolean;
+/** Bound for one browser snapshot fetch. */
+export declare const STATE_FETCH_TIMEOUT_MS = 2500;
+/**
+ * Fetch JSON with an abort timeout. A hung host must not freeze the card
+ * on its empty fold.
+ * @param url - snapshot URL.
+ * @param timeoutMs - abort after this many milliseconds.
+ */
+export declare function fetchJsonWithTimeout(url: string, timeoutMs?: number): Promise<{
+    ok: boolean;
+    json: unknown;
+}>;
 /** Group tasks by their precomputed dependency depth. */
 export declare function taskStages<T extends RelationshipTask>(tasks: readonly T[]): readonly RelationshipStage<T>[];
 /**

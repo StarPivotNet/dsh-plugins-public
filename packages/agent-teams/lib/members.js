@@ -405,10 +405,11 @@ export function turnActivityOf(ctx, childId) {
  * `inactive`.
  * @param ctx - the plugin context (injects `subagents` and `agents`).
  * @param captainSessionId - the captain's session id.
+ * @param signal - optional abort forwarded to `listChildren`.
  * @returns child id → activity, missing entries are unknown children.
  */
-export async function memberActivity(ctx, captainSessionId) {
-    const entries = await ctx.subagents.listChildren(brandedSessionId(captainSessionId));
+export async function memberActivity(ctx, captainSessionId, signal) {
+    const entries = await ctx.subagents.listChildren(brandedSessionId(captainSessionId), signal);
     const activity = new Map();
     for (const entry of entries) {
         if (entry.kind === 'child')

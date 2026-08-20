@@ -11,6 +11,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  * @module dsh-agent-teams/client/card
  */
 import { useEffect, useMemo, useState } from 'react';
+import { fetchJsonWithTimeout } from "./activity-model.js";
 import { LEAD_ART, memberArtUrl } from "./artwork.js";
 import css from './AgentTeamsCard.module.css';
 /** Window event name the floater listens for to open itself. */
@@ -38,12 +39,12 @@ export function AgentTeamsCard({ node, openSession, currentSessionId }) {
         const tick = async () => {
             for (const url of ['/plugins/dsh-agent-teams/state', '/plugins/dsh-agent-teams/state?archived=1']) {
                 try {
-                    const response = await fetch(url, { cache: 'no-store' });
-                    if (!response.ok)
+                    const { ok, json } = await fetchJsonWithTimeout(url);
+                    if (!ok || typeof json !== 'object' || json === null || !('teams' in json))
                         continue;
-                    const body = (await response.json());
-                    const found = Array.isArray(body.teams)
-                        ? body.teams.find((team) => team.teamId === data.teamId && (owner === '' || team.captainSessionId === owner))
+                    const teams = json.teams;
+                    const found = Array.isArray(teams)
+                        ? teams.find((team) => team.teamId === data.teamId && (owner === '' || team.captainSessionId === owner))
                         : undefined;
                     if (found !== undefined) {
                         if (!cancelled)
@@ -52,7 +53,7 @@ export function AgentTeamsCard({ node, openSession, currentSessionId }) {
                     }
                 }
                 catch {
-                    // Host restarting; retry on the next poll.
+                    // Host restarting or timed out; keep the folded roster.
                 }
             }
         };

@@ -18,7 +18,7 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { IconBranchOutline16, IconChevronRightOutline14, IconCloseOutline16, StateDot, } from '@deepseek-ai/dsh-client-ui-primitives';
-import { activityPanelExpandedForSession, relatedTaskIds, taskStages } from "./activity-model.js";
+import { activityPanelExpandedForSession, fetchJsonWithTimeout, relatedTaskIds, taskStages } from "./activity-model.js";
 import { ACTION_ART, LEAD_ART, memberArtUrl } from "./artwork.js";
 import { OPEN_PANEL_EVENT } from "./AgentTeamsCard.js";
 import css from './ActivityPanel.module.css';
@@ -222,19 +222,17 @@ export function ActivityPanel({ sessionsList, openSession }) {
                 return;
             inFlight = true;
             try {
-                const [liveResponse, archivedResponse] = await Promise.all([
-                    fetch(STATE_URL, { cache: 'no-store' }),
-                    fetch(`${STATE_URL}?archived=1`, { cache: 'no-store' }),
+                const [live, archived] = await Promise.all([
+                    fetchJsonWithTimeout(STATE_URL),
+                    fetchJsonWithTimeout(`${STATE_URL}?archived=1`),
                 ]);
-                if (liveResponse.ok) {
-                    const body = (await liveResponse.json());
-                    if (!cancelled && Array.isArray(body.teams))
-                        setTeams(body.teams);
+                if (live.ok && typeof live.json === 'object' && live.json !== null && 'teams' in live.json
+                    && Array.isArray(live.json.teams) && !cancelled) {
+                    setTeams(live.json.teams);
                 }
-                if (archivedResponse.ok) {
-                    const body = (await archivedResponse.json());
-                    if (!cancelled && Array.isArray(body.teams))
-                        setArchivedTeams(body.teams);
+                if (archived.ok && typeof archived.json === 'object' && archived.json !== null && 'teams' in archived.json
+                    && Array.isArray(archived.json.teams) && !cancelled) {
+                    setArchivedTeams(archived.json.teams);
                 }
             }
             catch {

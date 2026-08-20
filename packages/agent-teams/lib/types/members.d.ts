@@ -157,6 +157,7 @@ export declare function turnActivityOf(ctx: Context, childId: string): 'running'
  * `inactive`.
  * @param ctx - the plugin context (injects `subagents` and `agents`).
  * @param captainSessionId - the captain's session id.
+ * @param signal - optional abort forwarded to `listChildren`.
  * @returns child id → activity, missing entries are unknown children.
  */
-export declare function memberActivity(ctx: Context, captainSessionId: string): Promise<Map<string, 'running' | 'inactive'>>;
+export declare function memberActivity(ctx: Context, captainSessionId: string, signal?: AbortSignal): Promise<Map<string, 'running' | 'inactive'>>;

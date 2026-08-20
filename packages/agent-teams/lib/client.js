@@ -21,6 +21,36 @@ window.__ModuleLoader__.load({
 		function activityPanelExpandedForSession(open, owner, current) {
 			return open && owner !== void 0 && owner === current;
 		}
+		/** Bound for one browser snapshot fetch. */
+		const STATE_FETCH_TIMEOUT_MS = 2500;
+		/**
+		* Fetch JSON with an abort timeout. A hung host must not freeze the card
+		* on its empty fold.
+		* @param url - snapshot URL.
+		* @param timeoutMs - abort after this many milliseconds.
+		*/
+		async function fetchJsonWithTimeout(url, timeoutMs = STATE_FETCH_TIMEOUT_MS) {
+			const controller = new AbortController();
+			const timer = setTimeout(() => {
+				controller.abort();
+			}, timeoutMs);
+			try {
+				const response = await fetch(url, {
+					cache: "no-store",
+					signal: controller.signal
+				});
+				if (!response.ok) return {
+					ok: false,
+					json: void 0
+				};
+				return {
+					ok: true,
+					json: await response.json()
+				};
+			} finally {
+				clearTimeout(timer);
+			}
+		}
 		/** Group tasks by their precomputed dependency depth. */
 		function taskStages(tasks) {
 			const byDepth = /* @__PURE__ */ new Map();
@@ -168,10 +198,10 @@ window.__ModuleLoader__.load({
 				let cancelled = false;
 				const tick = async () => {
 					for (const url of ["/plugins/dsh-agent-teams/state", "/plugins/dsh-agent-teams/state?archived=1"]) try {
-						const response = await fetch(url, { cache: "no-store" });
-						if (!response.ok) continue;
-						const body = await response.json();
-						const found = Array.isArray(body.teams) ? body.teams.find((team) => team.teamId === data.teamId && (owner === "" || team.captainSessionId === owner)) : void 0;
+						const { ok, json } = await fetchJsonWithTimeout(url);
+						if (!ok || typeof json !== "object" || json === null || !("teams" in json)) continue;
+						const teams = json.teams;
+						const found = Array.isArray(teams) ? teams.find((team) => team.teamId === data.teamId && (owner === "" || team.captainSessionId === owner)) : void 0;
 						if (found !== void 0) {
 							if (!cancelled) setSnapshot(found);
 							return;
@@ -888,15 +918,9 @@ window.__ModuleLoader__.load({
 					if (inFlight || cancelled) return;
 					inFlight = true;
 					try {
-						const [liveResponse, archivedResponse] = await Promise.all([fetch(STATE_URL, { cache: "no-store" }), fetch(`${STATE_URL}?archived=1`, { cache: "no-store" })]);
-						if (liveResponse.ok) {
-							const body = await liveResponse.json();
-							if (!cancelled && Array.isArray(body.teams)) setTeams(body.teams);
-						}
-						if (archivedResponse.ok) {
-							const body = await archivedResponse.json();
-							if (!cancelled && Array.isArray(body.teams)) setArchivedTeams(body.teams);
-						}
+						const [live, archived] = await Promise.all([fetchJsonWithTimeout(STATE_URL), fetchJsonWithTimeout(`${STATE_URL}?archived=1`)]);
+						if (live.ok && typeof live.json === "object" && live.json !== null && "teams" in live.json && Array.isArray(live.json.teams) && !cancelled) setTeams(live.json.teams);
+						if (archived.ok && typeof archived.json === "object" && archived.json !== null && "teams" in archived.json && Array.isArray(archived.json.teams) && !cancelled) setArchivedTeams(archived.json.teams);
 					} catch {} finally {
 						inFlight = false;
 					}
@@ -1083,6 +1107,74 @@ window.__ModuleLoader__.load({
 			})] });
 		}
 		//#endregion
+		//#region lib/card-meta.js
+		/**
+		* Durable `tool/result.meta` for the in-conversation team card.
+		*
+		* The card folds first-party tool events. These records carry the team id and
+		* roster so add/remove updates join the create Context after replay, without
+		* waiting on the live snapshot route.
+		* @module dsh-agent-teams/card-meta
+		*/
+		/** Narrow a persisted tool/result meta payload to a card update. */
+		function parseAgentTeamsToolMeta(value) {
+			if (typeof value !== "object" || value === null || !("kind" in value) || !("teamId" in value)) return;
+			const teamId = value.teamId;
+			if (typeof teamId !== "string" || teamId === "") return void 0;
+			if (value.kind === "create") {
+				if (!("teamName" in value) || typeof value.teamName !== "string") return void 0;
+				if (!("captainSessionId" in value) || typeof value.captainSessionId !== "string") return void 0;
+				const members = "members" in value ? parseMembers(value.members) : [];
+				if (members === void 0) return void 0;
+				return {
+					kind: "create",
+					teamId,
+					teamName: value.teamName,
+					captainSessionId: value.captainSessionId,
+					members
+				};
+			}
+			if (value.kind === "add-member") {
+				if (!("member" in value)) return void 0;
+				const member = parseMember(value.member);
+				if (member === void 0) return void 0;
+				return {
+					kind: "add-member",
+					teamId,
+					member
+				};
+			}
+			if (value.kind === "remove-member") {
+				if (!("name" in value) || typeof value.name !== "string" || value.name === "") return void 0;
+				return {
+					kind: "remove-member",
+					teamId,
+					name: value.name
+				};
+			}
+		}
+		function parseMembers(value) {
+			if (!Array.isArray(value)) return void 0;
+			const members = [];
+			for (const entry of value) {
+				const member = parseMember(entry);
+				if (member === void 0) return void 0;
+				members.push(member);
+			}
+			return members;
+		}
+		function parseMember(value) {
+			if (typeof value !== "object" || value === null) return void 0;
+			if (!("id" in value) || typeof value.id !== "string") return void 0;
+			if (!("name" in value) || typeof value.name !== "string" || value.name === "") return void 0;
+			const role = "role" in value && typeof value.role === "string" ? value.role : "";
+			return {
+				id: value.id,
+				name: value.name,
+				role
+			};
+		}
+		//#endregion
 		//#region lib/client/agent-teams-card-definition.js
 		/**
 		* AgentTeams conversation card: a lightweight in-conversation summary shown
@@ -1091,11 +1183,17 @@ window.__ModuleLoader__.load({
 		* panel (useful after the floater was closed, or when re-opening an old
 		* session for review).
 		*
-		* The fold anchors to the Harness's durable `tool/call` + `tool/result`
-		* records for `agent_teams_create`. Those are first-party session events, so
-		* the card survives restarts without writing an out-of-repo event type.
+		* The fold anchors to first-party `tool/call` + `tool/result` records for
+		* create, add_member, and remove_member. Create opens the Context; later
+		* member tools update the same team id through `tool/result.meta`. Those
+		* events survive restarts without writing an out-of-repo event type.
 		* @module dsh-agent-teams/client/card
 		*/
+		/** Fold a team display name the same way the host does for typical ids. */
+		function foldTeamId(name) {
+			const cleaned = name.normalize("NFC").trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
+			return cleaned === "" ? "team" : cleaned;
+		}
 		/** Parse the only create-call fields the historic card owns. */
 		function parseAgentTeamsCreateArgs(value) {
 			try {
@@ -1103,29 +1201,83 @@ window.__ModuleLoader__.load({
 				if (typeof parsed !== "object" || parsed === null || !("name" in parsed) || typeof parsed.name !== "string") return;
 				const name = parsed.name.trim();
 				if (name === "") return void 0;
-				const cleaned = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 				return {
-					teamId: cleaned === "" ? "team" : cleaned,
+					teamId: foldTeamId(name),
 					name
 				};
 			} catch {
 				return;
 			}
 		}
+		/** Read the durable team id from a create tool result (meta first, then render text). */
+		function parseCreateResultTeamId(event) {
+			const meta = parseAgentTeamsToolMeta(event.data.meta);
+			if (meta?.kind === "create") return meta.teamId;
+			const text = resultText(event.data.message.content);
+			return /created \(id ([^)]+)\)/.exec(text)?.[1];
+		}
+		function resultText(content) {
+			const parts = [];
+			for (const block of content) {
+				if (typeof block !== "object" || block === null || !("type" in block)) continue;
+				if (block.type === "text" && "text" in block && typeof block.text === "string") {
+					parts.push(block.text);
+					continue;
+				}
+				if (block.type !== "tool-result" || !("content" in block) || !Array.isArray(block.content)) continue;
+				for (const inner of block.content) if (typeof inner === "object" && inner !== null && "type" in inner && inner.type === "text" && "text" in inner && typeof inner.text === "string") parts.push(inner.text);
+			}
+			return parts.join("\n");
+		}
+		function applyMemberMeta(state, meta) {
+			if (meta === void 0 || meta.teamId !== state.teamId) return state;
+			if (meta.kind === "create") return {
+				...state,
+				name: meta.teamName,
+				captainSessionId: meta.captainSessionId,
+				members: meta.members,
+				accepted: true
+			};
+			if (meta.kind === "add-member") {
+				const without = state.members.filter((member) => member.name !== meta.member.name);
+				return {
+					...state,
+					accepted: true,
+					members: [...without, meta.member]
+				};
+			}
+			return {
+				...state,
+				accepted: true,
+				members: state.members.filter((member) => member.name !== meta.name)
+			};
+		}
+		function toolResultFailed(event) {
+			return event.data.error !== void 0 || event.data.message.content.some((block) => block.type === "tool-result" && block.isError === true);
+		}
 		/** Durable first-party tool events folded into one keyed Chat node. */
 		const agentTeamsCardDefinition = {
 			kind: "agent-teams",
 			target: "chat",
 			match: (event) => {
-				if (event.type === "tool/call" && event.data.name === "agent_teams_create") return parseAgentTeamsCreateArgs(event.data.arguments) === void 0 ? null : {
-					id: String(event.data.callId),
-					role: "start"
-				};
-				if (event.type === "tool/result" && event.data.message.source.kind === "tool") return {
-					id: String(event.data.message.source.callId),
+				if (event.type === "tool/call" && event.data.name === "agent_teams_create") {
+					const parsed = parseAgentTeamsCreateArgs(event.data.arguments);
+					return parsed === void 0 ? null : {
+						id: parsed.teamId,
+						role: "start"
+					};
+				}
+				if (event.type !== "tool/result" || event.data.message.source.kind !== "tool") return null;
+				const meta = parseAgentTeamsToolMeta(event.data.meta);
+				if (meta !== void 0) return {
+					id: meta.teamId,
 					role: "update"
 				};
-				return null;
+				const createdId = parseCreateResultTeamId(event);
+				return createdId === void 0 ? null : {
+					id: createdId,
+					role: "update"
+				};
 			},
 			start: (_context, match) => {
 				if (match.event.type !== "tool/call") throw new Error("agent-teams card start requires agent_teams_create tool/call");
@@ -1133,12 +1285,16 @@ window.__ModuleLoader__.load({
 				if (parsed === void 0) throw new Error("agent-teams card start requires valid create arguments");
 				return {
 					...parsed,
+					captainSessionId: "",
+					members: [],
 					accepted: false
 				};
 			},
 			update: (context, match) => {
 				if (match.event.type !== "tool/result") return context.state;
-				if (match.event.data.error !== void 0 || match.event.data.message.content.some((block) => block.type === "tool-result" && block.isError === true)) return context.state;
+				if (toolResultFailed(match.event)) return context.state;
+				const meta = parseAgentTeamsToolMeta(match.event.data.meta);
+				if (meta !== void 0) return applyMemberMeta(context.state, meta);
 				return {
 					...context.state,
 					accepted: true
@@ -1158,9 +1314,9 @@ window.__ModuleLoader__.load({
 					visibility: "visible",
 					data: {
 						teamId: state.teamId,
-						captainSessionId: "",
+						captainSessionId: state.captainSessionId,
 						teamName: state.name,
-						members: []
+						members: state.members
 					}
 				};
 			}

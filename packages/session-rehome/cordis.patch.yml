@@ -1,0 +1,6 @@
+# Install with:
+#   dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:packages/session-rehome
+# then restart dsh web.
+- insert:
+    - id: session-rehome
+      name: '@starpivot/dsh-session-rehome'

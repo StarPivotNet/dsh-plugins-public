@@ -14,6 +14,7 @@ packages/
   model-capabilities/   @starpivot/dsh-model-capabilities
   blank-session-gc/     @starpivot/dsh-blank-session-gc
   busy-enter-steer/     @starpivot/dsh-busy-enter-steer
+  session-rehome/       @starpivot/dsh-session-rehome
   agent-teams/          @starpivot/dsh-agent-teams
 ```
 

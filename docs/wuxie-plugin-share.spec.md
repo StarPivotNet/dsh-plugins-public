@@ -2,7 +2,7 @@
 
 ## Goal
 
-把本机 6 个自写插件做成组织公开仓里的可安装 bundle，别人能用 git path 自选安装。本机个人仓和 copy-deploy 继续只服务这台机器。
+把本机自写插件做成组织公开仓里的可安装 bundle，别人能用 git path 自选安装。本机个人仓和 copy-deploy 继续只服务这台机器。
 
 ## Scenario
 
@@ -23,6 +23,7 @@ dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:package
 | `packages/model-capabilities` | `@starpivot/dsh-model-capabilities` | 原创 |
 | `packages/blank-session-gc` | `@starpivot/dsh-blank-session-gc` | 原创 |
 | `packages/busy-enter-steer` | `@starpivot/dsh-busy-enter-steer` | 原创 |
+| `packages/session-rehome` | `@starpivot/dsh-session-rehome` | 原创 |
 | `packages/agent-teams` | `@starpivot/dsh-agent-teams` | fork，按 better-sidebar 解耦 |
 
 每个包必须：
@@ -33,6 +34,8 @@ dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:package
 - `repository` 指向本仓对应 `packages/<name>`
 - 带 README，写清行为和 git 安装命令
 - fork 包另有 `UPSTREAM.md`（来源仓 + 钉死提交 + 许可证），保留原 LICENSE，去掉活 rebase 工作流
+
+本轮：新增 `session-rehome`；刷新 `agent-teams` 到本机 fork 当前源码，组织身份字段不变。
 
 ## Non-goals
 
@@ -53,12 +56,12 @@ dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:package
 
 ## Acceptance
 
-- `packages/` 下能看到上表 6 个目录
+- `packages/` 下列出上表目录，含 `session-rehome`
 - 每个 `package.json` 能被 `dsh plugin add github:StarPivotNet/dsh-plugins-public#path:packages/<name>` 识别为 bundle
-- 根 README / AGENTS 列出这 6 个包和安装命令
-- `agent-teams` 组织拷贝不再把 NanmiCoder 当活上游
+- 根 README / AGENTS 列出这些包和 git 安装命令
+- `agent-teams` 组织拷贝不再把 NanmiCoder 当活上游；`lib/client.js` 以 `@starpivot/dsh-agent-teams` 注册
 - 推到 `StarPivotNet/dsh-plugins-public` 的 `main`
-- 本机 6 个个人仓 `git status` 仍干净、remote 未改
+- 本机个人仓 `git status` 仍干净、remote 未改
 
 ## Settled decisions
 
@@ -66,3 +69,4 @@ dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:package
 - 组织包名全部 `@starpivot/dsh-*`
 - 先 git 安装，后发 npm
 - kanban 不上
+- 本轮只加 session-rehome、刷新 agent-teams

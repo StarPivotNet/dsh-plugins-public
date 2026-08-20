@@ -12,6 +12,7 @@ Public out-of-tree DeepSeek Harness plugins. One installable plugin per director
 | [`packages/model-capabilities`](packages/model-capabilities) | `@starpivot/dsh-model-capabilities` | Fill missing llm-pi-ai model capability fields |
 | [`packages/blank-session-gc`](packages/blank-session-gc) | `@starpivot/dsh-blank-session-gc` | Keep one unused blank conversation |
 | [`packages/busy-enter-steer`](packages/busy-enter-steer) | `@starpivot/dsh-busy-enter-steer` | Default busy Enter to steer |
+| [`packages/session-rehome`](packages/session-rehome) | `@starpivot/dsh-session-rehome` | Rehome the current conversation to an existing project |
 | [`packages/agent-teams`](packages/agent-teams) | `@starpivot/dsh-agent-teams` | Multi-agent team orchestration |
 
 ## Install

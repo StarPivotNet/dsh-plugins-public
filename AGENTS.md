@@ -16,6 +16,7 @@ packages/
   busy-enter-steer/     @starpivot/dsh-busy-enter-steer
   session-rehome/       @starpivot/dsh-session-rehome
   agent-teams/          @starpivot/dsh-agent-teams
+  file-drop/            @starpivot/dsh-file-drop
 ```
 
 A new plugin is a new `packages/<name>` folder with its own manifest, patch layer, sources, tests, and build. Install it with `github:StarPivotNet/dsh-plugins-public#path:packages/<name>`.

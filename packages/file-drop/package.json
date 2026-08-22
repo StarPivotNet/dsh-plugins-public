@@ -1,0 +1,59 @@
+{
+  "name": "@starpivot/dsh-file-drop",
+  "version": "0.1.0",
+  "description": "Drop non-image files into the composer as filesystem paths instead of the stock images-only refusal.",
+  "homepage": "https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/file-drop",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "drop",
+    "composer",
+    "files"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StarPivotNet/dsh-plugins-public.git",
+    "directory": "packages/file-drop"
+  },
+  "main": "lib/node.js",
+  "exports": {
+    ".": "./lib/node.js",
+    "./host": "./lib/host.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib/node.js",
+    "lib/host.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepublishOnly": "node scripts/build.mjs",
+    "test": "node --experimental-strip-types --test src/logic.spec.ts src/host.spec.ts"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-connection"
+      ]
+    }
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

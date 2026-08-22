@@ -195,6 +195,12 @@ importers:
         specifier: ^1.30.0
         version: 1.33.0
 
+  packages/file-drop:
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+
   packages/session-import:
     devDependencies:
       esbuild:

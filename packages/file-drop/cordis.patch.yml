@@ -1,0 +1,10 @@
+# Install with:
+#   dsh plugin --profile web add @starpivot/dsh-file-drop
+# then restart dsh web.
+
+- insert:
+    - id: file-drop
+      name: '@starpivot/dsh-file-drop/host'
+
+    - id: ui-file-drop
+      name: '@starpivot/dsh-file-drop'

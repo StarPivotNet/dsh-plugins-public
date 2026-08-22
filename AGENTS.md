@@ -19,6 +19,7 @@ packages/
   session-title/        @starpivot/dsh-session-title
   agent-teams/          @starpivot/dsh-agent-teams
   file-drop/            @starpivot/dsh-file-drop
+  kanban/               @starpivot/dsh-kanban
 ```
 
 A new plugin is a new `packages/<name>` folder with its own manifest, patch layer, sources, tests, and build. Install it with `github:StarPivotNet/dsh-plugins-public#path:packages/<name>`.

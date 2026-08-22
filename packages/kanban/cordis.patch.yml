@@ -1,0 +1,6 @@
+# Install with:
+#   dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:packages/kanban
+# then restart dsh web.
+- insert:
+    - id: kanban
+      name: '@starpivot/dsh-kanban'

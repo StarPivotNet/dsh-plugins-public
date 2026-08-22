@@ -1,0 +1,85 @@
+{
+  "name": "@starpivot/dsh-kanban",
+  "version": "0.3.0",
+  "description": "Task board for the DeepSeek Harness Web UI (share copy of the Wuxie233 fork of Ericwong5021/dsh-kanban)",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "FORK.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StarPivotNet/dsh-plugins-public.git",
+    "directory": "packages/kanban"
+  },
+  "bugs": {
+    "url": "https://github.com/StarPivotNet/dsh-plugins-public/issues"
+  },
+  "homepage": "https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/kanban",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "kanban"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsdown",
+    "pack:check": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "lightningcss": "^1.32.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.5",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.0-rc.5",
+    "@deepseek-ai/dsh-client-ui-sidebar": "^0.1.0-rc.5",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.5"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-sidebar": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6",
+    "@types/node": "^24.13.3",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3"
+  }
+}

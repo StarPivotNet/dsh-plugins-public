@@ -17,6 +17,7 @@ Public out-of-tree DeepSeek Harness plugins. One installable plugin per director
 | [`packages/session-title`](packages/session-title) | `@starpivot/dsh-session-title` | Settings for auto-title prompt and optional title model |
 | [`packages/file-drop`](packages/file-drop) | `@starpivot/dsh-file-drop` | Drop any non-image file as a path; large files stay a brief summary |
 | [`packages/agent-teams`](packages/agent-teams) | `@starpivot/dsh-agent-teams` | Multi-agent team orchestration |
+| [`packages/kanban`](packages/kanban) | `@starpivot/dsh-kanban` | Sidebar task board over existing sessions |
 
 ## Install
 

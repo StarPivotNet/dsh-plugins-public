@@ -1,7 +1,7 @@
 {
   "name": "@starpivot/dsh-session-rehome",
-  "version": "0.1.0",
-  "description": "move_agent_to_root: rehome the current conversation to an existing project directory",
+  "description": "move_agent_to_root: rehome the current conversation to an existing project directory, with an ask/auto setting",
+  "version": "0.2.0",
   "homepage": "https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/session-rehome",
   "keywords": [
     "dsh-plugin",
@@ -9,18 +9,14 @@
     "session"
   ],
   "type": "module",
-  "license": "MIT",
-  "publishConfig": {
-    "access": "public"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/StarPivotNet/dsh-plugins-public.git",
-    "directory": "packages/session-rehome"
-  },
   "main": "lib/index.js",
   "exports": {
-    ".": "./lib/index.js",
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml"
   },
@@ -29,12 +25,34 @@
     "cordis.patch.yml",
     "README.md"
   ],
+  "scripts": {
+    "test": "node scripts/rehome-policy.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StarPivotNet/dsh-plugins-public.git",
+    "directory": "packages/session-rehome"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-settings"
+      ],
+      "platform": "web"
     }
   },
+  "license": "MIT",
   "peerDependencies": {
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
     "@deepseek-ai/schemastery": "^3.18.1"
   }
 }

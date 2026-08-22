@@ -1,0 +1,59 @@
+{
+  "name": "@starpivot/dsh-session-title",
+  "description": "Settings page for auto-title prompt and optional title model; host intercept of purpose=session-title LLM calls",
+  "version": "0.1.0",
+  "homepage": "https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/session-title",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "session"
+  ],
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node scripts/policy.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StarPivotNet/dsh-plugins-public.git",
+    "directory": "packages/session-title"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-settings"
+      ],
+      "platform": "web"
+    }
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  }
+}

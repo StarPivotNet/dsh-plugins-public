@@ -1,0 +1,6 @@
+# Install with:
+#   dsh plugin --profile web add github:StarPivotNet/dsh-plugins-public#path:packages/restart-continue
+# then restart dsh web.
+- insert:
+    - id: restart-continue
+      name: '@starpivot/dsh-restart-continue'

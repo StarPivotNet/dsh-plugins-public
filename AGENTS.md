@@ -15,6 +15,8 @@ packages/
   blank-session-gc/     @starpivot/dsh-blank-session-gc
   busy-enter-steer/     @starpivot/dsh-busy-enter-steer
   session-rehome/       @starpivot/dsh-session-rehome
+  restart-continue/     @starpivot/dsh-restart-continue
+  session-title/        @starpivot/dsh-session-title
   agent-teams/          @starpivot/dsh-agent-teams
   file-drop/            @starpivot/dsh-file-drop
 ```

@@ -13,6 +13,8 @@ Public out-of-tree DeepSeek Harness plugins. One installable plugin per director
 | [`packages/blank-session-gc`](packages/blank-session-gc) | `@starpivot/dsh-blank-session-gc` | Keep one unused blank conversation |
 | [`packages/busy-enter-steer`](packages/busy-enter-steer) | `@starpivot/dsh-busy-enter-steer` | Default busy Enter to steer |
 | [`packages/session-rehome`](packages/session-rehome) | `@starpivot/dsh-session-rehome` | Rehome the current conversation to an existing project |
+| [`packages/restart-continue`](packages/restart-continue) | `@starpivot/dsh-restart-continue` | After restart, continue conversations interrupted in the last 24 hours |
+| [`packages/session-title`](packages/session-title) | `@starpivot/dsh-session-title` | Settings for auto-title prompt and optional title model |
 | [`packages/file-drop`](packages/file-drop) | `@starpivot/dsh-file-drop` | Drop any non-image file as a path; large files stay a brief summary |
 | [`packages/agent-teams`](packages/agent-teams) | `@starpivot/dsh-agent-teams` | Multi-agent team orchestration |
 

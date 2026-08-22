@@ -6,6 +6,9 @@ export const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif'] as co
 
 export const DEFAULT_MAX_STAGE_BYTES = 8 * 1024 * 1024
 
+/** Files at or above this size insert only a brief summary, never their bytes. */
+export const DEFAULT_BRIEF_BYTES = 256 * 1024
+
 /** Browser-declared image MIME the stock composer already accepts. */
 export function isImageMediaType(type: string): boolean {
   return (IMAGE_MEDIA_TYPES as readonly string[]).includes(type)
@@ -118,6 +121,42 @@ export function quotePath(path: string): string {
 /** One path per line for insertion into the composer. */
 export function formatDroppedPaths(paths: readonly string[]): string {
   return paths.map(quotePath).join('\n')
+}
+
+/** Human-readable byte count for composer summaries. */
+export function formatByteSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return 'unknown size'
+  if (bytes < 1024) return `${String(bytes)} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+}
+
+export interface DroppedFileBrief {
+  readonly name: string
+  readonly path?: string
+  readonly size?: number
+  readonly mediaType?: string
+  readonly staged?: boolean
+  readonly tooLarge?: boolean
+}
+
+/** One-line composer card: path plus size; large files stay summary-only. */
+export function formatDroppedBrief(file: DroppedFileBrief): string {
+  const label = file.path !== undefined ? quotePath(file.path) : file.name
+  const size = file.size === undefined ? undefined : formatByteSize(file.size)
+  const kind = file.tooLarge ? 'large file' : file.staged ? 'staged file' : undefined
+  const extras = [size, kind].filter((value): value is string => value !== undefined)
+  if (extras.length === 0) return label
+  return `${label} (${extras.join(', ')})`
+}
+
+export function formatDroppedBriefs(files: readonly DroppedFileBrief[]): string {
+  return files.map(formatDroppedBrief).join('\n')
+}
+
+export function isBriefOnly(size: number | undefined, limit = DEFAULT_BRIEF_BYTES): boolean {
+  return typeof size === 'number' && size >= limit
 }
 
 /**

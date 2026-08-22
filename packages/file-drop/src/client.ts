@@ -1,11 +1,14 @@
 /** Client interceptor: non-image drops become composer paths. */
 
 import {
+  DEFAULT_BRIEF_BYTES,
   collectDropPaths,
-  formatDroppedPaths,
+  formatDroppedBriefs,
+  isBriefOnly,
   joinInsertion,
   shouldClaimTransfer,
   type DroppedFile,
+  type DroppedFileBrief,
 } from './logic.ts'
 
 export const CHANNEL = '/file-drop'
@@ -13,7 +16,7 @@ export const CHANNEL = '/file-drop'
 type RpcResult<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string } }
 
 export interface FileDropRpc {
-  call: (channel: string, endpoint: string, payload: unknown) => Promise<RpcResult<{ path: string }>>
+  call: (channel: string, endpoint: string, payload: unknown) => Promise<RpcResult<DroppedFileBrief>>
 }
 
 export interface FileDropLabels {
@@ -246,8 +249,18 @@ export function installFileDropInterceptor(options: FileDropInterceptorOptions):
 }
 
 async function handleDrop(files: File[], uriList: string, options: FileDropInterceptorOptions): Promise<void> {
-  const collected = collectDropPaths(files.map(droppedFromFile), uriList)
-  const paths = [...collected.known]
+  const dropped = files.map(droppedFromFile)
+  const collected = collectDropPaths(dropped, uriList)
+  const briefs: DroppedFileBrief[] = collected.known.map(path => {
+    const match = dropped.find(file => file.path === path || file.name === path.split('/').pop())
+    return {
+      name: match?.name ?? path,
+      path,
+      size: match?.size,
+      mediaType: match?.type,
+      tooLarge: isBriefOnly(match?.size),
+    }
+  })
   const failures: string[] = []
   const missingFiles = collected.missing
     .map(item => files.find(file => file.name === item.name && file.type === item.type && file.size === item.size))
@@ -255,17 +268,30 @@ async function handleDrop(files: File[], uriList: string, options: FileDropInter
 
   for (const file of missingFiles) {
     try {
-      const data = await fileToBase64(file)
-      const payload = await options.rpc.call(CHANNEL, 'stage', { name: file.name, mediaType: file.type, data })
+      const tooLarge = isBriefOnly(file.size, DEFAULT_BRIEF_BYTES)
+      const data = tooLarge ? '' : await fileToBase64(file)
+      const payload = await options.rpc.call(CHANNEL, 'stage', {
+        name: file.name,
+        mediaType: file.type,
+        size: file.size,
+        data,
+      })
       if (!payload.ok) throw new Error(payload.error.message)
-      paths.push(payload.value.path)
+      briefs.push({
+        name: payload.value.name || file.name,
+        path: payload.value.path,
+        size: payload.value.size ?? file.size,
+        mediaType: file.type,
+        staged: payload.value.staged,
+        tooLarge: payload.value.tooLarge ?? tooLarge,
+      })
     } catch (error) {
       failures.push(file.name + ': ' + (error instanceof Error ? error.message : String(error)))
     }
   }
 
-  if (paths.length > 0) {
-    const chunk = formatDroppedPaths(paths)
+  if (briefs.length > 0) {
+    const chunk = formatDroppedBriefs(briefs)
     if (!insertIntoComposer(chunk)) {
       options.toast?.('无法写入输入框：' + chunk)
     }

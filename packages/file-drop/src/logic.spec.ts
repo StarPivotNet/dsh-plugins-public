@@ -3,7 +3,11 @@ import test from 'node:test'
 import {
   basename,
   fileUrlToPath,
+  formatByteSize,
+  formatDroppedBrief,
+  formatDroppedBriefs,
   formatDroppedPaths,
+  isBriefOnly,
   isImageMediaType,
   joinInsertion,
   parseUriList,
@@ -106,6 +110,21 @@ test('collectDropPaths uses File.path, unique URIs, then leftover files', () => 
   assert.deepEqual(
     collectDropPaths([], 'file:///tmp/project'),
     { known: ['/tmp/project'], missing: [] },
+  )
+})
+
+test('large files render as a brief, not full content', () => {
+  assert.equal(isBriefOnly(255 * 1024), false)
+  assert.equal(isBriefOnly(256 * 1024), true)
+  assert.equal(formatByteSize(1536), '1.5 KB')
+  assert.equal(formatDroppedBrief({ name: 'a.ts', path: '/tmp/a.ts', size: 12 }), '/tmp/a.ts (12 B)')
+  assert.equal(
+    formatDroppedBrief({ name: 'movie.mp4', path: '/tmp/movie.mp4', size: 2 * 1024 * 1024, tooLarge: true }),
+    '/tmp/movie.mp4 (2.0 MB, large file)',
+  )
+  assert.equal(
+    formatDroppedBriefs([{ name: 'a.ts', path: '/tmp/a.ts', size: 12 }, { name: 'b.bin', size: 300000, tooLarge: true }]),
+    '/tmp/a.ts (12 B)\nb.bin (293.0 KB, large file)',
   )
 })
 

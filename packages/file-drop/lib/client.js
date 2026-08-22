@@ -30,6 +30,7 @@ module.exports = __toCommonJS(plugin_exports);
 var IMAGE_MEDIA_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 var IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 var DEFAULT_MAX_STAGE_BYTES = 8 * 1024 * 1024;
+var DEFAULT_BRIEF_BYTES = 256 * 1024;
 function isImageMediaType(type) {
   return IMAGE_MEDIA_TYPES.includes(type);
 }
@@ -93,8 +94,26 @@ function quotePath(path) {
   if (!/[\s"'\\]/.test(path)) return path;
   return '"' + path.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
 }
-function formatDroppedPaths(paths) {
-  return paths.map(quotePath).join("\n");
+function formatByteSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return "unknown size";
+  if (bytes < 1024) return `${String(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+function formatDroppedBrief(file) {
+  const label = file.path !== void 0 ? quotePath(file.path) : file.name;
+  const size = file.size === void 0 ? void 0 : formatByteSize(file.size);
+  const kind = file.tooLarge ? "large file" : file.staged ? "staged file" : void 0;
+  const extras = [size, kind].filter((value) => value !== void 0);
+  if (extras.length === 0) return label;
+  return `${label} (${extras.join(", ")})`;
+}
+function formatDroppedBriefs(files) {
+  return files.map(formatDroppedBrief).join("\n");
+}
+function isBriefOnly(size, limit = DEFAULT_BRIEF_BYTES) {
+  return typeof size === "number" && size >= limit;
 }
 function joinInsertion(existing, chunk) {
   if (chunk.length === 0) return { next: existing, caret: existing.length };
@@ -324,22 +343,45 @@ function installFileDropInterceptor(options) {
   };
 }
 async function handleDrop(files, uriList, options) {
-  const collected = collectDropPaths(files.map(droppedFromFile), uriList);
-  const paths = [...collected.known];
+  const dropped = files.map(droppedFromFile);
+  const collected = collectDropPaths(dropped, uriList);
+  const briefs = collected.known.map((path) => {
+    const match = dropped.find((file) => file.path === path || file.name === path.split("/").pop());
+    return {
+      name: match?.name ?? path,
+      path,
+      size: match?.size,
+      mediaType: match?.type,
+      tooLarge: isBriefOnly(match?.size)
+    };
+  });
   const failures = [];
   const missingFiles = collected.missing.map((item) => files.find((file) => file.name === item.name && file.type === item.type && file.size === item.size)).filter((file) => file !== void 0);
   for (const file of missingFiles) {
     try {
-      const data = await fileToBase64(file);
-      const payload = await options.rpc.call(CHANNEL, "stage", { name: file.name, mediaType: file.type, data });
+      const tooLarge = isBriefOnly(file.size, DEFAULT_BRIEF_BYTES);
+      const data = tooLarge ? "" : await fileToBase64(file);
+      const payload = await options.rpc.call(CHANNEL, "stage", {
+        name: file.name,
+        mediaType: file.type,
+        size: file.size,
+        data
+      });
       if (!payload.ok) throw new Error(payload.error.message);
-      paths.push(payload.value.path);
+      briefs.push({
+        name: payload.value.name || file.name,
+        path: payload.value.path,
+        size: payload.value.size ?? file.size,
+        mediaType: file.type,
+        staged: payload.value.staged,
+        tooLarge: payload.value.tooLarge ?? tooLarge
+      });
     } catch (error) {
       failures.push(file.name + ": " + (error instanceof Error ? error.message : String(error)));
     }
   }
-  if (paths.length > 0) {
-    const chunk = formatDroppedPaths(paths);
+  if (briefs.length > 0) {
+    const chunk = formatDroppedBriefs(briefs);
     if (!insertIntoComposer(chunk)) {
       options.toast?.("\u65E0\u6CD5\u5199\u5165\u8F93\u5165\u6846\uFF1A" + chunk);
     }
@@ -351,11 +393,11 @@ async function handleDrop(files, uriList, options) {
 var inject = ["connection"];
 var zh = {
   title: "\u62D6\u5165\u6587\u4EF6\u5373\u53EF\u63D2\u5165\u8DEF\u5F84",
-  desc: "\u56FE\u7247\u4ECD\u4F5C\u4E3A\u9644\u4EF6\uFF1B\u5176\u5B83\u6587\u4EF6\u5199\u5165\u8F93\u5165\u6846\uFF0C\u6CA1\u6709\u672C\u673A\u8DEF\u5F84\u65F6\u4F1A\u5148\u5B58\u5230 ~/.dsh/dropped"
+  desc: "\u56FE\u7247\u4ECD\u4F5C\u4E3A\u9644\u4EF6\uFF1B\u5176\u5B83\u4EFB\u610F\u6587\u4EF6\u5199\u5165\u8DEF\u5F84\u3002\u8D85\u8FC7 256KB \u53EA\u63D2\u5165\u7B80\u8981\u4FE1\u606F\uFF0C\u4E0D\u8BFB\u5B8C\u6574\u5185\u5BB9"
 };
 var en = {
   title: "Drop files to insert their paths",
-  desc: "Images stay attachments. Other files are inserted as paths; files without a local path are staged under ~/.dsh/dropped."
+  desc: "Images stay attachments. Any other file inserts a path. Files over 256KB insert a brief summary only."
 };
 function fileDropRpc(ctx) {
   const rpc = ctx.get("connection").rpc;

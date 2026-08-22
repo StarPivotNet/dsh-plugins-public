@@ -13,7 +13,7 @@ Public out-of-tree DeepSeek Harness plugins. One installable plugin per director
 | [`packages/blank-session-gc`](packages/blank-session-gc) | `@starpivot/dsh-blank-session-gc` | Keep one unused blank conversation |
 | [`packages/busy-enter-steer`](packages/busy-enter-steer) | `@starpivot/dsh-busy-enter-steer` | Default busy Enter to steer |
 | [`packages/session-rehome`](packages/session-rehome) | `@starpivot/dsh-session-rehome` | Rehome the current conversation to an existing project |
-| [`packages/file-drop`](packages/file-drop) | `@starpivot/dsh-file-drop` | Drop non-image files into the composer as paths |
+| [`packages/file-drop`](packages/file-drop) | `@starpivot/dsh-file-drop` | Drop any non-image file as a path; large files stay a brief summary |
 | [`packages/agent-teams`](packages/agent-teams) | `@starpivot/dsh-agent-teams` | Multi-agent team orchestration |
 
 ## Install

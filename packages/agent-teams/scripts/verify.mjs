@@ -12,7 +12,8 @@
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   CAPTAIN_KEY,
   appendMailbox,
@@ -35,8 +36,9 @@ import {
 } from '../lib/client/agent-teams-card-definition.js'
 import { parseAgentTeamsToolMeta } from '../lib/card-meta.js'
 import { ACTIVITY_LIST_TIMEOUT_MS, withTimeout } from '../lib/timeout.js'
-import { bargeCaptainReport } from '../lib/tools.js'
+import { bargeCaptainReport, deliverCaptainReport, parseDeliveryMode, resolveMemberSpawnBrief } from '../lib/tools.js'
 import {
+  assignedWorkBlock,
   deliverToMember,
   installMemberSelectionRuntime,
   MEMBER_DENIED_TOOLS,
@@ -47,6 +49,7 @@ import {
   retireMember,
   spawnMember,
 } from '../lib/members.js'
+import { lastMatchingStallNotice, lastTurnEndKind, shouldNotifyMemberStall, stallCaptainMessage } from '../lib/stall.js'
 import { assembleTeamSnapshot } from '../lib/snapshot.js'
 import {
   FEEDBACK_LABEL,
@@ -360,6 +363,20 @@ try {
     agents: { get: () => undefined },
     logger: { warn: () => {} },
   }
+  const claimedTeam = {
+    ...activityTeam,
+    tasks: [
+      { id: 't1', subject: 'claimed work', status: 'claimed', assignee: 'backend', dependencies: [], createdAt: 0, updatedAt: 0 },
+    ],
+    taskSeq: 1,
+  }
+  const claimedSnapshot = await assembleTeamSnapshot(stoppedConversationCtx, activityRoot, 'workspace', claimedTeam)
+  check(
+    'claimed tasks count as current work in the activity snapshot',
+    claimedSnapshot.members.find((member) => member.name === 'backend')?.currentTask === 't1',
+    JSON.stringify(claimedSnapshot.members.find((member) => member.name === 'backend')),
+  )
+
   const missingSnapshot = await assembleTeamSnapshot(missingAgentCtx, activityRoot, 'workspace', activityTeam)
   check(
     'snapshot roster comes from disk even when no live agent is loaded',
@@ -511,7 +528,7 @@ const captainBarged = bargeCaptainReport(
   'finished t1',
 )
 check(
-  'member report barges into the live captain instead of steering the next step',
+  'explicit barge still interrupts the live captain',
   captainBarged
     && captainCancels.length === 1
     && captainCancels[0]?.cause?.kind === 'parent'
@@ -520,6 +537,35 @@ check(
     && captainDeliveries[0]?.content[0]?.type === 'text'
     && captainDeliveries[0]?.content[0]?.text === 'AgentTeams message from member alice:\n\nfinished t1',
 )
+const queuedCaptainCancels = []
+const queuedCaptainDeliveries = []
+const captainQueued = deliverCaptainReport(
+  {
+    cancel: (cause, options) => queuedCaptainCancels.push({ cause, options }),
+    followup: message => queuedCaptainDeliveries.push(message),
+  },
+  'alice',
+  'finished t1',
+  'queue',
+)
+const defaultCaptainCancels = []
+const defaultCaptainDeliveries = []
+const captainDefault = deliverCaptainReport(
+  {
+    cancel: (cause, options) => defaultCaptainCancels.push({ cause, options }),
+    followup: message => defaultCaptainDeliveries.push(message),
+  },
+  'alice',
+  'finished t1',
+)
+check(
+  'default captain delivery barges into the live captain',
+  captainDefault && defaultCaptainCancels.length === 1 && defaultCaptainDeliveries.length === 1,
+)
+check(
+  'explicit queue captain delivery does not cancel the current turn',
+  captainQueued && queuedCaptainCancels.length === 0 && queuedCaptainDeliveries.length === 1,
+)
 check(
   'failed live captain delivery falls back to the durable mailbox',
   bargeCaptainReport({
@@ -527,6 +573,11 @@ check(
     followup: () => { throw new Error('offline') },
   }, 'alice', 'finished t1') === false,
 )
+check('parseDeliveryMode defaults to barge', parseDeliveryMode(undefined) === 'barge' && parseDeliveryMode('barge') === 'barge')
+check('parseDeliveryMode accepts queue', parseDeliveryMode('queue') === 'queue')
+let badMode = false
+try { parseDeliveryMode('steer') } catch (error) { badMode = String(error).includes('queue') }
+check('parseDeliveryMode rejects unknown modes', badMode)
 
 const memberFollowups = []
 const memberInterrupts = []
@@ -543,17 +594,78 @@ const memberAccepted = await deliverToMember(
   },
   { id: 'captain' },
   'sess-backend',
-  'stop and do t2',
+  'continue t2',
   new AbortController().signal,
 )
 check(
-  'member delivery interrupts the current turn before followup',
+  'default member delivery interrupts the current turn before followup',
   memberAccepted
     && memberInterrupts.length === 1
     && memberInterrupts[0]?.id === 'sess-backend'
     && memberFollowups.length === 1
     && memberFollowups[0]?.id === 'sess-backend',
 )
+const queuedFollowups = []
+const queuedInterrupts = []
+const queuedAccepted = await deliverToMember(
+  {
+    subagents: {
+      interrupt: (id, authority) => queuedInterrupts.push({ id, authority }),
+      followup: async (_captain, id, content) => {
+        queuedFollowups.push({ id, content })
+        return 'msg-q'
+      },
+    },
+    logger: { warn: () => {} },
+  },
+  { id: 'captain' },
+  'sess-backend',
+  'continue t2 later',
+  new AbortController().signal,
+  'queue',
+)
+check(
+  'explicit queue member delivery does not interrupt',
+  queuedAccepted
+    && queuedInterrupts.length === 0
+    && queuedFollowups.length === 1
+    && queuedFollowups[0]?.id === 'sess-backend',
+)
+const bargedFollowups = []
+const bargedInterrupts = []
+const bargedAccepted = await deliverToMember(
+  {
+    subagents: {
+      interrupt: (id, authority) => bargedInterrupts.push({ id, authority }),
+      followup: async (_captain, id, content) => {
+        bargedFollowups.push({ id, content })
+        return 'msg-2'
+      },
+    },
+    logger: { warn: () => {} },
+  },
+  { id: 'captain' },
+  'sess-backend',
+  'stop and do t2',
+  new AbortController().signal,
+  'barge',
+)
+check(
+  'barge member delivery interrupts the current turn before followup',
+  bargedAccepted
+    && bargedInterrupts.length === 1
+    && bargedInterrupts[0]?.id === 'sess-backend'
+    && bargedFollowups.length === 1
+    && bargedFollowups[0]?.id === 'sess-backend',
+)
+check(
+  'spawn brief falls back when prompt is missing',
+  resolveMemberSpawnBrief({ task_subject: 'Build identity', task_description: 'Write the identity module.' }) === 'Write the identity module.'
+    && resolveMemberSpawnBrief({ prompt: 'Do t1 now', task_subject: 'Build identity' }) === 'Do t1 now',
+)
+let emptyBriefRejected = false
+try { resolveMemberSpawnBrief({ task_subject: '   ' }) } catch (error) { emptyBriefRejected = String(error).includes('spawn brief') }
+check('empty spawn brief is rejected', emptyBriefRejected)
 
 const firstTask = {
   id: 't1',
@@ -575,6 +687,8 @@ check(
   dispatch.includes('task t1: Build identity')
     && dispatch.includes('Implement t1 now')
     && dispatch.includes('Do not send a ready check-in')
+    && dispatch.includes('Your assigned work (claimed or in_progress)')
+    && dispatch.includes('t1 [claimed] Build identity')
     && !dispatch.includes('Wait for the captain'),
   dispatch,
 )
@@ -586,7 +700,77 @@ const persona = memberPersona(
 check(
   'member persona treats the first user message as the first task',
   persona.includes('first user message is already the first assigned task')
-    && persona.includes('complete a claimed task directly'),
+    && persona.includes('complete a claimed task directly')
+    && persona.includes('Never say you are waiting for assignment'),
+)
+const pinnedPersona = memberPersona(
+  { name: 'shelf', id: 'shelf', captainSessionId: 'c', createdAt: 0, members: [], tasks: [], taskSeq: 0 },
+  { id: 'sess-catalog', name: 'catalog-engineer', role: 'engineer', joinedAt: 0, status: 'idle' },
+  '.agent-teams',
+  [],
+  '/tmp/example-project',
+)
+check(
+  'persona names the workspace root and forbids sibling search',
+  pinnedPersona.includes('Workspace root: /tmp/example-project')
+    && pinnedPersona.includes('Do not search, read, or write sibling repositories'),
+)
+check(
+  'assignedWorkBlock lists claimed tasks',
+  assignedWorkBlock(
+    { name: 't', id: 't', captainSessionId: 'c', createdAt: 0, members: [], tasks: [firstTask], taskSeq: 1 },
+    'identity-builder',
+  ).includes('t1 [claimed] Build identity'),
+)
+check(
+  'lastTurnEndKind reads newest turn/end',
+  lastTurnEndKind([
+    { type: 'turn/start' },
+    { type: 'turn/end', data: { reason: { kind: 'completed' } } },
+    { type: 'turn/end', data: { reason: { kind: 'interrupted' } } },
+  ]) === 'interrupted',
+)
+check(
+  'interrupted idle member with open work notifies the captain',
+  shouldNotifyMemberStall({
+    memberStatus: 'idle',
+    activity: 'idle',
+    lastTurnEndKind: 'interrupted',
+    openTaskIds: ['t1'],
+    pendingInbox: false,
+  }).notify === true
+    && stallCaptainMessage('backend', ['t1']).includes('Plugin stall notice')
+    && stallCaptainMessage('backend', ['t1']).includes('still owns t1'),
+)
+check(
+  'pending inbox or completed turn does not notify',
+  shouldNotifyMemberStall({
+    memberStatus: 'idle',
+    activity: 'idle',
+    lastTurnEndKind: 'interrupted',
+    openTaskIds: ['t1'],
+    pendingInbox: true,
+  }).notify === false
+    && shouldNotifyMemberStall({
+      memberStatus: 'idle',
+      activity: 'idle',
+      lastTurnEndKind: 'completed',
+      openTaskIds: ['t1'],
+      pendingInbox: false,
+    }).notify === false,
+)
+const stallText = stallCaptainMessage('backend', ['t1'])
+check(
+  'duplicate stall for the same open tasks is suppressed',
+  shouldNotifyMemberStall({
+    memberStatus: 'idle',
+    activity: 'idle',
+    lastTurnEndKind: 'interrupted',
+    openTaskIds: ['t1'],
+    pendingInbox: false,
+    lastStallNotice: stallText,
+  }).notify === false
+    && lastMatchingStallNotice([{ from: 'backend', content: stallText }], 'backend', ['t1']) === stallText,
 )
 
 const retired = []
@@ -1007,6 +1191,72 @@ try {
     pointer.captainWorkspace === wtRoot && pointer.teamId === 'wt-verify',
   )
 
+  const cwdDir = join(wtRoot, 'app')
+  await mkdir(cwdDir, { recursive: true })
+  let cwdSpec
+  const cwdMember = { id: '', name: 'app-eng', role: 'engineer', joinedAt: Date.now(), status: 'idle' }
+  await spawnMember(
+    {
+      subagents: {
+        getProvider: () => ({ prepareContinuable: () => undefined, capabilities: { persona: true, toolFilter: true } }),
+        list: () => ['spawn'],
+        startContinuable: async (spec) => {
+          cwdSpec = spec
+          return { childId: 'cwd-member', messageId: 'm-cwd' }
+        },
+        interrupt: () => {},
+      },
+      agents: { get: () => ({ session: { header: { cwd: cwdDir } } }) },
+    },
+    { provider: 'spawn', maxDepth: 1 },
+    { withPending: async (_p, _l, _s, op) => op() },
+    { provider: 'mock', model: 'mock' },
+    wtCaptain,
+    wtTeam,
+    cwdMember,
+    '.agent-teams',
+    new AbortController().signal,
+    firstTask,
+    'Implement t1 now.',
+    undefined,
+    cwdDir,
+  )
+  check('non-worktree cwd is passed through', cwdSpec?.cwd === cwdDir && cwdMember.id === 'cwd-member' && cwdMember.worktree === undefined)
+  const cwdPointer = JSON.parse(readFileSync(join(cwdDir, '.agent-teams', 'captain-pointer.json'), 'utf8'))
+  check(
+    'cwd that differs from the captain workspace writes a captain pointer',
+    cwdPointer.captainWorkspace === wtRoot && cwdPointer.teamId === 'wt-verify',
+  )
+
+  let relativeCwdRefused = false
+  try {
+    await spawnMember(
+      {
+        subagents: {
+          getProvider: () => ({ prepareContinuable: () => undefined, capabilities: { persona: true, toolFilter: true } }),
+          list: () => ['spawn'],
+          startContinuable: async () => { throw new Error('must not spawn') },
+        },
+        agents: { get: () => ({ session: { header: { cwd: wtRoot } } }) },
+      },
+      { provider: 'spawn', maxDepth: 1 },
+      { withPending: async (_p, _l, _s, op) => op() },
+      { provider: 'mock', model: 'mock' },
+      wtCaptain,
+      wtTeam,
+      { id: '', name: 'rel-cwd', role: 'engineer', joinedAt: Date.now(), status: 'idle' },
+      '.agent-teams',
+      new AbortController().signal,
+      firstTask,
+      'Implement t1 now.',
+      undefined,
+      'relative/path',
+    )
+  } catch (error) {
+    relativeCwdRefused = String(error).includes('absolute path')
+  }
+  check('relative cwd path is rejected', relativeCwdRefused)
+
   const refuseSpawn = (runtimeConfig, memberDraft, worktreeArg) => spawnMember(
     {
       subagents: {
@@ -1083,6 +1333,14 @@ try {
   check('unpatched runtime seam fails loud and interrupts the member', seamMissLoud)
 } finally {
   rmSync(wtRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+}
+
+console.log('source: conversation cards do not poll the snapshot route')
+{
+  const root = dirname(fileURLToPath(import.meta.url))
+  const card = await readFile(join(root, '../src/client/AgentTeamsCard.tsx'), 'utf8')
+  check('AgentTeamsCard does not fetch /plugins/dsh-agent-teams/state', !card.includes('/plugins/dsh-agent-teams/state'))
+  check('AgentTeamsCard does not start a setInterval poll', !card.includes('setInterval'))
 }
 
 if (failures > 0) {

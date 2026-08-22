@@ -19,6 +19,7 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { IconBranchOutline16, IconChevronRightOutline14, IconCloseOutline16, StateDot, } from '@deepseek-ai/dsh-client-ui-primitives';
 import { activityPanelExpandedForSession, fetchJsonWithTimeout, relatedTaskIds, taskStages } from "./activity-model.js";
+import { resetActivitySnapshot, setActivityArchivedTeams, setActivityLiveTeams } from "./activity-store.js";
 import { ACTION_ART, LEAD_ART, memberArtUrl } from "./artwork.js";
 import { OPEN_PANEL_EVENT } from "./AgentTeamsCard.js";
 import css from './ActivityPanel.module.css';
@@ -228,11 +229,15 @@ export function ActivityPanel({ sessionsList, openSession }) {
                 ]);
                 if (live.ok && typeof live.json === 'object' && live.json !== null && 'teams' in live.json
                     && Array.isArray(live.json.teams) && !cancelled) {
-                    setTeams(live.json.teams);
+                    const next = live.json.teams;
+                    setTeams(next);
+                    setActivityLiveTeams(next);
                 }
                 if (archived.ok && typeof archived.json === 'object' && archived.json !== null && 'teams' in archived.json
                     && Array.isArray(archived.json.teams) && !cancelled) {
-                    setArchivedTeams(archived.json.teams);
+                    const next = archived.json.teams;
+                    setArchivedTeams(next);
+                    setActivityArchivedTeams(next);
                 }
             }
             catch {
@@ -247,6 +252,7 @@ export function ActivityPanel({ sessionsList, openSession }) {
         return () => {
             cancelled = true;
             clearInterval(timer);
+            resetActivitySnapshot();
         };
     }, []);
     useEffect(() => {

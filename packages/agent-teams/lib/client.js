@@ -101,6 +101,70 @@ window.__ModuleLoader__.load({
 			return related;
 		}
 		//#endregion
+		//#region lib/client/activity-store.js
+		/**
+		* Shared AgentTeams activity snapshot.
+		*
+		* The activity panel is the single poller of `/plugins/dsh-agent-teams/state`.
+		* Conversation cards subscribe here instead of fetching the route themselves.
+		* @module dsh-agent-teams/client/activity-store
+		*/
+		const EMPTY = {
+			teams: [],
+			archived: []
+		};
+		const listeners = /* @__PURE__ */ new Set();
+		let snapshot = EMPTY;
+		function publish(next) {
+			snapshot = next;
+			for (const listener of listeners) listener();
+		}
+		/** Current live+archived snapshot. Stable until the panel publishes a new list. */
+		function getActivitySnapshot() {
+			return snapshot;
+		}
+		/**
+		* Subscribe to snapshot publication.
+		* @param listener - called after live or archived lists change.
+		* @returns disposer.
+		*/
+		function subscribeActivitySnapshot(listener) {
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+			};
+		}
+		/** Replace the live team list. */
+		function setActivityLiveTeams(teams) {
+			if (snapshot.teams === teams) return;
+			publish({
+				teams,
+				archived: snapshot.archived
+			});
+		}
+		/** Replace the archived team list. */
+		function setActivityArchivedTeams(teams) {
+			if (snapshot.archived === teams) return;
+			publish({
+				teams: snapshot.teams,
+				archived: teams
+			});
+		}
+		/** Drop both lists (panel unmount / HMR). */
+		function resetActivitySnapshot() {
+			if (snapshot.teams.length === 0 && snapshot.archived.length === 0) return;
+			publish(EMPTY);
+		}
+		/**
+		* Find one team in the live list, then the archived list.
+		* @param teamId - durable team id.
+		* @param owner - captain session id; empty matches any captain.
+		*/
+		function findActivityTeam(teamId, owner) {
+			const match = (team) => team.teamId === teamId && (owner === "" || team.captainSessionId === owner);
+			return snapshot.teams.find(match) ?? snapshot.archived.find(match);
+		}
+		//#endregion
 		//#region lib/client/artwork.js
 		/**
 		* Shared whale artwork lookup for the activity panel and the conversation
@@ -140,8 +204,8 @@ window.__ModuleLoader__.load({
 			return null;
 		}
 		//#endregion
-		//#region \0dsh-css:/root/CODE/dsh-plugins-public/packages/agent-teams/src/client/AgentTeamsCard.module.css.mjs
-		const css$1 = ".R8H69q_root{box-sizing:border-box;border:1px solid var(--dsw-alias-line-normal);background:var(--dsw-alias-bg-module-platform);border-radius:10px;flex-direction:column;gap:8px;width:100%;min-width:0;padding:10px 12px;display:flex}.R8H69q_head{align-items:center;gap:8px;min-width:0;display:flex}.R8H69q_leadAvatar{border:1px solid var(--dsw-alias-line-strong);object-fit:cover;background:#0b1d33;border-radius:50%;flex:none;width:24px;height:24px}.R8H69q_teamName{color:var(--dsw-alias-label-primary);text-overflow:ellipsis;white-space:nowrap;flex:0 auto;font-size:13px;font-weight:600;line-height:20px;overflow:hidden}.R8H69q_memberCount{color:var(--dsw-alias-label-tertiary);white-space:nowrap;flex:none;margin-left:auto;font-size:11px;line-height:16px}.R8H69q_panelButton{border:1px solid var(--dsw-alias-line-strong);background:var(--dsw-alias-bg-module);color:var(--dsw-alias-label-secondary);font:inherit;cursor:pointer;border-radius:999px;flex:none;padding:2px 8px;font-size:10.5px;font-weight:600;line-height:16px;transition:border-color .12s,color .12s}.R8H69q_panelButton:hover{border-color:var(--dsw-alias-state-business-primary);color:var(--dsw-alias-state-business-primary)}.R8H69q_panelButton:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:1px}.R8H69q_members{flex-wrap:wrap;gap:6px;min-width:0;display:flex}.R8H69q_member{border:1px solid var(--dsw-alias-line-normal);background:var(--dsw-alias-bg-module);max-width:160px;color:var(--dsw-alias-label-secondary);font:inherit;cursor:pointer;border-radius:999px;align-items:center;gap:5px;padding:3px 8px 3px 3px;font-size:11px;font-weight:500;line-height:16px;transition:border-color .12s,background-color .12s;display:inline-flex}.R8H69q_member:hover{border-color:var(--dsw-alias-state-business-primary);background:var(--dsw-alias-bg-fill-neutral)}.R8H69q_member:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:1px}.R8H69q_memberArt{border:1px solid var(--dsw-alias-line-strong);object-fit:cover;background:#0b1d33;border-radius:50%;width:20px;height:20px}.R8H69q_memberInitial{background:var(--dsw-alias-bg-fill-business);width:20px;height:20px;color:var(--dsw-alias-label-on-fill);border-radius:50%;justify-content:center;align-items:center;font-size:10px;font-weight:600;line-height:20px;display:inline-flex}.R8H69q_memberName{text-overflow:ellipsis;white-space:nowrap;min-width:0;overflow:hidden}";
+		//#region \0dsh-css:src/client/AgentTeamsCard.module.css.mjs
+		const css$1 = ".Zigywq_root{box-sizing:border-box;border:1px solid var(--dsw-alias-line-normal);background:var(--dsw-alias-bg-module-platform);border-radius:10px;flex-direction:column;gap:8px;width:100%;min-width:0;padding:10px 12px;display:flex}.Zigywq_head{align-items:center;gap:8px;min-width:0;display:flex}.Zigywq_leadAvatar{border:1px solid var(--dsw-alias-line-strong);object-fit:cover;background:#0b1d33;border-radius:50%;flex:none;width:24px;height:24px}.Zigywq_teamName{color:var(--dsw-alias-label-primary);text-overflow:ellipsis;white-space:nowrap;flex:0 auto;font-size:13px;font-weight:600;line-height:20px;overflow:hidden}.Zigywq_memberCount{color:var(--dsw-alias-label-tertiary);white-space:nowrap;flex:none;margin-left:auto;font-size:11px;line-height:16px}.Zigywq_panelButton{border:1px solid var(--dsw-alias-line-strong);background:var(--dsw-alias-bg-module);color:var(--dsw-alias-label-secondary);font:inherit;cursor:pointer;border-radius:999px;flex:none;padding:2px 8px;font-size:10.5px;font-weight:600;line-height:16px;transition:border-color .12s,color .12s}.Zigywq_panelButton:hover{border-color:var(--dsw-alias-state-business-primary);color:var(--dsw-alias-state-business-primary)}.Zigywq_panelButton:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:1px}.Zigywq_members{flex-wrap:wrap;gap:6px;min-width:0;display:flex}.Zigywq_member{border:1px solid var(--dsw-alias-line-normal);background:var(--dsw-alias-bg-module);max-width:160px;color:var(--dsw-alias-label-secondary);font:inherit;cursor:pointer;border-radius:999px;align-items:center;gap:5px;padding:3px 8px 3px 3px;font-size:11px;font-weight:500;line-height:16px;transition:border-color .12s,background-color .12s;display:inline-flex}.Zigywq_member:hover{border-color:var(--dsw-alias-state-business-primary);background:var(--dsw-alias-bg-fill-neutral)}.Zigywq_member:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:1px}.Zigywq_memberArt{border:1px solid var(--dsw-alias-line-strong);object-fit:cover;background:#0b1d33;border-radius:50%;width:20px;height:20px}.Zigywq_memberInitial{background:var(--dsw-alias-bg-fill-business);width:20px;height:20px;color:var(--dsw-alias-label-on-fill);border-radius:50%;justify-content:center;align-items:center;font-size:10px;font-weight:600;line-height:20px;display:inline-flex}.Zigywq_memberName{text-overflow:ellipsis;white-space:nowrap;min-width:0;overflow:hidden}";
 		const tagId$1 = "@starpivot/dsh-agent-teams/AgentTeamsCard.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
 			const tag = document.createElement("style");
@@ -151,17 +215,17 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var AgentTeamsCard_module_css_default = {
-			"head": "R8H69q_head",
-			"leadAvatar": "R8H69q_leadAvatar",
-			"member": "R8H69q_member",
-			"memberArt": "R8H69q_memberArt",
-			"memberCount": "R8H69q_memberCount",
-			"memberInitial": "R8H69q_memberInitial",
-			"memberName": "R8H69q_memberName",
-			"members": "R8H69q_members",
-			"panelButton": "R8H69q_panelButton",
-			"root": "R8H69q_root",
-			"teamName": "R8H69q_teamName"
+			"head": "Zigywq_head",
+			"leadAvatar": "Zigywq_leadAvatar",
+			"member": "Zigywq_member",
+			"memberArt": "Zigywq_memberArt",
+			"memberCount": "Zigywq_memberCount",
+			"memberInitial": "Zigywq_memberInitial",
+			"memberName": "Zigywq_memberName",
+			"members": "Zigywq_members",
+			"panelButton": "Zigywq_panelButton",
+			"root": "Zigywq_root",
+			"teamName": "Zigywq_teamName"
 		};
 		//#endregion
 		//#region lib/client/AgentTeamsCard.js
@@ -173,7 +237,8 @@ window.__ModuleLoader__.load({
 		*
 		* The floater and this card share the `agent-teams:open-panel` window event
 		* so the card can summon the panel even after it was closed (or when an old
-		* session is re-opened for review).
+		* session is re-opened for review). Live enrichment comes from the panel's
+		* shared snapshot; a missing snapshot keeps the folded roster.
 		* @module dsh-agent-teams/client/card
 		*/
 		/** Window event name the floater listens for to open itself. */
@@ -193,30 +258,8 @@ window.__ModuleLoader__.load({
 		function AgentTeamsCard({ node, openSession, currentSessionId }) {
 			const data = node.data;
 			const owner = data.captainSessionId || currentSessionId() || "";
-			const [snapshot, setSnapshot] = (0, react.useState)();
-			(0, react.useEffect)(() => {
-				let cancelled = false;
-				const tick = async () => {
-					for (const url of ["/plugins/dsh-agent-teams/state", "/plugins/dsh-agent-teams/state?archived=1"]) try {
-						const { ok, json } = await fetchJsonWithTimeout(url);
-						if (!ok || typeof json !== "object" || json === null || !("teams" in json)) continue;
-						const teams = json.teams;
-						const found = Array.isArray(teams) ? teams.find((team) => team.teamId === data.teamId && (owner === "" || team.captainSessionId === owner)) : void 0;
-						if (found !== void 0) {
-							if (!cancelled) setSnapshot(found);
-							return;
-						}
-					} catch {}
-				};
-				tick();
-				const timer = setInterval(() => {
-					tick();
-				}, 1500);
-				return () => {
-					cancelled = true;
-					clearInterval(timer);
-				};
-			}, [data.teamId, owner]);
+			(0, react.useSyncExternalStore)(subscribeActivitySnapshot, getActivitySnapshot);
+			const snapshot = findActivityTeam(data.teamId, owner);
 			const resolved = (0, react.useMemo)(() => ({
 				...data,
 				captainSessionId: snapshot?.captainSessionId ?? owner,
@@ -290,8 +333,8 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region \0dsh-css:/root/CODE/dsh-plugins-public/packages/agent-teams/src/client/ActivityPanel.module.css.mjs
-		const css = "html{--agent-teams-panel-width:388px;--agent-teams-panel-right:calc(18px + var(--dsh-sidebar-width,0px));--agent-teams-panel-gap:14px;--agent-teams-panel-shift:calc(var(--agent-teams-panel-width) + 18px + var(--agent-teams-panel-gap))}html[data-agent-teams-panel-open] [data-phase=active]{box-sizing:border-box;padding-right:var(--agent-teams-panel-shift)}[data-phase=active]{will-change:padding-right;transition:padding-right .36s cubic-bezier(.22,1,.36,1)}.rU0dBW_badge{top:64px;right:var(--agent-teams-panel-right);z-index:2147483000;box-sizing:border-box;border:1px solid var(--dsw-alias-line-normal);background:color-mix(in srgb, var(--dsw-alias-bg-module-platform) 92%, transparent);backdrop-filter:blur(16px);height:34px;box-shadow:0 8px 28px color-mix(in srgb, var(--dsw-alias-label-primary) 14%, transparent);color:var(--dsw-alias-label-secondary);font:inherit;cursor:pointer;border-radius:999px;align-items:center;gap:7px;padding:0 12px;font-size:12px;font-weight:600;line-height:20px;transition:border-color .15s,transform .12s;display:inline-flex;position:fixed}.rU0dBW_badge:hover{border-color:var(--dsw-alias-line-strong);transform:translateY(-1px)}.rU0dBW_badge:active{transform:translateY(0)scale(.98)}.rU0dBW_badge:focus-visible,.rU0dBW_closeButton:focus-visible,.rU0dBW_memberRow:focus-visible,.rU0dBW_taskNode:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.rU0dBW_badgeDot,.rU0dBW_panelDot{background:var(--dsw-alias-label-tertiary);border-radius:50%;width:7px;height:7px}.rU0dBW_badgeDot[data-busy=true],.rU0dBW_panelDot[data-busy=true]{background:var(--dsw-alias-state-business-primary);animation:1.25s ease-in-out infinite rU0dBW_agentTeamsPulse}.rU0dBW_badgeCount,.rU0dBW_memberCount,.rU0dBW_teamStats,.rU0dBW_stageLabel,.rU0dBW_taskId{font-variant-numeric:tabular-nums}.rU0dBW_panel{top:64px;right:var(--agent-teams-panel-right);z-index:2147483000;width:min(var(--agent-teams-panel-width), calc(100vw - 24px));box-sizing:border-box;border:1px solid color-mix(in srgb, var(--dsw-alias-line-strong) 58%, transparent);background:color-mix(in srgb, var(--dsw-alias-bg-module-platform) 95%, transparent);backdrop-filter:blur(20px)saturate(1.08);max-height:70dvh;box-shadow:0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent), 0 32px 72px color-mix(in srgb, var(--dsw-alias-label-primary) 16%, transparent);border-radius:16px;flex-direction:column;animation:.18s ease-out rU0dBW_agentTeamsPanelIn;display:flex;position:fixed;overflow:hidden}@keyframes rU0dBW_agentTeamsPanelIn{0%{opacity:0;transform:translateY(-6px)scale(.99)}to{opacity:1;transform:translateY(0)scale(1)}}@keyframes rU0dBW_agentTeamsPulse{0%,to{opacity:.42}50%{opacity:1}}.rU0dBW_panelHead{border-bottom:1px solid var(--dsw-alias-line-normal);flex:none;justify-content:space-between;align-items:center;min-height:44px;padding:0 14px 0 16px;display:flex}.rU0dBW_panelTitle{color:var(--dsw-alias-label-primary);align-items:center;gap:8px;font-size:14px;font-weight:600;line-height:20px;display:inline-flex}.rU0dBW_closeButton{width:28px;height:28px;color:var(--dsw-alias-label-tertiary);cursor:pointer;background:0 0;border:0;border-radius:7px;justify-content:center;align-items:center;padding:0;transition:background-color .12s,color .12s,transform .12s;display:inline-flex}.rU0dBW_closeButton:hover{background:var(--dsw-alias-bg-fill-neutral);color:var(--dsw-alias-label-primary)}.rU0dBW_closeButton:active{transform:scale(.94)}.rU0dBW_teams{overscroll-behavior:contain;flex-direction:column;min-height:0;display:flex;overflow-y:auto}.rU0dBW_team{border-bottom:1px solid var(--dsw-alias-line-normal);flex-direction:column;gap:12px;padding:12px 14px 16px;display:flex}.rU0dBW_team:last-child{border-bottom:0}.rU0dBW_teamHead{align-items:center;gap:10px;min-width:0;display:flex}.rU0dBW_teamName{min-width:0;color:var(--dsw-alias-label-primary);text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:13px;font-weight:600;line-height:18px;overflow:hidden}.rU0dBW_teamStats{color:var(--dsw-alias-label-tertiary);white-space:nowrap;flex:none;gap:8px;font-size:10.5px;line-height:16px;display:inline-flex}.rU0dBW_sectionHead{justify-content:space-between;align-items:center;gap:8px;min-width:0;display:flex}.rU0dBW_sectionTitle{color:var(--dsw-alias-label-secondary);align-items:center;gap:6px;font-size:11px;font-weight:600;line-height:16px;display:inline-flex}.rU0dBW_sectionHint{color:var(--dsw-alias-label-tertiary);text-overflow:ellipsis;white-space:nowrap;font-size:10px;line-height:14px;overflow:hidden}.rU0dBW_delegationSection{min-width:0}.rU0dBW_captainNode{box-sizing:border-box;border:1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 32%, var(--dsw-alias-line-normal));background:color-mix(in srgb, var(--dsw-alias-state-business-primary) 7%, var(--dsw-alias-bg-module));border-radius:10px;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:9px;min-height:48px;padding:8px 10px;display:grid}.rU0dBW_captainAvatar,.rU0dBW_memberAvatar{flex:none;justify-content:center;align-items:center;display:inline-flex;position:relative}.rU0dBW_captainAvatar{width:36px;height:36px}.rU0dBW_leadAvatar,.rU0dBW_memberArt,.rU0dBW_memberInitial{box-sizing:border-box;border:1px solid var(--dsw-alias-line-strong);object-fit:cover;background:#0b1d33;border-radius:50%;width:34px;height:34px}.rU0dBW_captainInfo,.rU0dBW_memberInfo{flex-direction:column;min-width:0;display:flex}.rU0dBW_captainInfo{gap:2px}.rU0dBW_captainLine,.rU0dBW_memberLine{align-items:center;gap:6px;min-width:0;display:flex}.rU0dBW_captainName,.rU0dBW_memberName{color:var(--dsw-alias-label-primary);text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;font-weight:600;line-height:18px;overflow:hidden}.rU0dBW_captainRole,.rU0dBW_memberRole{color:var(--dsw-alias-label-tertiary);text-overflow:ellipsis;white-space:nowrap;font-size:10px;line-height:14px;overflow:hidden}.rU0dBW_captainSummary,.rU0dBW_memberStatusLine{color:var(--dsw-alias-label-secondary);text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;line-height:15px;overflow:hidden}.rU0dBW_captainState,.rU0dBW_memberState{color:var(--dsw-alias-label-tertiary);white-space:nowrap;flex:none;align-items:center;gap:5px;font-size:10px;font-weight:500;line-height:15px;display:inline-flex}.rU0dBW_captainState[data-busy=true],.rU0dBW_memberState[data-activity=working]{color:var(--dsw-alias-state-business-primary)}.rU0dBW_delegationTree{flex-direction:column;gap:2px;margin-left:18px;padding:9px 0 0 20px;display:flex;position:relative}.rU0dBW_delegationTree:before{background:color-mix(in srgb, var(--dsw-alias-state-business-primary) 48%, var(--dsw-alias-line-normal));content:\"\";width:1px;position:absolute;top:0;bottom:22px;left:0}.rU0dBW_memberBlock{flex-direction:column;min-width:0;padding:3px 0 7px;display:flex;position:relative}.rU0dBW_memberBranch{background:color-mix(in srgb, var(--dsw-alias-state-business-primary) 48%, var(--dsw-alias-line-normal));width:20px;height:1px;display:block;position:absolute;top:23px;right:100%}.rU0dBW_memberBranch:before{background:var(--dsw-alias-state-business-primary);content:\"\";border-radius:50%;width:5px;height:5px;position:absolute;top:-2px;right:-1px}.rU0dBW_memberRow{box-sizing:border-box;width:100%;min-width:0;min-height:44px;color:inherit;font:inherit;text-align:left;cursor:pointer;background:0 0;border:0;border-radius:8px;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:8px;padding:4px 6px;transition:background-color .12s,transform .12s;display:grid}.rU0dBW_memberRow:hover,.rU0dBW_memberRow[data-activity=working]{background:color-mix(in srgb, var(--dsw-alias-state-business-primary) 6%, var(--dsw-alias-bg-module))}.rU0dBW_memberRow:active{transform:scale(.995)}.rU0dBW_memberAvatar{width:34px;height:34px}.rU0dBW_memberAvatar[data-unread=true]:after{border:1px solid var(--dsw-alias-state-business-primary);content:\"\";border-radius:50%;animation:1.5s ease-out infinite rU0dBW_agentTeamsRing;position:absolute;inset:-3px}@keyframes rU0dBW_agentTeamsRing{0%{opacity:.82;transform:scale(.94)}75%,to{opacity:0;transform:scale(1.18)}}.rU0dBW_memberInitial{color:var(--dsw-alias-label-on-fill);justify-content:center;align-items:center;font-size:14px;font-weight:600;line-height:20px;display:inline-flex}.rU0dBW_stateArt{box-sizing:border-box;border:2px solid var(--dsw-alias-bg-module-platform);object-fit:cover;background:#0b1d33;border-radius:50%;width:19px;height:19px;position:absolute;bottom:-4px;right:-4px}.rU0dBW_stateArt[data-activity=working]{animation:2.4s ease-in-out infinite rU0dBW_agentTeamsFloat}.rU0dBW_stateArt[data-activity=idle]{animation:4.2s ease-in-out infinite rU0dBW_agentTeamsBreathe}.rU0dBW_stateArt[data-activity=unknown]{animation:2.8s ease-in-out infinite rU0dBW_agentTeamsThink}@keyframes rU0dBW_agentTeamsFloat{0%,to{transform:translateY(0)rotate(-4deg)}50%{transform:translateY(-2px)rotate(4deg)}}@keyframes rU0dBW_agentTeamsBreathe{0%,to{opacity:.82;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}@keyframes rU0dBW_agentTeamsThink{0%,to{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}.rU0dBW_memberState{margin-left:auto}.rU0dBW_memberCount{color:var(--dsw-alias-label-tertiary);font-size:10.5px;line-height:16px}.rU0dBW_assignmentLine{align-items:center;gap:7px;min-width:0;padding:0 6px 0 52px;display:flex}.rU0dBW_assignmentLabel{color:var(--dsw-alias-label-tertiary);flex:none;font-size:9.5px;line-height:14px}.rU0dBW_assignmentTasks{flex-wrap:wrap;flex:1;gap:4px;min-width:0;display:flex}.rU0dBW_assignmentChip{background:var(--dsw-alias-bg-fill-neutral);min-height:16px;color:var(--dsw-alias-label-secondary);border-radius:4px;align-items:center;padding:0 5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px;font-weight:600;line-height:14px;display:inline-flex}.rU0dBW_assignmentChip[data-state=running]{background:var(--dsw-alias-bg-fill-business);color:var(--dsw-alias-label-on-fill)}.rU0dBW_assignmentChip[data-state=completed]{background:var(--dsw-alias-bg-fill-success);color:var(--dsw-alias-label-on-fill)}.rU0dBW_assignmentChip[data-state=blocked]{background:var(--dsw-alias-bg-fill-warning);color:var(--dsw-alias-label-on-fill)}.rU0dBW_assignmentChip[data-state=failed]{background:var(--dsw-alias-bg-fill-danger);color:var(--dsw-alias-label-on-fill)}.rU0dBW_assignmentChip[data-state=cancelled]{color:var(--dsw-alias-label-tertiary);text-decoration:line-through}.rU0dBW_unreadPill{color:var(--dsw-alias-state-business-primary);white-space:nowrap;flex:none;font-size:9.5px;font-weight:600;line-height:14px}.rU0dBW_taskEmpty{color:var(--dsw-alias-label-tertiary);font-size:9.5px;line-height:14px}.rU0dBW_dependencySection{border-top:1px solid var(--dsw-alias-line-normal);flex-direction:column;gap:7px;min-width:0;padding-top:10px;display:flex}.rU0dBW_stageFlow{scrollbar-width:thin;align-items:stretch;gap:0;min-width:0;padding:1px 1px 5px;display:flex;overflow-x:auto}.rU0dBW_stageGroup{flex:1 0 126px;min-width:126px;display:flex;position:relative}.rU0dBW_stageConnector{width:22px;height:14px;color:var(--dsw-alias-label-tertiary);flex:none;align-items:center;margin-top:0;display:flex}.rU0dBW_stageLine{background:var(--dsw-alias-line-strong);flex:1;height:1px;display:block}.rU0dBW_stageColumn{flex-direction:column;flex:1;gap:5px;min-width:0;display:flex}.rU0dBW_stageLabel{color:var(--dsw-alias-label-tertiary);justify-content:space-between;align-items:center;gap:6px;padding:0 2px;font-size:9.5px;font-weight:600;line-height:14px;display:flex}.rU0dBW_stageLabel span{background:var(--dsw-alias-bg-fill-neutral);border-radius:4px;justify-content:center;align-items:center;min-width:14px;height:14px;font-size:8.5px;display:inline-flex}.rU0dBW_stageTasks{flex-direction:column;gap:5px;display:flex}.rU0dBW_taskNode{box-sizing:border-box;border:1px solid var(--dsw-alias-line-normal);background:var(--dsw-alias-bg-module);min-width:0;min-height:72px;color:var(--dsw-alias-label-primary);font:inherit;text-align:left;cursor:pointer;border-radius:8px;flex-direction:column;gap:4px;padding:7px 8px;transition:border-color .14s,opacity .14s,transform .12s,background-color .14s;display:flex}.rU0dBW_taskNode:hover,.rU0dBW_taskNode[data-focused=true]{border-color:var(--dsw-alias-state-business-primary);background:color-mix(in srgb, var(--dsw-alias-state-business-primary) 6%, var(--dsw-alias-bg-module));transform:translateY(-1px)}.rU0dBW_taskNode[data-dimmed=true]{opacity:.34}.rU0dBW_taskNode[data-state=completed]{border-color:color-mix(in srgb, var(--dsw-alias-state-success) 48%, var(--dsw-alias-line-normal))}.rU0dBW_taskNode[data-state=blocked]{border-color:color-mix(in srgb, var(--dsw-alias-state-warning) 52%, var(--dsw-alias-line-normal))}.rU0dBW_taskNode[data-state=failed]{border-color:color-mix(in srgb, var(--dsw-alias-state-danger) 56%, var(--dsw-alias-line-normal))}.rU0dBW_taskNodeHead,.rU0dBW_taskRoute{justify-content:space-between;align-items:center;gap:5px;min-width:0;display:flex}.rU0dBW_taskId{color:var(--dsw-alias-label-tertiary);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9.5px;font-weight:700}.rU0dBW_taskBadge{background:var(--dsw-alias-bg-fill-neutral);min-height:14px;color:var(--dsw-alias-label-secondary);border-radius:4px;flex:none;align-items:center;padding:0 4px;font-size:8.5px;font-weight:600;line-height:13px;display:inline-flex}.rU0dBW_taskBadge[data-state=running]{background:var(--dsw-alias-bg-fill-business);color:var(--dsw-alias-label-on-fill)}.rU0dBW_taskBadge[data-state=completed]{background:var(--dsw-alias-bg-fill-success);color:var(--dsw-alias-label-on-fill)}.rU0dBW_taskBadge[data-state=blocked]{background:var(--dsw-alias-bg-fill-warning);color:var(--dsw-alias-label-on-fill)}.rU0dBW_taskBadge[data-state=failed]{background:var(--dsw-alias-bg-fill-danger);color:var(--dsw-alias-label-on-fill)}.rU0dBW_taskBadge[data-state=cancelled]{color:var(--dsw-alias-label-tertiary);text-decoration:line-through}.rU0dBW_taskSubject{min-height:30px;color:var(--dsw-alias-label-primary);-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:10.5px;font-weight:500;line-height:15px;display:-webkit-box;overflow:hidden}.rU0dBW_taskRoute{color:var(--dsw-alias-label-tertiary);margin-top:auto;font-size:8.5px;line-height:13px}.rU0dBW_taskOwner,.rU0dBW_taskDeps{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.rU0dBW_taskOwner{max-width:48%;color:var(--dsw-alias-label-secondary);font-weight:600}.rU0dBW_taskDeps{text-align:right;flex:1}.rU0dBW_taskStart{color:var(--dsw-alias-label-tertiary)}.rU0dBW_unclaimed,.rU0dBW_inbox{border-top:1px solid var(--dsw-alias-line-normal);flex-direction:column;gap:5px;min-width:0;padding-top:10px;display:flex}.rU0dBW_unclaimedTitle{color:var(--dsw-alias-label-secondary);font-size:10.5px;font-weight:600;line-height:15px}.rU0dBW_inboxRow{border-radius:6px;grid-template-columns:112px minmax(0,1fr);align-items:center;gap:8px;min-width:0;min-height:24px;padding:2px 5px;display:grid}.rU0dBW_inboxRow:hover{background:var(--dsw-alias-bg-module)}.rU0dBW_inboxRoute{min-width:0;color:var(--dsw-alias-state-business-primary);text-overflow:ellipsis;white-space:nowrap;align-items:center;gap:3px;font-size:9.5px;font-weight:600;line-height:14px;display:inline-flex;overflow:hidden}.rU0dBW_inboxContent{min-width:0;color:var(--dsw-alias-label-tertiary);text-overflow:ellipsis;white-space:nowrap;font-size:10px;line-height:14px;overflow:hidden}.rU0dBW_emptyHint{color:var(--dsw-alias-label-tertiary);padding:10px 12px;font-size:11px;line-height:16px}.rU0dBW_team[data-historic],.rU0dBW_archivedWrap{opacity:.82}.rU0dBW_historicPill{background:var(--dsw-alias-bg-fill-neutral);color:var(--dsw-alias-label-tertiary);border-radius:4px;flex:none;margin-left:auto;padding:1px 7px;font-size:9.5px;font-weight:600;line-height:15px}.rU0dBW_members{flex-direction:column;gap:3px;display:flex}.rU0dBW_archivedWrap:before{color:var(--dsw-alias-label-tertiary);content:\"已结束 · 历史归档\";padding:5px 14px 0;font-size:9.5px;font-weight:600;line-height:14px;display:block}@media (prefers-reduced-motion:reduce){[data-phase=active],.rU0dBW_panel,.rU0dBW_badge,.rU0dBW_badgeDot,.rU0dBW_panelDot,.rU0dBW_stateArt,.rU0dBW_memberAvatar[data-unread=true]:after{transition:none;animation:none}}@media (width<=960px){html{--agent-teams-main-shift:0px}html[data-agent-teams-panel-open] [data-phase=active]{padding-right:0}}@media (width<=640px){html{--agent-teams-panel-right:calc(10px + var(--dsh-sidebar-width,0px))}.rU0dBW_panel{width:auto;max-height:calc(100dvh - 68px);top:56px;left:10px}.rU0dBW_badge{top:56px}.rU0dBW_teamStats span[data-stat=messages]{display:none}.rU0dBW_captainNode{grid-template-columns:38px minmax(0,1fr)}.rU0dBW_captainState{display:none}.rU0dBW_delegationTree{margin-left:12px;padding-left:15px}.rU0dBW_memberBranch{width:15px}.rU0dBW_assignmentLine{padding-left:45px}}";
+		//#region \0dsh-css:src/client/ActivityPanel.module.css.mjs
+		const css = "html{--agent-teams-panel-width:388px;--agent-teams-panel-right:calc(18px + var(--dsh-sidebar-width,0px));--agent-teams-panel-gap:14px;--agent-teams-panel-shift:calc(var(--agent-teams-panel-width) + 18px + var(--agent-teams-panel-gap))}html[data-agent-teams-panel-open] [data-phase=active]{box-sizing:border-box;padding-right:var(--agent-teams-panel-shift)}[data-phase=active]{will-change:padding-right;transition:padding-right .36s cubic-bezier(.22,1,.36,1)}.afzx2G_badge{top:64px;right:var(--agent-teams-panel-right);z-index:2147483000;box-sizing:border-box;border:1px solid var(--dsw-alias-line-normal);background:color-mix(in srgb, var(--dsw-alias-bg-module-platform) 92%, transparent);backdrop-filter:blur(16px);height:34px;box-shadow:0 8px 28px color-mix(in srgb, var(--dsw-alias-label-primary) 14%, transparent);color:var(--dsw-alias-label-secondary);font:inherit;cursor:pointer;border-radius:999px;align-items:center;gap:7px;padding:0 12px;font-size:12px;font-weight:600;line-height:20px;transition:border-color .15s,transform .12s;display:inline-flex;position:fixed}.afzx2G_badge:hover{border-color:var(--dsw-alias-line-strong);transform:translateY(-1px)}.afzx2G_badge:active{transform:translateY(0)scale(.98)}.afzx2G_badge:focus-visible,.afzx2G_closeButton:focus-visible,.afzx2G_memberRow:focus-visible,.afzx2G_taskNode:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.afzx2G_badgeDot,.afzx2G_panelDot{background:var(--dsw-alias-label-tertiary);border-radius:50%;width:7px;height:7px}.afzx2G_badgeDot[data-busy=true],.afzx2G_panelDot[data-busy=true]{background:var(--dsw-alias-state-business-primary);animation:1.25s ease-in-out infinite afzx2G_agentTeamsPulse}.afzx2G_badgeCount,.afzx2G_memberCount,.afzx2G_teamStats,.afzx2G_stageLabel,.afzx2G_taskId{font-variant-numeric:tabular-nums}.afzx2G_panel{top:64px;right:var(--agent-teams-panel-right);z-index:2147483000;width:min(var(--agent-teams-panel-width), calc(100vw - 24px));box-sizing:border-box;border:1px solid color-mix(in srgb, var(--dsw-alias-line-strong) 58%, transparent);background:color-mix(in srgb, var(--dsw-alias-bg-module-platform) 95%, transparent);backdrop-filter:blur(20px)saturate(1.08);max-height:70dvh;box-shadow:0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent), 0 32px 72px color-mix(in srgb, var(--dsw-alias-label-primary) 16%, transparent);border-radius:16px;flex-direction:column;animation:.18s ease-out afzx2G_agentTeamsPanelIn;display:flex;position:fixed;overflow:hidden}@keyframes afzx2G_agentTeamsPanelIn{0%{opacity:0;transform:translateY(-6px)scale(.99)}to{opacity:1;transform:translateY(0)scale(1)}}@keyframes afzx2G_agentTeamsPulse{0%,to{opacity:.42}50%{opacity:1}}.afzx2G_panelHead{border-bottom:1px solid var(--dsw-alias-line-normal);flex:none;justify-content:space-between;align-items:center;min-height:44px;padding:0 14px 0 16px;display:flex}.afzx2G_panelTitle{color:var(--dsw-alias-label-primary);align-items:center;gap:8px;font-size:14px;font-weight:600;line-height:20px;display:inline-flex}.afzx2G_closeButton{width:28px;height:28px;color:var(--dsw-alias-label-tertiary);cursor:pointer;background:0 0;border:0;border-radius:7px;justify-content:center;align-items:center;padding:0;transition:background-color .12s,color .12s,transform .12s;display:inline-flex}.afzx2G_closeButton:hover{background:var(--dsw-alias-bg-fill-neutral);color:var(--dsw-alias-label-primary)}.afzx2G_closeButton:active{transform:scale(.94)}.afzx2G_teams{overscroll-behavior:contain;flex-direction:column;min-height:0;display:flex;overflow-y:auto}.afzx2G_team{border-bottom:1px solid var(--dsw-alias-line-normal);flex-direction:column;gap:12px;padding:12px 14px 16px;display:flex}.afzx2G_team:last-child{border-bottom:0}.afzx2G_teamHead{align-items:center;gap:10px;min-width:0;display:flex}.afzx2G_teamName{min-width:0;color:var(--dsw-alias-label-primary);text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:13px;font-weight:600;line-height:18px;overflow:hidden}.afzx2G_teamStats{color:var(--dsw-alias-label-tertiary);white-space:nowrap;flex:none;gap:8px;font-size:10.5px;line-height:16px;display:inline-flex}.afzx2G_sectionHead{justify-content:space-between;align-items:center;gap:8px;min-width:0;display:flex}.afzx2G_sectionTitle{color:var(--dsw-alias-label-secondary);align-items:center;gap:6px;font-size:11px;font-weight:600;line-height:16px;display:inline-flex}.afzx2G_sectionHint{color:var(--dsw-alias-label-tertiary);text-overflow:ellipsis;white-space:nowrap;font-size:10px;line-height:14px;overflow:hidden}.afzx2G_delegationSection{min-width:0}.afzx2G_captainNode{box-sizing:border-box;border:1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 32%, var(--dsw-alias-line-normal));background:color-mix(in srgb, var(--dsw-alias-state-business-primary) 7%, var(--dsw-alias-bg-module));border-radius:10px;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:9px;min-height:48px;padding:8px 10px;display:grid}.afzx2G_captainAvatar,.afzx2G_memberAvatar{flex:none;justify-content:center;align-items:center;display:inline-flex;position:relative}.afzx2G_captainAvatar{width:36px;height:36px}.afzx2G_leadAvatar,.afzx2G_memberArt,.afzx2G_memberInitial{box-sizing:border-box;border:1px solid var(--dsw-alias-line-strong);object-fit:cover;background:#0b1d33;border-radius:50%;width:34px;height:34px}.afzx2G_captainInfo,.afzx2G_memberInfo{flex-direction:column;min-width:0;display:flex}.afzx2G_captainInfo{gap:2px}.afzx2G_captainLine,.afzx2G_memberLine{align-items:center;gap:6px;min-width:0;display:flex}.afzx2G_captainName,.afzx2G_memberName{color:var(--dsw-alias-label-primary);text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;font-weight:600;line-height:18px;overflow:hidden}.afzx2G_captainRole,.afzx2G_memberRole{color:var(--dsw-alias-label-tertiary);text-overflow:ellipsis;white-space:nowrap;font-size:10px;line-height:14px;overflow:hidden}.afzx2G_captainSummary,.afzx2G_memberStatusLine{color:var(--dsw-alias-label-secondary);text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;line-height:15px;overflow:hidden}.afzx2G_captainState,.afzx2G_memberState{color:var(--dsw-alias-label-tertiary);white-space:nowrap;flex:none;align-items:center;gap:5px;font-size:10px;font-weight:500;line-height:15px;display:inline-flex}.afzx2G_captainState[data-busy=true],.afzx2G_memberState[data-activity=working]{color:var(--dsw-alias-state-business-primary)}.afzx2G_delegationTree{flex-direction:column;gap:2px;margin-left:18px;padding:9px 0 0 20px;display:flex;position:relative}.afzx2G_delegationTree:before{background:color-mix(in srgb, var(--dsw-alias-state-business-primary) 48%, var(--dsw-alias-line-normal));content:\"\";width:1px;position:absolute;top:0;bottom:22px;left:0}.afzx2G_memberBlock{flex-direction:column;min-width:0;padding:3px 0 7px;display:flex;position:relative}.afzx2G_memberBranch{background:color-mix(in srgb, var(--dsw-alias-state-business-primary) 48%, var(--dsw-alias-line-normal));width:20px;height:1px;display:block;position:absolute;top:23px;right:100%}.afzx2G_memberBranch:before{background:var(--dsw-alias-state-business-primary);content:\"\";border-radius:50%;width:5px;height:5px;position:absolute;top:-2px;right:-1px}.afzx2G_memberRow{box-sizing:border-box;width:100%;min-width:0;min-height:44px;color:inherit;font:inherit;text-align:left;cursor:pointer;background:0 0;border:0;border-radius:8px;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:8px;padding:4px 6px;transition:background-color .12s,transform .12s;display:grid}.afzx2G_memberRow:hover,.afzx2G_memberRow[data-activity=working]{background:color-mix(in srgb, var(--dsw-alias-state-business-primary) 6%, var(--dsw-alias-bg-module))}.afzx2G_memberRow:active{transform:scale(.995)}.afzx2G_memberAvatar{width:34px;height:34px}.afzx2G_memberAvatar[data-unread=true]:after{border:1px solid var(--dsw-alias-state-business-primary);content:\"\";border-radius:50%;animation:1.5s ease-out infinite afzx2G_agentTeamsRing;position:absolute;inset:-3px}@keyframes afzx2G_agentTeamsRing{0%{opacity:.82;transform:scale(.94)}75%,to{opacity:0;transform:scale(1.18)}}.afzx2G_memberInitial{color:var(--dsw-alias-label-on-fill);justify-content:center;align-items:center;font-size:14px;font-weight:600;line-height:20px;display:inline-flex}.afzx2G_stateArt{box-sizing:border-box;border:2px solid var(--dsw-alias-bg-module-platform);object-fit:cover;background:#0b1d33;border-radius:50%;width:19px;height:19px;position:absolute;bottom:-4px;right:-4px}.afzx2G_stateArt[data-activity=working]{animation:2.4s ease-in-out infinite afzx2G_agentTeamsFloat}.afzx2G_stateArt[data-activity=idle]{animation:4.2s ease-in-out infinite afzx2G_agentTeamsBreathe}.afzx2G_stateArt[data-activity=unknown]{animation:2.8s ease-in-out infinite afzx2G_agentTeamsThink}@keyframes afzx2G_agentTeamsFloat{0%,to{transform:translateY(0)rotate(-4deg)}50%{transform:translateY(-2px)rotate(4deg)}}@keyframes afzx2G_agentTeamsBreathe{0%,to{opacity:.82;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}@keyframes afzx2G_agentTeamsThink{0%,to{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}.afzx2G_memberState{margin-left:auto}.afzx2G_memberCount{color:var(--dsw-alias-label-tertiary);font-size:10.5px;line-height:16px}.afzx2G_assignmentLine{align-items:center;gap:7px;min-width:0;padding:0 6px 0 52px;display:flex}.afzx2G_assignmentLabel{color:var(--dsw-alias-label-tertiary);flex:none;font-size:9.5px;line-height:14px}.afzx2G_assignmentTasks{flex-wrap:wrap;flex:1;gap:4px;min-width:0;display:flex}.afzx2G_assignmentChip{background:var(--dsw-alias-bg-fill-neutral);min-height:16px;color:var(--dsw-alias-label-secondary);border-radius:4px;align-items:center;padding:0 5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px;font-weight:600;line-height:14px;display:inline-flex}.afzx2G_assignmentChip[data-state=running]{background:var(--dsw-alias-bg-fill-business);color:var(--dsw-alias-label-on-fill)}.afzx2G_assignmentChip[data-state=completed]{background:var(--dsw-alias-bg-fill-success);color:var(--dsw-alias-label-on-fill)}.afzx2G_assignmentChip[data-state=blocked]{background:var(--dsw-alias-bg-fill-warning);color:var(--dsw-alias-label-on-fill)}.afzx2G_assignmentChip[data-state=failed]{background:var(--dsw-alias-bg-fill-danger);color:var(--dsw-alias-label-on-fill)}.afzx2G_assignmentChip[data-state=cancelled]{color:var(--dsw-alias-label-tertiary);text-decoration:line-through}.afzx2G_unreadPill{color:var(--dsw-alias-state-business-primary);white-space:nowrap;flex:none;font-size:9.5px;font-weight:600;line-height:14px}.afzx2G_taskEmpty{color:var(--dsw-alias-label-tertiary);font-size:9.5px;line-height:14px}.afzx2G_dependencySection{border-top:1px solid var(--dsw-alias-line-normal);flex-direction:column;gap:7px;min-width:0;padding-top:10px;display:flex}.afzx2G_stageFlow{scrollbar-width:thin;align-items:stretch;gap:0;min-width:0;padding:1px 1px 5px;display:flex;overflow-x:auto}.afzx2G_stageGroup{flex:1 0 126px;min-width:126px;display:flex;position:relative}.afzx2G_stageConnector{width:22px;height:14px;color:var(--dsw-alias-label-tertiary);flex:none;align-items:center;margin-top:0;display:flex}.afzx2G_stageLine{background:var(--dsw-alias-line-strong);flex:1;height:1px;display:block}.afzx2G_stageColumn{flex-direction:column;flex:1;gap:5px;min-width:0;display:flex}.afzx2G_stageLabel{color:var(--dsw-alias-label-tertiary);justify-content:space-between;align-items:center;gap:6px;padding:0 2px;font-size:9.5px;font-weight:600;line-height:14px;display:flex}.afzx2G_stageLabel span{background:var(--dsw-alias-bg-fill-neutral);border-radius:4px;justify-content:center;align-items:center;min-width:14px;height:14px;font-size:8.5px;display:inline-flex}.afzx2G_stageTasks{flex-direction:column;gap:5px;display:flex}.afzx2G_taskNode{box-sizing:border-box;border:1px solid var(--dsw-alias-line-normal);background:var(--dsw-alias-bg-module);min-width:0;min-height:72px;color:var(--dsw-alias-label-primary);font:inherit;text-align:left;cursor:pointer;border-radius:8px;flex-direction:column;gap:4px;padding:7px 8px;transition:border-color .14s,opacity .14s,transform .12s,background-color .14s;display:flex}.afzx2G_taskNode:hover,.afzx2G_taskNode[data-focused=true]{border-color:var(--dsw-alias-state-business-primary);background:color-mix(in srgb, var(--dsw-alias-state-business-primary) 6%, var(--dsw-alias-bg-module));transform:translateY(-1px)}.afzx2G_taskNode[data-dimmed=true]{opacity:.34}.afzx2G_taskNode[data-state=completed]{border-color:color-mix(in srgb, var(--dsw-alias-state-success) 48%, var(--dsw-alias-line-normal))}.afzx2G_taskNode[data-state=blocked]{border-color:color-mix(in srgb, var(--dsw-alias-state-warning) 52%, var(--dsw-alias-line-normal))}.afzx2G_taskNode[data-state=failed]{border-color:color-mix(in srgb, var(--dsw-alias-state-danger) 56%, var(--dsw-alias-line-normal))}.afzx2G_taskNodeHead,.afzx2G_taskRoute{justify-content:space-between;align-items:center;gap:5px;min-width:0;display:flex}.afzx2G_taskId{color:var(--dsw-alias-label-tertiary);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9.5px;font-weight:700}.afzx2G_taskBadge{background:var(--dsw-alias-bg-fill-neutral);min-height:14px;color:var(--dsw-alias-label-secondary);border-radius:4px;flex:none;align-items:center;padding:0 4px;font-size:8.5px;font-weight:600;line-height:13px;display:inline-flex}.afzx2G_taskBadge[data-state=running]{background:var(--dsw-alias-bg-fill-business);color:var(--dsw-alias-label-on-fill)}.afzx2G_taskBadge[data-state=completed]{background:var(--dsw-alias-bg-fill-success);color:var(--dsw-alias-label-on-fill)}.afzx2G_taskBadge[data-state=blocked]{background:var(--dsw-alias-bg-fill-warning);color:var(--dsw-alias-label-on-fill)}.afzx2G_taskBadge[data-state=failed]{background:var(--dsw-alias-bg-fill-danger);color:var(--dsw-alias-label-on-fill)}.afzx2G_taskBadge[data-state=cancelled]{color:var(--dsw-alias-label-tertiary);text-decoration:line-through}.afzx2G_taskSubject{min-height:30px;color:var(--dsw-alias-label-primary);-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:10.5px;font-weight:500;line-height:15px;display:-webkit-box;overflow:hidden}.afzx2G_taskRoute{color:var(--dsw-alias-label-tertiary);margin-top:auto;font-size:8.5px;line-height:13px}.afzx2G_taskOwner,.afzx2G_taskDeps{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.afzx2G_taskOwner{max-width:48%;color:var(--dsw-alias-label-secondary);font-weight:600}.afzx2G_taskDeps{text-align:right;flex:1}.afzx2G_taskStart{color:var(--dsw-alias-label-tertiary)}.afzx2G_unclaimed,.afzx2G_inbox{border-top:1px solid var(--dsw-alias-line-normal);flex-direction:column;gap:5px;min-width:0;padding-top:10px;display:flex}.afzx2G_unclaimedTitle{color:var(--dsw-alias-label-secondary);font-size:10.5px;font-weight:600;line-height:15px}.afzx2G_inboxRow{border-radius:6px;grid-template-columns:112px minmax(0,1fr);align-items:center;gap:8px;min-width:0;min-height:24px;padding:2px 5px;display:grid}.afzx2G_inboxRow:hover{background:var(--dsw-alias-bg-module)}.afzx2G_inboxRoute{min-width:0;color:var(--dsw-alias-state-business-primary);text-overflow:ellipsis;white-space:nowrap;align-items:center;gap:3px;font-size:9.5px;font-weight:600;line-height:14px;display:inline-flex;overflow:hidden}.afzx2G_inboxContent{min-width:0;color:var(--dsw-alias-label-tertiary);text-overflow:ellipsis;white-space:nowrap;font-size:10px;line-height:14px;overflow:hidden}.afzx2G_emptyHint{color:var(--dsw-alias-label-tertiary);padding:10px 12px;font-size:11px;line-height:16px}.afzx2G_team[data-historic],.afzx2G_archivedWrap{opacity:.82}.afzx2G_historicPill{background:var(--dsw-alias-bg-fill-neutral);color:var(--dsw-alias-label-tertiary);border-radius:4px;flex:none;margin-left:auto;padding:1px 7px;font-size:9.5px;font-weight:600;line-height:15px}.afzx2G_members{flex-direction:column;gap:3px;display:flex}.afzx2G_archivedWrap:before{color:var(--dsw-alias-label-tertiary);content:\"已结束 · 历史归档\";padding:5px 14px 0;font-size:9.5px;font-weight:600;line-height:14px;display:block}@media (prefers-reduced-motion:reduce){[data-phase=active],.afzx2G_panel,.afzx2G_badge,.afzx2G_badgeDot,.afzx2G_panelDot,.afzx2G_stateArt,.afzx2G_memberAvatar[data-unread=true]:after{transition:none;animation:none}}@media (width<=960px){html{--agent-teams-main-shift:0px}html[data-agent-teams-panel-open] [data-phase=active]{padding-right:0}}@media (width<=640px){html{--agent-teams-panel-right:calc(10px + var(--dsh-sidebar-width,0px))}.afzx2G_panel{width:auto;max-height:calc(100dvh - 68px);top:56px;left:10px}.afzx2G_badge{top:56px}.afzx2G_teamStats span[data-stat=messages]{display:none}.afzx2G_captainNode{grid-template-columns:38px minmax(0,1fr)}.afzx2G_captainState{display:none}.afzx2G_delegationTree{margin-left:12px;padding-left:15px}.afzx2G_memberBranch{width:15px}.afzx2G_assignmentLine{padding-left:45px}}";
 		const tagId = "@starpivot/dsh-agent-teams/ActivityPanel.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -301,86 +344,86 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var ActivityPanel_module_css_default = {
-			"agentTeamsBreathe": "rU0dBW_agentTeamsBreathe",
-			"agentTeamsFloat": "rU0dBW_agentTeamsFloat",
-			"agentTeamsPanelIn": "rU0dBW_agentTeamsPanelIn",
-			"agentTeamsPulse": "rU0dBW_agentTeamsPulse",
-			"agentTeamsRing": "rU0dBW_agentTeamsRing",
-			"agentTeamsThink": "rU0dBW_agentTeamsThink",
-			"archivedWrap": "rU0dBW_archivedWrap",
-			"assignmentChip": "rU0dBW_assignmentChip",
-			"assignmentLabel": "rU0dBW_assignmentLabel",
-			"assignmentLine": "rU0dBW_assignmentLine",
-			"assignmentTasks": "rU0dBW_assignmentTasks",
-			"badge": "rU0dBW_badge",
-			"badgeCount": "rU0dBW_badgeCount",
-			"badgeDot": "rU0dBW_badgeDot",
-			"captainAvatar": "rU0dBW_captainAvatar",
-			"captainInfo": "rU0dBW_captainInfo",
-			"captainLine": "rU0dBW_captainLine",
-			"captainName": "rU0dBW_captainName",
-			"captainNode": "rU0dBW_captainNode",
-			"captainRole": "rU0dBW_captainRole",
-			"captainState": "rU0dBW_captainState",
-			"captainSummary": "rU0dBW_captainSummary",
-			"closeButton": "rU0dBW_closeButton",
-			"delegationSection": "rU0dBW_delegationSection",
-			"delegationTree": "rU0dBW_delegationTree",
-			"dependencySection": "rU0dBW_dependencySection",
-			"emptyHint": "rU0dBW_emptyHint",
-			"historicPill": "rU0dBW_historicPill",
-			"inbox": "rU0dBW_inbox",
-			"inboxContent": "rU0dBW_inboxContent",
-			"inboxRoute": "rU0dBW_inboxRoute",
-			"inboxRow": "rU0dBW_inboxRow",
-			"leadAvatar": "rU0dBW_leadAvatar",
-			"memberArt": "rU0dBW_memberArt",
-			"memberAvatar": "rU0dBW_memberAvatar",
-			"memberBlock": "rU0dBW_memberBlock",
-			"memberBranch": "rU0dBW_memberBranch",
-			"memberCount": "rU0dBW_memberCount",
-			"memberInfo": "rU0dBW_memberInfo",
-			"memberInitial": "rU0dBW_memberInitial",
-			"memberLine": "rU0dBW_memberLine",
-			"memberName": "rU0dBW_memberName",
-			"memberRole": "rU0dBW_memberRole",
-			"memberRow": "rU0dBW_memberRow",
-			"memberState": "rU0dBW_memberState",
-			"memberStatusLine": "rU0dBW_memberStatusLine",
-			"members": "rU0dBW_members",
-			"panel": "rU0dBW_panel",
-			"panelDot": "rU0dBW_panelDot",
-			"panelHead": "rU0dBW_panelHead",
-			"panelTitle": "rU0dBW_panelTitle",
-			"sectionHead": "rU0dBW_sectionHead",
-			"sectionHint": "rU0dBW_sectionHint",
-			"sectionTitle": "rU0dBW_sectionTitle",
-			"stageColumn": "rU0dBW_stageColumn",
-			"stageConnector": "rU0dBW_stageConnector",
-			"stageFlow": "rU0dBW_stageFlow",
-			"stageGroup": "rU0dBW_stageGroup",
-			"stageLabel": "rU0dBW_stageLabel",
-			"stageLine": "rU0dBW_stageLine",
-			"stageTasks": "rU0dBW_stageTasks",
-			"stateArt": "rU0dBW_stateArt",
-			"taskBadge": "rU0dBW_taskBadge",
-			"taskDeps": "rU0dBW_taskDeps",
-			"taskEmpty": "rU0dBW_taskEmpty",
-			"taskId": "rU0dBW_taskId",
-			"taskNode": "rU0dBW_taskNode",
-			"taskNodeHead": "rU0dBW_taskNodeHead",
-			"taskOwner": "rU0dBW_taskOwner",
-			"taskRoute": "rU0dBW_taskRoute",
-			"taskStart": "rU0dBW_taskStart",
-			"taskSubject": "rU0dBW_taskSubject",
-			"team": "rU0dBW_team",
-			"teamHead": "rU0dBW_teamHead",
-			"teamName": "rU0dBW_teamName",
-			"teamStats": "rU0dBW_teamStats",
-			"teams": "rU0dBW_teams",
-			"unclaimed": "rU0dBW_unclaimed",
-			"unclaimedTitle": "rU0dBW_unclaimedTitle",
-			"unreadPill": "rU0dBW_unreadPill"
+			"agentTeamsBreathe": "afzx2G_agentTeamsBreathe",
+			"agentTeamsFloat": "afzx2G_agentTeamsFloat",
+			"agentTeamsPanelIn": "afzx2G_agentTeamsPanelIn",
+			"agentTeamsPulse": "afzx2G_agentTeamsPulse",
+			"agentTeamsRing": "afzx2G_agentTeamsRing",
+			"agentTeamsThink": "afzx2G_agentTeamsThink",
+			"archivedWrap": "afzx2G_archivedWrap",
+			"assignmentChip": "afzx2G_assignmentChip",
+			"assignmentLabel": "afzx2G_assignmentLabel",
+			"assignmentLine": "afzx2G_assignmentLine",
+			"assignmentTasks": "afzx2G_assignmentTasks",
+			"badge": "afzx2G_badge",
+			"badgeCount": "afzx2G_badgeCount",
+			"badgeDot": "afzx2G_badgeDot",
+			"captainAvatar": "afzx2G_captainAvatar",
+			"captainInfo": "afzx2G_captainInfo",
+			"captainLine": "afzx2G_captainLine",
+			"captainName": "afzx2G_captainName",
+			"captainNode": "afzx2G_captainNode",
+			"captainRole": "afzx2G_captainRole",
+			"captainState": "afzx2G_captainState",
+			"captainSummary": "afzx2G_captainSummary",
+			"closeButton": "afzx2G_closeButton",
+			"delegationSection": "afzx2G_delegationSection",
+			"delegationTree": "afzx2G_delegationTree",
+			"dependencySection": "afzx2G_dependencySection",
+			"emptyHint": "afzx2G_emptyHint",
+			"historicPill": "afzx2G_historicPill",
+			"inbox": "afzx2G_inbox",
+			"inboxContent": "afzx2G_inboxContent",
+			"inboxRoute": "afzx2G_inboxRoute",
+			"inboxRow": "afzx2G_inboxRow",
+			"leadAvatar": "afzx2G_leadAvatar",
+			"memberArt": "afzx2G_memberArt",
+			"memberAvatar": "afzx2G_memberAvatar",
+			"memberBlock": "afzx2G_memberBlock",
+			"memberBranch": "afzx2G_memberBranch",
+			"memberCount": "afzx2G_memberCount",
+			"memberInfo": "afzx2G_memberInfo",
+			"memberInitial": "afzx2G_memberInitial",
+			"memberLine": "afzx2G_memberLine",
+			"memberName": "afzx2G_memberName",
+			"memberRole": "afzx2G_memberRole",
+			"memberRow": "afzx2G_memberRow",
+			"memberState": "afzx2G_memberState",
+			"memberStatusLine": "afzx2G_memberStatusLine",
+			"members": "afzx2G_members",
+			"panel": "afzx2G_panel",
+			"panelDot": "afzx2G_panelDot",
+			"panelHead": "afzx2G_panelHead",
+			"panelTitle": "afzx2G_panelTitle",
+			"sectionHead": "afzx2G_sectionHead",
+			"sectionHint": "afzx2G_sectionHint",
+			"sectionTitle": "afzx2G_sectionTitle",
+			"stageColumn": "afzx2G_stageColumn",
+			"stageConnector": "afzx2G_stageConnector",
+			"stageFlow": "afzx2G_stageFlow",
+			"stageGroup": "afzx2G_stageGroup",
+			"stageLabel": "afzx2G_stageLabel",
+			"stageLine": "afzx2G_stageLine",
+			"stageTasks": "afzx2G_stageTasks",
+			"stateArt": "afzx2G_stateArt",
+			"taskBadge": "afzx2G_taskBadge",
+			"taskDeps": "afzx2G_taskDeps",
+			"taskEmpty": "afzx2G_taskEmpty",
+			"taskId": "afzx2G_taskId",
+			"taskNode": "afzx2G_taskNode",
+			"taskNodeHead": "afzx2G_taskNodeHead",
+			"taskOwner": "afzx2G_taskOwner",
+			"taskRoute": "afzx2G_taskRoute",
+			"taskStart": "afzx2G_taskStart",
+			"taskSubject": "afzx2G_taskSubject",
+			"team": "afzx2G_team",
+			"teamHead": "afzx2G_teamHead",
+			"teamName": "afzx2G_teamName",
+			"teamStats": "afzx2G_teamStats",
+			"teams": "afzx2G_teams",
+			"unclaimed": "afzx2G_unclaimed",
+			"unclaimedTitle": "afzx2G_unclaimedTitle",
+			"unreadPill": "afzx2G_unreadPill"
 		};
 		//#endregion
 		//#region lib/client/ActivityPanel.js
@@ -919,8 +962,16 @@ window.__ModuleLoader__.load({
 					inFlight = true;
 					try {
 						const [live, archived] = await Promise.all([fetchJsonWithTimeout(STATE_URL), fetchJsonWithTimeout(`${STATE_URL}?archived=1`)]);
-						if (live.ok && typeof live.json === "object" && live.json !== null && "teams" in live.json && Array.isArray(live.json.teams) && !cancelled) setTeams(live.json.teams);
-						if (archived.ok && typeof archived.json === "object" && archived.json !== null && "teams" in archived.json && Array.isArray(archived.json.teams) && !cancelled) setArchivedTeams(archived.json.teams);
+						if (live.ok && typeof live.json === "object" && live.json !== null && "teams" in live.json && Array.isArray(live.json.teams) && !cancelled) {
+							const next = live.json.teams;
+							setTeams(next);
+							setActivityLiveTeams(next);
+						}
+						if (archived.ok && typeof archived.json === "object" && archived.json !== null && "teams" in archived.json && Array.isArray(archived.json.teams) && !cancelled) {
+							const next = archived.json.teams;
+							setArchivedTeams(next);
+							setActivityArchivedTeams(next);
+						}
 					} catch {} finally {
 						inFlight = false;
 					}
@@ -932,6 +983,7 @@ window.__ModuleLoader__.load({
 				return () => {
 					cancelled = true;
 					clearInterval(timer);
+					resetActivitySnapshot();
 				};
 			}, []);
 			(0, react.useEffect)(() => {

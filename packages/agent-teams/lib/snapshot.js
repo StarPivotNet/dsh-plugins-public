@@ -12,13 +12,18 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { turnActivityOf } from "./members.js";
 import { CAPTAIN_KEY, listArchivedTeamIds, readArchivedTeam, readMailbox, readTeam, taskDepthsById, taskVisualState, } from "./state.js";
-/** The current task of a member: its first unfinished owned task. */
+/** The current task of a member: first in_progress, else first claimed. */
 function currentTaskOf(memberName, tasks) {
+    let claimed = '';
     for (const task of tasks) {
-        if (task.status === 'in_progress' && task.assignee === memberName)
+        if (task.assignee !== memberName)
+            continue;
+        if (task.status === 'in_progress')
             return task.id;
+        if (task.status === 'claimed' && claimed === '')
+            claimed = task.id;
     }
-    return '';
+    return claimed;
 }
 /**
  * Assemble one team snapshot from its durable files plus live turn activity.

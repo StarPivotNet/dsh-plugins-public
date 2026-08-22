@@ -10,6 +10,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import type { Agent } from '@deepseek-ai/dsh-agent';
+import { type TeamDeliveryMode } from './members.ts';
 /** Resolved plugin config consumed by the tools. */
 export interface ToolsConfig {
     /** State directory name under the captain's workspace. */
@@ -26,13 +27,32 @@ export interface ToolsConfig {
     readOnlyRoles: readonly string[];
 }
 /**
- * Barge a durable member report into the live captain immediately.
+ * Deliver a durable member report to the live captain.
  *
- * A running captain is cancelled first (`keepInbox`) so the report starts a
- * new turn instead of waiting at the next step or behind the current
- * orchestration turn. An idle captain just receives the follow-up.
+ * Barge (default) cancels the current turn first (`keepInbox`) so a new
+ * instruction starts immediately. Queue becomes the next FIFO turn and does
+ * not abort in-flight captain tools.
+ */
+export declare function deliverCaptainReport(captain: Pick<Agent, 'cancel' | 'followup'>, from: string, content: string, mode?: TeamDeliveryMode): boolean;
+/**
+ * Barge a durable member report into the live captain immediately.
+ * @deprecated Use {@link deliverCaptainReport} with `mode: 'barge'`.
  */
 export declare function bargeCaptainReport(captain: Pick<Agent, 'cancel' | 'followup'>, from: string, content: string): boolean;
+/**
+ * Resolve the first-turn brief for a new member. `prompt` is the documented
+ * field; `brief` / `instructions` / `task_description` / `task_subject` cover
+ * XML argument drops that otherwise fail as "missing required property prompt".
+ */
+export declare function resolveMemberSpawnBrief(args: {
+    prompt?: string;
+    brief?: string;
+    instructions?: string;
+    task_description?: string;
+    task_subject: string;
+}): string;
+/** Parse the live-delivery mode. Default is barge so new instructions start now. */
+export declare function parseDeliveryMode(value: string | undefined): TeamDeliveryMode;
 /**
  * Register every `agent_teams_*` tool into the shared tools registry.
  * @param ctx - the plugin context (injects `tools`).

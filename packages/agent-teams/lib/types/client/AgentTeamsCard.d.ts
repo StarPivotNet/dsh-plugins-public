@@ -6,7 +6,8 @@
  *
  * The floater and this card share the `agent-teams:open-panel` window event
  * so the card can summon the panel even after it was closed (or when an old
- * session is re-opened for review).
+ * session is re-opened for review). Live enrichment comes from the panel's
+ * shared snapshot; a missing snapshot keeps the folded roster.
  * @module dsh-agent-teams/client/card
  */
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';

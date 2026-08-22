@@ -4,7 +4,7 @@
  *
  * Members are durable continuable subagents of the captain, so a member keeps
  * its conversation across turns and across harness restarts: the captain
- * barges in with {@link deliverToMember}, it works through its turn
+ * queues or barges in with {@link deliverToMember}, it works through its turn
  * (updating team state through the `agent_teams_*` tools), and becomes idle
  * again. Its final assistant message is not readable programmatically, so the
  * member persists its report into the captain's mailbox and the task records,
@@ -65,14 +65,30 @@ export declare function resolveMemberLlmSelection(ctx: Context, captain: Agent, 
  */
 export declare function installMemberSelectionRuntime(ctx: Context, stateDir: string): MemberSelectionRuntime;
 /**
+ * Open claimed/in_progress tasks assigned to one member, in board order.
+ * @param team - the live team record.
+ * @param memberName - the member's team name.
+ * @returns that member's unfinished owned tasks.
+ */
+export declare function assignedOpenTasks(team: TeamState, memberName: string): TeamTask[];
+/**
+ * Compact text listing one member's open work. Empty when nothing is assigned.
+ * @param team - the live team record.
+ * @param memberName - the member's team name.
+ * @returns a heading plus one line per open task, or an empty string.
+ */
+export declare function assignedWorkBlock(team: TeamState, memberName: string): string;
+/**
  * The member's system prompt (persona), shadowing the deployment persona for
  * that child. Self-contained: it replaces the whole persona section.
  * @param team - the team the member joined.
  * @param member - the member record (name/role are read before spawning).
  * @param stateDir - configured state directory, so the member can locate the
  *   team files with its own file tools.
+ * @param readOnlyRoles - role tokens that additionally deny write tools.
+ * @param workspaceRoot - absolute working directory the member must stay in.
  */
-export declare function memberPersona(team: TeamState, member: TeamMember, stateDir: string, readOnlyRoles?: readonly string[]): string;
+export declare function memberPersona(team: TeamState, member: TeamMember, stateDir: string, readOnlyRoles?: readonly string[], workspaceRoot?: string): string;
 /**
  * The initial user message delivered when the member is created.
  * This is the first work turn, not a greeting: the runtime requires a
@@ -80,8 +96,9 @@ export declare function memberPersona(team: TeamState, member: TeamMember, state
  * @param team - the team the member joined.
  * @param task - the claimed first task.
  * @param brief - captain instructions for that task.
+ * @param workspaceRoot - absolute working directory the member must stay in.
  */
-export declare function memberDispatchPrompt(team: TeamState, task: TeamTask, brief: string): string;
+export declare function memberDispatchPrompt(team: TeamState, task: TeamTask, brief: string, workspaceRoot?: string): string;
 /**
  * Spawn one member as a durable continuable subagent of the captain and fill
  * `member.id` with its child session id. On failure nothing is persisted.
@@ -98,14 +115,17 @@ export declare function memberDispatchPrompt(team: TeamState, task: TeamTask, br
  * @param brief - captain instructions delivered as the first user message.
  * @param worktree - optional absolute git worktree the member is spawned
  *   inside for write isolation; read-only roles refuse it.
+ * @param cwd - optional absolute working directory when no worktree is used.
  */
-export declare function spawnMember(ctx: Context, config: MemberRuntimeConfig, selections: MemberSelectionRuntime, llmSelection: MemberLlmSelection, captain: Agent, team: TeamState, member: TeamMember, stateDir: string, signal: AbortSignal, firstTask: TeamTask, brief: string, worktree?: string): Promise<void>;
+export declare function spawnMember(ctx: Context, config: MemberRuntimeConfig, selections: MemberSelectionRuntime, llmSelection: MemberLlmSelection, captain: Agent, team: TeamState, member: TeamMember, stateDir: string, signal: AbortSignal, firstTask: TeamTask, brief: string, worktree?: string, cwd?: string): Promise<void>;
+/** How a live team message reaches a running recipient. */
+export type TeamDeliveryMode = 'queue' | 'barge';
 /**
- * Deliver one message by barging into the member's current turn.
+ * Deliver one message to a member. Barge (default) interrupts the current
+ * turn so a new instruction starts immediately. Queue becomes the next FIFO
+ * turn and does not abort in-flight tools.
  *
- * A running member is interrupted first (`keepInbox`) so the new message
- * starts immediately instead of waiting behind the current turn. Best
- * effort: a failure (member gone or not continuable) is logged and
+ * Best effort: a failure (member gone or not continuable) is logged and
  * reported as `false` so the caller can decide (mailbox delivery still
  * happened).
  *
@@ -118,9 +138,10 @@ export declare function spawnMember(ctx: Context, config: MemberRuntimeConfig, s
  * @param childId - the member's durable child session id.
  * @param text - the message content.
  * @param signal - caller cancellation, forwarded to the delivery.
+ * @param mode - queue behind the current turn, or barge into it.
  * @returns whether the member inbox accepted the message.
  */
-export declare function deliverToMember(ctx: Context, captain: Agent, childId: string, text: string, signal: AbortSignal): Promise<boolean>;
+export declare function deliverToMember(ctx: Context, captain: Agent, childId: string, text: string, signal: AbortSignal, mode?: TeamDeliveryMode): Promise<boolean>;
 /**
  * Request cancellation of one live member's current turn. Best effort, fire
  * and return; the target may keep running until it observes the signal.

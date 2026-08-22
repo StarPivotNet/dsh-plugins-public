@@ -1,6 +1,6 @@
 {
   "name": "@starpivot/dsh-agent-teams",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "AgentTeams for DeepSeek Harness: durable teammates, task DAG, read-only role isolation",
   "type": "module",
   "main": "lib/index.js",

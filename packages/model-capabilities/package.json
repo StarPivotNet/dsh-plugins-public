@@ -1,6 +1,6 @@
 {
   "name": "@starpivot/dsh-model-capabilities",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Background auto-fill of llm-pi-ai model capability fields from overrides → pi-ai catalogs → models.dev",
   "homepage": "https://github.com/StarPivotNet/dsh-plugins-public/tree/main/packages/model-capabilities",
   "keywords": [

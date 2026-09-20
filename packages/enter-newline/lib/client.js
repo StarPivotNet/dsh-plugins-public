@@ -1,6 +1,7 @@
 window.__ModuleLoader__.load({
-  id: "@starpivot/dsh-enter-newline",
-  factory: (require) => {
+  id: "@deepseek-ai/dsh-client-enter-newline",
+  factory: () => {
+    function create(api) {
     var module = { exports: {} };
     var exports = module.exports;
     Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
@@ -18,9 +19,9 @@ window.__ModuleLoader__.load({
     // event so the draft machine records it exactly like Shift+Enter would.
     // Shift+Enter replays a plain Enter keydown so the product's own submit
     // path (menu arbitration, queue/steer policy, IME guard) runs unchanged.
-    const react = require("react");
-    const { createSnapshotStore } = require("@deepseek-ai/dsh-client-runtime/client");
-    const { Menu, IconChevronDownOutline14 } = require("@deepseek-ai/dsh-client-ui-primitives");
+    const react = api.react;
+    const { createSnapshotStore } = api;
+    const { Menu, IconChevronDownOutline14 } = api.primitives;
 
     const NS = "enter-newline";
     const ENTER_BEHAVIOR_FIELD = "enterBehavior";
@@ -152,58 +153,11 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function installInterceptor(policy) {
-      let synthesizing = false
-      const onKeyDown = (event) => {
-        if (policy.enterBehavior.getSnapshot() !== "newline") return
-        if (event.key !== "Enter") return
-        if (event.ctrlKey || event.metaKey || event.altKey) return
-        if (event.isComposing || event.keyCode === 229) return
-        const target = event.target
-        if (!(target instanceof HTMLTextAreaElement)) return
-        if (target.readOnly) return
-        if (target.closest("[data-composer-card]") === null) return
-        if (target.hasAttribute("aria-activedescendant")) return
-        if (synthesizing) return
-        if (event.shiftKey) {
-          // Shift+Enter sends in newline mode: block the native newline and
-          // replay a plain Enter so the product's submit path runs unchanged.
-          event.preventDefault()
-          event.stopPropagation()
-          synthesizing = true
-          try {
-            target.dispatchEvent(new KeyboardEvent("keydown", {
-              key: "Enter",
-              code: "Enter",
-              keyCode: 13,
-              which: 13,
-              bubbles: true,
-              cancelable: true,
-            }))
-          } finally {
-            synthesizing = false
-          }
-          return
-        }
-        event.preventDefault()
-        event.stopPropagation()
-        const start = target.selectionStart ?? target.value.length
-        const end = target.selectionEnd ?? start
-        const next = target.value.slice(0, start) + "\n" + target.value.slice(end)
-        const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set
-        nativeSetter.call(target, next)
-        target.setSelectionRange(start + 1, start + 1)
-        target.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertLineBreak", data: "\n" }))
-      }
-      document.addEventListener("keydown", onKeyDown, true)
-      return () => {
-        document.removeEventListener("keydown", onKeyDown, true)
-      }
-    }
+    function installInterceptor(policy) { return api.installComposerEnterPolicy(() => policy.enterBehavior.getSnapshot()) }
 
     function apply(ctx) {
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), "ui-enter-newline: dictionaries")
-      const policy = new EnterBehaviorPolicy(ctx.settingsScope.bind({ namespace: NS }))
+      const policy = new EnterBehaviorPolicy(ctx.settingsScope.bind({ namespace: "ui-enter-newline" }))
       ctx.slots.inject("settings.general.item", () => ctx.slots.register({
         name: "settings.general.item",
         id: "composer-enter-newline",
@@ -220,5 +174,18 @@ window.__ModuleLoader__.load({
     exports.apply = apply;
     exports.inject = ["slots", "locale", "connection", "remote", "settingsScope"];
     return module.exports;
-  }
-});
+    }
+    return { default: { async activate(context) {
+      const ui = context.protocols.client({ apiVersion: 'ui.dsh/v1alpha1', kind: 'ContributionHost' })
+      if (!ui) throw new Error('StarPivot WebPlugin surface is unavailable')
+      let onReady
+      const ready = new Promise((resolve, reject) => { onReady = error => error ? reject(error) : resolve() })
+      const lease = ui.register({
+        descriptor: { id: "enter-newline", surface: { apiVersion: 'plugins.starpivot.dev/v1', kind: 'WebPlugin' }, content: {} },
+        localModule: { create, onReady },
+      })
+      context.scope.add(() => lease.dispose())
+      await ready
+    } } }
+  },
+})
